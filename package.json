@@ -1,0 +1,21 @@
+{
+  "name": "spry-shim",
+  "version": "0.0.1",
+  "description": "Like husky, but for shimming/blocking commands with project-specific guidance",
+  "module": "src/index.ts",
+  "type": "module",
+  "bin": {
+    "shim": "./bin/shim"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --outdir dist --target node",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
