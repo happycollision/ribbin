@@ -2,7 +2,16 @@
 # All tests run inside this container to prevent any damage to the host machine
 FROM golang:1.23-alpine
 
-RUN apk add --no-cache bash coreutils
+# Install basic dependencies
+RUN apk add --no-cache bash coreutils curl git
+
+# Install mise (version manager - uses symlink-based shims)
+RUN curl https://mise.run | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Install asdf (version manager - uses shell script shims)
+RUN git clone https://github.com/asdf-vm/asdf.git /root/.asdf --branch v0.14.0
+ENV PATH="/root/.asdf/shims:/root/.asdf/bin:${PATH}"
 
 WORKDIR /app
 COPY go.mod go.sum ./
