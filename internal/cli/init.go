@@ -26,18 +26,38 @@ Example:
 	RunE: runInit,
 }
 
-const defaultConfig = `# ribbin configuration
-# See https://github.com/happycollision/ribbin for documentation
+const defaultConfig = `# ribbin - Command shimming tool
+# https://github.com/happycollision/ribbin
+#
+# ribbin intercepts calls to specified commands and blocks them with helpful
+# error messages. This is useful for:
+#
+#   - Enforcing project conventions (e.g., "use pnpm, not npm")
+#   - Preventing AI agents from running commands directly
+#   - Redirecting to project-specific wrappers with correct config
+#
+# Quick start:
+#   1. Uncomment and edit the examples below
+#   2. Run 'ribbin shim' to install the shims
+#   3. Run 'ribbin on' to enable globally (or 'ribbin activate' for this shell)
+#
+# Bypass: Set RIBBIN_BYPASS=1 to run the original command when needed.
 
-# Example: Block direct tsc usage
+# Example: Block direct tsc usage (use project's typecheck script instead)
 # [shims.tsc]
 # action = "block"
-# message = "Use 'pnpm run typecheck' instead"
+# message = "Use 'pnpm run typecheck' instead - it uses the project's tsconfig"
 
-# Example: Block npm in pnpm projects
+# Example: Enforce pnpm in this project
 # [shims.npm]
 # action = "block"
-# message = "This project uses pnpm"
+# message = "This project uses pnpm. Run 'pnpm install' instead."
+
+# Example: Block cat, suggest bat for syntax highlighting
+# [shims.cat]
+# action = "block"
+# message = "Use 'bat' for syntax highlighting"
+# paths = ["/bin/cat", "/usr/bin/cat"]  # Optional: only block specific paths
 `
 
 func runInit(cmd *cobra.Command, args []string) error {
