@@ -1,6 +1,6 @@
 # Build output
 bin/
-ribbin
+/ribbin
 
 # Go
 *.exe
