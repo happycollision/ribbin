@@ -22,7 +22,7 @@ func SidecarPath(binaryPath string) (string, error) {
 
 // Install creates a shim for a binary:
 // 1. Acquire lock to prevent TOCTOU races
-// 2. Validate paths and check file state
+// 2. Validate paths and check file state (including symlink validation)
 // 3. Rename original to {path}.ribbin-original
 // 4. Create symlink {path} -> ribbinPath
 // 5. Update registry
@@ -42,9 +42,38 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 		return fmt.Errorf("invalid ribbin path: %w", err)
 	}
 
+	// 2a. VALIDATE SYMLINKS (if binary is a symlink)
+	info, err := os.Lstat(binaryPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("cannot stat binary: %w", err)
+	}
+	if info != nil && info.Mode()&os.ModeSymlink != 0 {
+		// Binary is a symlink - validate it's safe
+		finalTarget, err := security.ValidateSymlinkForShimming(binaryPath)
+		if err != nil {
+			return err
+		}
+
+		// Get symlink info for user warning
+		symlinkInfo, infoErr := security.GetSymlinkInfo(binaryPath)
+		if infoErr == nil && symlinkInfo.ChainDepth > 0 {
+			fmt.Fprintf(os.Stderr, "⚠️  Warning: %s is a symlink ", filepath.Base(binaryPath))
+			if symlinkInfo.ChainDepth > 1 {
+				fmt.Fprintf(os.Stderr, "(chain depth %d) ", symlinkInfo.ChainDepth)
+			}
+			fmt.Fprintf(os.Stderr, "-> %s\n", finalTarget)
+			fmt.Fprintf(os.Stderr, "   The shim will redirect to the symlink, not the final target\n")
+		}
+	}
+
 	sidecarPath, err := SidecarPath(binaryPath)
 	if err != nil {
 		return err
+	}
+
+	// 2b. ENSURE NO SYMLINKS IN SIDECAR PATH (prevent TOCTOU attacks)
+	if err := security.NoSymlinksInPath(filepath.Dir(sidecarPath)); err != nil {
+		return fmt.Errorf("unsafe parent directory (contains symlinks): %w", err)
 	}
 
 	// 3. GET FILE INFO (for later verification)
@@ -87,6 +116,11 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 		return fmt.Errorf("cannot rename binary to sidecar: %w", err)
 	}
 
+	// 6a. VERIFY SIDECAR IS NOT A SYMLINK (security check)
+	if err := verifySidecarNotSymlink(sidecarPath); err != nil {
+		return err
+	}
+
 	// 7. CREATE SYMLINK (rollback on failure)
 	if err := os.Symlink(ribbinPath, binaryPath); err != nil {
 		// ROLLBACK: restore original
@@ -108,6 +142,20 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 	}
 
 	// Lock automatically released by defer
+	return nil
+}
+
+// verifySidecarNotSymlink ensures the sidecar file is not a symlink.
+// This prevents attacks where an attacker creates a malicious symlink
+// in place of the expected sidecar file.
+func verifySidecarNotSymlink(sidecarPath string) error {
+	info, err := os.Lstat(sidecarPath)
+	if err != nil {
+		return fmt.Errorf("cannot verify sidecar: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("security violation: sidecar is a symlink: %s", sidecarPath)
+	}
 	return nil
 }
 

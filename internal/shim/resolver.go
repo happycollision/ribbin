@@ -40,7 +40,9 @@ func IsAlreadyShimmed(path string) (bool, error) {
 		return false, nil
 	}
 
-	// Read the symlink target
+	// Read the symlink target using os.Readlink (not SafeReadlink)
+	// We use os.Readlink here because we just need the direct target,
+	// not a validated chain. This is a simple check, not a security operation.
 	target, err := os.Readlink(path)
 	if err != nil {
 		return false, err

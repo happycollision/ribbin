@@ -103,6 +103,28 @@ Examples:
 					continue
 				}
 
+				// Check if path is a symlink and display information
+				info, err := os.Lstat(path)
+				if err != nil {
+					fmt.Printf("Warning: cannot stat '%s': %v, skipping\n", path, err)
+					continue
+				}
+				if info.Mode()&os.ModeSymlink != 0 {
+					symlinkInfo, err := security.GetSymlinkInfo(path)
+					if err != nil {
+						fmt.Printf("⚠️  Skipping unsafe symlink '%s': %v\n", path, err)
+						failed++
+						continue
+					}
+					if symlinkInfo.ChainDepth > 0 {
+						fmt.Printf("ℹ️  %s is a symlink ", filepath.Base(path))
+						if symlinkInfo.ChainDepth > 1 {
+							fmt.Printf("(depth %d) ", symlinkInfo.ChainDepth)
+						}
+						fmt.Printf("-> %s\n", symlinkInfo.FinalTarget)
+					}
+				}
+
 				// Validate binary for shimming (security check)
 				if err := security.ValidateBinaryForShim(path, confirmSystemDir); err != nil {
 					fmt.Printf("Failed to shim '%s': %v\n", path, err)

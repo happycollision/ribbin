@@ -150,6 +150,16 @@ func isWithinAllowedDirectory(path string) bool {
 		return true
 	}
 
+	// Allow macOS temp directories (used by t.TempDir())
+	// macOS creates temp dirs in /var/folders/... which is safe for testing
+	if strings.HasPrefix(path, "/var/folders/") {
+		return true
+	}
+	// Also allow /private/var/folders/ (the real path on macOS)
+	if strings.HasPrefix(path, "/private/var/folders/") {
+		return true
+	}
+
 	// Reject additional obviously dangerous paths that might not be in the forbidden list
 	dangerousPrefixes := []string{
 		"/etc/",
@@ -163,6 +173,10 @@ func isWithinAllowedDirectory(path string) bool {
 
 	for _, prefix := range dangerousPrefixes {
 		if strings.HasPrefix(path, prefix) {
+			// Exception: we already allowed /var/folders/ above
+			if prefix == "/var/" && (strings.HasPrefix(path, "/var/folders/") || strings.HasPrefix(path, "/private/var/folders/")) {
+				continue
+			}
 			return false
 		}
 	}
