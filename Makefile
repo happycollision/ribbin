@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage test-integration clean
+.PHONY: build install test test-coverage test-integration benchmark benchmark-grep benchmark-all benchmark-full clean
 
 BINARY_NAME=ribbin
 BUILD_DIR=bin
@@ -29,6 +29,26 @@ test-integration:
 test-shell:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
 	docker run --rm -it $(TEST_IMAGE) sh
+
+# Run benchmark to measure shim overhead on cat (10k iterations, fast command)
+benchmark:
+	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
+	docker run --rm $(TEST_IMAGE) go test -tags=integration -bench=BenchmarkShimOverhead -benchtime=10000x -run=^$$ ./internal
+
+# Run benchmark to measure shim overhead on grep (1k iterations, slower command)
+benchmark-grep:
+	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
+	docker run --rm $(TEST_IMAGE) go test -tags=integration -bench=BenchmarkShimOverheadGrep -benchtime=1000x -run=^$$ ./internal
+
+# Run all benchmarks
+benchmark-all:
+	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
+	docker run --rm $(TEST_IMAGE) go test -tags=integration -bench=Benchmark -benchtime=1000x -run=^$$ ./internal
+
+# Run full benchmark with cat (1 million iterations)
+benchmark-full:
+	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
+	docker run --rm $(TEST_IMAGE) go test -tags=integration -bench=BenchmarkShimOverhead -benchtime=1000000x -run=^$$ ./internal
 
 clean:
 	rm -rf $(BUILD_DIR)
