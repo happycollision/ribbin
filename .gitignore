@@ -1,19 +1,17 @@
-# dependencies (bun install)
-node_modules
+# Build output
+bin/
+ribbin
 
-# output
-out
-dist
-*.tgz
-
-# code coverage
-coverage
-*.lcov
-
-# logs
-logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
 
 # dotenv environment variable files
 .env
@@ -22,15 +20,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.production.local
 .env.local
 
-# caches
-.eslintcache
-.cache
-*.tsbuildinfo
-
-# IntelliJ based IDEs
+# IDE
 .idea
+.vscode
 
-# Finder (MacOS) folder config
+# OS
 .DS_Store
 
 # Personal command overrides

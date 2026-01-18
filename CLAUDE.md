@@ -1,15 +1,44 @@
-# spry-shim
+# ribbin
 
 Command shimming tool - blocks direct tool calls and redirects to project-specific alternatives.
 
-## Bun
+## Go
 
-This project uses Bun.
+This project uses Go (managed via mise).
 
-- `bun run dev` - Run CLI in development
-- `bun test` - Run tests
-- `bun run build` - Build for distribution
+- `make build` - Build binary to bin/ribbin
+- `make install` - Install to GOPATH/bin
+- `make test` - Run tests (in Docker)
+- `make clean` - Remove build artifacts
+- `go build ./cmd/ribbin` - Direct build
+
+## Project Structure
+
+```
+cmd/ribbin/         # CLI entry point
+internal/cli/       # CLI commands (Cobra)
+internal/config/    # Config file parsing (TOML)
+internal/shim/      # Shim logic
+internal/process/   # PID ancestry checking
+```
+
+## Config Format
+
+Project config uses TOML (`ribbin.toml`):
+
+```toml
+# Block direct tsc usage
+[shims.tsc]
+action = "block"
+message = "Use 'pnpm run typecheck' instead"
+
+# Block cat, suggest bat
+[shims.cat]
+action = "block"
+message = "Use 'bat' for syntax highlighting"
+paths = ["/usr/bin/cat", "/bin/cat"]
+```
 
 ## Project Status
 
-Early planning phase. See Plan.md for design notes and implementation roadmap.
+Implementation in progress. See Plan.md for design notes.
