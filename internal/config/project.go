@@ -1,10 +1,12 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"github.com/happycollision/ribbin/internal/security"
 )
 
 // ShimConfig defines the behavior for a shimmed command
@@ -37,6 +39,10 @@ func FindProjectConfig() (string, error) {
 	for {
 		configPath := filepath.Join(dir, "ribbin.toml")
 		if _, err := os.Stat(configPath); err == nil {
+			// Validate config path before returning
+			if err := security.ValidateConfigPath(configPath); err != nil {
+				return "", fmt.Errorf("unsafe config file at %s: %w", configPath, err)
+			}
 			return configPath, nil
 		}
 
@@ -51,6 +57,11 @@ func FindProjectConfig() (string, error) {
 
 // LoadProjectConfig loads a project configuration from the specified path
 func LoadProjectConfig(path string) (*ProjectConfig, error) {
+	// Validate config path before loading
+	if err := security.ValidateConfigPath(path); err != nil {
+		return nil, fmt.Errorf("invalid config path: %w", err)
+	}
+
 	var config ProjectConfig
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, err

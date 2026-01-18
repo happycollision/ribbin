@@ -9,8 +9,19 @@ import (
 )
 
 func TestSidecarPath(t *testing.T) {
-	path := SidecarPath("/usr/local/bin/cat")
-	expected := "/usr/local/bin/cat.ribbin-original"
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "cat")
+
+	// Create the binary file so path validation passes
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	path, err := SidecarPath(binPath)
+	if err != nil {
+		t.Fatalf("SidecarPath error: %v", err)
+	}
+	expected := binPath + ".ribbin-original"
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)
 	}
@@ -48,7 +59,10 @@ func TestInstall(t *testing.T) {
 		}
 
 		// Check sidecar exists
-		sidecarPath := SidecarPath(binaryPath)
+		sidecarPath, err := SidecarPath(binaryPath)
+		if err != nil {
+			t.Fatalf("SidecarPath error: %v", err)
+		}
 		if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
 			t.Error("sidecar should exist after install")
 		}
@@ -83,7 +97,10 @@ func TestInstall(t *testing.T) {
 		}
 
 		// Create sidecar (simulating already shimmed)
-		sidecarPath := SidecarPath(binaryPath)
+		sidecarPath, sidecarErr := SidecarPath(binaryPath)
+		if sidecarErr != nil {
+			t.Fatalf("SidecarPath error: %v", sidecarErr)
+		}
 		if err := os.WriteFile(sidecarPath, []byte("#!/bin/sh\n"), 0755); err != nil {
 			t.Fatalf("failed to create sidecar: %v", err)
 		}
@@ -94,8 +111,8 @@ func TestInstall(t *testing.T) {
 			Activations: make(map[int]config.ActivationEntry),
 		}
 
-		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
-		if err == nil {
+		installErr := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
+		if installErr == nil {
 			t.Error("expected error when binary is already shimmed")
 		}
 	})
@@ -124,7 +141,10 @@ func TestInstall(t *testing.T) {
 
 		// Original should be restored (though it might be at sidecar location)
 		// Check that we haven't left things in a broken state
-		sidecarPath := SidecarPath(binaryPath)
+		sidecarPath, err := SidecarPath(binaryPath)
+		if err != nil {
+			t.Fatalf("SidecarPath error: %v", err)
+		}
 
 		// Either original exists or sidecar exists
 		origExists := false
@@ -153,7 +173,12 @@ func TestUninstall(t *testing.T) {
 	t.Run("removes symlink and restores original", func(t *testing.T) {
 		binaryPath := filepath.Join(tmpDir, "uninstall-test")
 		ribbinPath := filepath.Join(tmpDir, "ribbin")
-		sidecarPath := SidecarPath(binaryPath)
+		sidecarPath, err := SidecarPath(binaryPath)
+		if err != nil {
+			// The path might not exist yet, which could cause validation to fail
+			// Use filepath.Join to construct it directly
+			sidecarPath = binaryPath + ".ribbin-original"
+		}
 
 		// Create sidecar (original)
 		originalContent := []byte("#!/bin/sh\necho original")
@@ -176,9 +201,9 @@ func TestUninstall(t *testing.T) {
 			Activations: make(map[int]config.ActivationEntry),
 		}
 
-		err := Uninstall(binaryPath, registry)
-		if err != nil {
-			t.Fatalf("Uninstall error: %v", err)
+		uninstallErr := Uninstall(binaryPath, registry)
+		if uninstallErr != nil {
+			t.Fatalf("Uninstall error: %v", uninstallErr)
 		}
 
 		// Sidecar should be gone

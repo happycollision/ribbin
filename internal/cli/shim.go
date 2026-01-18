@@ -6,9 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/security"
 	"github.com/happycollision/ribbin/internal/shim"
 	"github.com/spf13/cobra"
 )
+
+var confirmSystemDir bool
 
 var shimCmd = &cobra.Command{
 	Use:   "shim",
@@ -93,6 +96,20 @@ Example:
 					continue
 				}
 
+				// Validate binary for shimming (security check)
+				if err := security.ValidateBinaryForShim(path, confirmSystemDir); err != nil {
+					fmt.Printf("Failed to shim '%s': %v\n", path, err)
+					failed++
+					continue
+				}
+
+				// Warn if in confirmation directory
+				if security.RequiresConfirmation(path) && confirmSystemDir {
+					fmt.Fprintf(os.Stderr, "WARNING: Shimming binary in system directory\n")
+					fmt.Fprintf(os.Stderr, "   Path: %s\n", path)
+					fmt.Fprintf(os.Stderr, "   This may affect all users on the system\n\n")
+				}
+
 				// Check if already shimmed
 				alreadyShimmed, err := shim.IsAlreadyShimmed(path)
 				if err != nil {
@@ -126,4 +143,9 @@ Example:
 		// Step 6: Print summary
 		fmt.Printf("\nSummary: %d shimmed, %d skipped, %d failed\n", shimmed, skipped, failed)
 	},
+}
+
+func init() {
+	shimCmd.Flags().BoolVar(&confirmSystemDir, "confirm-system-dir", false,
+		"Confirm shimming binaries in system directories (security risk)")
 }

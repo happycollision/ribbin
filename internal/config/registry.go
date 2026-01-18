@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/happycollision/ribbin/internal/security"
 )
 
 // ShimEntry tracks an installed shim in the registry
@@ -50,8 +52,8 @@ func LoadRegistry() (*Registry, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+	// Check if file exists first (before acquiring lock)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// Return empty registry if file doesn't exist
 		return &Registry{
 			Shims:       make(map[string]ShimEntry),
@@ -59,6 +61,16 @@ func LoadRegistry() (*Registry, error) {
 			GlobalOn:    false,
 		}, nil
 	}
+
+	// SHARED LOCK for reading (allows concurrent reads)
+	lock, err := security.AcquireSharedLock(path, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	defer lock.Release()
+
+	// Read registry
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -102,16 +114,44 @@ func SaveRegistry(r *Registry) error {
 		return err
 	}
 
-	// Ensure directory exists
+	// Ensure directory exists (needed before lock file can be created)
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
+	// LOCK REGISTRY FILE
+	lock, err := security.AcquireLock(path, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	defer lock.Release()
+
+	// Write to temp file first
+	tmpPath := path + ".tmp"
 	data, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return err
+	}
+
+	// Remove destination if it exists (safe because we hold the lock)
+	// This is necessary because AtomicRename uses O_EXCL which fails if file exists
+	if _, err := os.Stat(path); err == nil {
+		if err := os.Remove(path); err != nil {
+			os.Remove(tmpPath) // Cleanup temp file
+			return err
+		}
+	}
+
+	// ATOMIC RENAME
+	if err := security.AtomicRename(tmpPath, path); err != nil {
+		os.Remove(tmpPath) // Cleanup
+		return err
+	}
+
+	return nil
 }
