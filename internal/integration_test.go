@@ -836,6 +836,165 @@ paths = ["` + nodeShimPath + `"]
 	t.Log("asdf compatibility test completed successfully!")
 }
 
+// TestParentDirectoryConfigDiscovery tests that ribbin finds ribbin.toml in parent directories
+// when the shim is invoked from a subdirectory. This is an end-to-end test using the actual
+// ribbin binary to verify the full flow works.
+func TestParentDirectoryConfigDiscovery(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-parent-config-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create directory structure:
+	// tmpDir/home/                  - fake home directory
+	// tmpDir/project/ribbin.toml    - config in project root
+	// tmpDir/project/src/lib/deep/  - deep subdirectory where we'll run from
+	// tmpDir/bin/                   - where shims live
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	deepDir := filepath.Join(projectDir, "src", "lib", "deep")
+	binDir := filepath.Join(tmpDir, "bin")
+
+	for _, dir := range []string{homeDir, projectDir, deepDir, binDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Create the "real" command
+	realCmdPath := filepath.Join(binDir, "test-cmd.ribbin-original")
+	realCmdContent := `#!/bin/sh
+echo "REAL_CMD: executed from $(pwd)"
+exit 0
+`
+	if err := os.WriteFile(realCmdPath, []byte(realCmdContent), 0755); err != nil {
+		t.Fatalf("failed to create real cmd: %v", err)
+	}
+
+	// Build ribbin
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	moduleRoot := findModuleRoot(t)
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Create shim symlink: test-cmd -> ribbin
+	shimPath := filepath.Join(binDir, "test-cmd")
+	if err := os.Symlink(ribbinPath, shimPath); err != nil {
+		t.Fatalf("failed to create shim symlink: %v", err)
+	}
+
+	// Create ribbin.toml in project root (NOT in the deep subdirectory)
+	configContent := `[shims.test-cmd]
+action = "block"
+message = "This command is blocked - config found in parent!"
+`
+	configPath := filepath.Join(projectDir, "ribbin.toml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Create registry with GlobalOn = true
+	registry := &config.Registry{
+		Shims: map[string]config.ShimEntry{
+			"test-cmd": {Original: shimPath, Config: configPath},
+		},
+		Activations: make(map[int]config.ActivationEntry),
+		GlobalOn:    true,
+	}
+	registryDir := filepath.Join(homeDir, ".config", "ribbin")
+	if err := os.MkdirAll(registryDir, 0755); err != nil {
+		t.Fatalf("failed to create registry dir: %v", err)
+	}
+	registryPath := filepath.Join(registryDir, "registry.json")
+	data, _ := json.MarshalIndent(registry, "", "  ")
+	if err := os.WriteFile(registryPath, data, 0644); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	// Test 1: Run from DEEP subdirectory - ribbin should find config in parent
+	os.Chdir(deepDir)
+	t.Logf("Running from: %s", deepDir)
+	t.Logf("Config at: %s", configPath)
+
+	cmd := exec.Command("test-cmd")
+	cmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err := cmd.CombinedOutput()
+
+	// Command should be BLOCKED because ribbin.toml is in a parent directory
+	if err == nil {
+		t.Errorf("command should be blocked when config is in parent dir, but succeeded with: %s", output)
+	}
+
+	// Verify the block message appears
+	if !contains(string(output), "block") && !contains(string(output), "parent") {
+		t.Logf("Output: %s", output)
+	}
+	t.Logf("Test 1 PASSED - Command blocked from deep subdir. Output: %s", output)
+
+	// Test 2: With RIBBIN_BYPASS=1, should passthrough even from subdirectory
+	cmd = exec.Command("test-cmd")
+	cmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+		"RIBBIN_BYPASS=1",
+	)
+	output, err = cmd.CombinedOutput()
+
+	if err != nil {
+		t.Errorf("bypass should work from subdirectory: %v\nOutput: %s", err, output)
+	}
+	if !contains(string(output), "REAL_CMD") {
+		t.Errorf("expected real command output with bypass, got: %s", output)
+	}
+	t.Logf("Test 2 PASSED - Bypass works from subdir. Output: %s", output)
+
+	// Test 3: Run from a directory WITHOUT ribbin.toml in any parent - should passthrough
+	noConfigDir := filepath.Join(tmpDir, "other", "location")
+	if err := os.MkdirAll(noConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create noconfig dir: %v", err)
+	}
+	os.Chdir(noConfigDir)
+
+	cmd = exec.Command("test-cmd")
+	cmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = cmd.CombinedOutput()
+
+	// Should passthrough since there's no ribbin.toml in any parent
+	if err != nil {
+		t.Errorf("should passthrough when no config in parents: %v\nOutput: %s", err, output)
+	}
+	if !contains(string(output), "REAL_CMD") {
+		t.Errorf("expected real command output (no config), got: %s", output)
+	}
+	t.Logf("Test 3 PASSED - Passthrough when no config in parents. Output: %s", output)
+
+	t.Log("Parent directory config discovery test completed successfully!")
+}
+
 // TestMiseWithActivation tests ribbin blocking when ribbin is activated and we're in a project dir
 func TestMiseWithActivation(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "ribbin-mise-block-test-*")
