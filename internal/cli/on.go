@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/dondenton/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/config"
 	"github.com/spf13/cobra"
 )
 

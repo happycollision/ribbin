@@ -1,4 +1,4 @@
-module github.com/dondenton/ribbin
+module github.com/happycollision/ribbin
 
 go 1.23
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dondenton/ribbin/internal/config"
-	"github.com/dondenton/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/shim"
 	"github.com/spf13/cobra"
 )
 

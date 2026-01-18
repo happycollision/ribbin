@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dondenton/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/config"
 )
 
 // setupTestEnv creates a test environment with temp HOME and working directory

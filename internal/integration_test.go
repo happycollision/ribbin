@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dondenton/ribbin/internal/config"
-	"github.com/dondenton/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/shim"
 )
 
 // TestFullShimCycle tests the complete shim install/activate/block/uninstall workflow

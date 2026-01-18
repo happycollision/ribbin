@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dondenton/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/config"
 )
 
 // SidecarPath returns the sidecar path for a binary

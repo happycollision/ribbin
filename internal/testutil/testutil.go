@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dondenton/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/config"
 )
 
 // CreateTempDir creates a temporary directory for testing and returns its path.

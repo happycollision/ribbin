@@ -6,8 +6,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dondenton/ribbin/internal/config"
-	"github.com/dondenton/ribbin/internal/process"
+	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/process"
 )
 
 // Run is the main entry point for shim mode.

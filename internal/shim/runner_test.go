@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dondenton/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/config"
 )
 
 func TestExtractCommandName(t *testing.T) {

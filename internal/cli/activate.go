@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/dondenton/ribbin/internal/config"
-	"github.com/dondenton/ribbin/internal/process"
+	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/process"
 	"github.com/spf13/cobra"
 )
 
