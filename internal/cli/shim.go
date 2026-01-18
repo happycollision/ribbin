@@ -15,14 +15,14 @@ var shimCmd = &cobra.Command{
 	Short: "Create a shim for a command",
 	Long:  "Create a shim that intercepts calls to a specific command",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Step 1: Find nearest ribbin.json
+		// Step 1: Find nearest ribbin.toml
 		configPath, err := config.FindProjectConfig()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error finding config: %v\n", err)
 			os.Exit(1)
 		}
 		if configPath == "" {
-			fmt.Fprintf(os.Stderr, "No ribbin.json found in current directory or any parent\n")
+			fmt.Fprintf(os.Stderr, "No ribbin.toml found. Run 'ribbin init' to create one.\n")
 			os.Exit(1)
 		}
 

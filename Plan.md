@@ -1,4 +1,4 @@
-# spry-shim
+# ribbin
 
 **Like husky, but for shimming/blocking commands with project-specific guidance.**
 
@@ -18,37 +18,38 @@ A universal tool that intercepts calls to specified commands and either:
 ## User Experience
 
 ```bash
-# Install globally
-bun install -g spry-shim
+# Install ribbin
+curl -fsSL https://raw.githubusercontent.com/happycollision/ribbin/main/install.sh | bash
 
 # In any project
-shim init                    # Creates .shimrc.json
-shim add tsc "Use 'bun run typecheck' instead"
-shim add npm "This project uses bun"
-shim install                 # Hooks into shell
+ribbin init                  # Creates ribbin.toml
+# Edit ribbin.toml to add your shims
+ribbin shim                  # Installs the shims
+ribbin activate              # Activates for current shell
+ribbin on                    # Or enable globally
 
 # Now in that project directory:
 tsc                          # ERROR: Use 'bun run typecheck' instead
-SHIM_BYPASS=1 tsc            # Runs real tsc (escape hatch)
+RIBBIN_BYPASS=1 tsc          # Runs real tsc (escape hatch)
 bun run typecheck            # Works normally
 ```
 
 ## Config Format
 
-```json
-// .shimrc.json
-{
-  "shims": {
-    "tsc": {
-      "message": "Use 'bun run typecheck' - direct tsc misses project config",
-      "suggest": "bun run typecheck"
-    },
-    "npm": {
-      "message": "This project uses bun",
-      "suggest": "bun"
-    }
-  }
-}
+```toml
+# ribbin.toml
+[shims.tsc]
+action = "block"
+message = "Use 'bun run typecheck' - direct tsc misses project config"
+
+[shims.npm]
+action = "block"
+message = "This project uses pnpm"
+
+[shims.cat]
+action = "block"
+message = "Use 'bat' for syntax highlighting"
+paths = ["/usr/bin/cat", "/bin/cat"]  # Optional: restrict to specific paths
 ```
 
 ## Architecture
@@ -56,131 +57,88 @@ bun run typecheck            # Works normally
 ### Core Technique: Busybox-style Universal Shim
 
 A single binary that:
-1. Gets invoked as `tsc`, `npm`, etc. (via symlinks or PATH manipulation)
+1. Gets invoked as `tsc`, `npm`, etc. (via symlinks replacing the original)
 2. Checks `argv[0]` to know what command was called
-3. Looks for `.shimrc.json` in cwd (walking up to find it)
-4. Either blocks with message, or execs the real command
+3. Looks for `ribbin.toml` in cwd (walking up to find it)
+4. Either blocks with message, or execs the real command (stored as `.ribbin-original` sidecar)
 
-### Shell Integration
+### Sidecar Approach
 
-Two approaches to consider:
+When `ribbin shim` is run:
+1. Original binary is renamed: `/usr/local/bin/cat` → `/usr/local/bin/cat.ribbin-original`
+2. Symlink to ribbin takes its place: `/usr/local/bin/cat` → `ribbin`
+3. When invoked, ribbin checks config and either blocks or execs the sidecar
 
-**Option A: Global shims directory (always in PATH)**
-- `~/.shim/bin/` contains symlinks to the universal shim
-- This directory is prepended to PATH via shell hook
-- Universal shim checks cwd for `.shimrc.json` on every invocation
+### Activation Modes
 
-**Option B: direnv-style per-directory PATH**
-- `shim install` adds a line to shell rc: `eval "$(shim shell-hook)"`
-- Shell hook modifies PATH when entering directories with `.shimrc.json`
-- Cleaner but requires shell hook to run on every `cd`
+- **Shell-scoped** (`ribbin activate`): Only affects the current shell and its children via process ancestry checking
+- **Global** (`ribbin on`/`off`): Affects all shells
 
-### Proposed File Structure
+## Current Implementation
 
 ```
-spry-shim/
-├── src/
-│   ├── cli.ts              # Main CLI (init, add, remove, install, list)
-│   ├── commands/
-│   │   ├── init.ts         # Create .shimrc.json
-│   │   ├── add.ts          # Add a shim rule
-│   │   ├── remove.ts       # Remove a shim rule
-│   │   ├── install.ts      # Set up shell integration
-│   │   └── list.ts         # Show active shims
-│   ├── shell-hook.ts       # Generates shell integration code
-│   ├── shim-runner.ts      # The universal shim logic
-│   └── config.ts           # Reads/writes .shimrc.json
-├── bin/
-│   └── shim                # CLI entry point
-└── templates/
-    └── shell-hook.sh       # Shell hook template
+ribbin/
+├── cmd/ribbin/             # CLI entry point
+│   └── main.go
+├── internal/
+│   ├── cli/                # CLI commands (Cobra)
+│   │   ├── cli.go          # Root command
+│   │   ├── init.go         # Create ribbin.toml
+│   │   ├── shim.go         # Install shims
+│   │   ├── unshim.go       # Remove shims
+│   │   ├── activate.go     # Shell-scoped activation
+│   │   ├── on.go           # Global enable
+│   │   └── off.go          # Global disable
+│   ├── config/             # Config file parsing
+│   │   ├── project.go      # ribbin.toml parsing (TOML)
+│   │   └── registry.go     # Global state (~/.config/ribbin/registry.json)
+│   ├── shim/               # Shim logic
+│   │   ├── installer.go    # Install/uninstall shims
+│   │   ├── resolver.go     # Find commands in PATH
+│   │   └── runner.go       # Shim execution logic
+│   └── process/            # PID ancestry checking
+│       ├── ancestry_darwin.go
+│       └── ancestry_linux.go
+└── testdata/               # Test fixtures
 ```
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
-| `shim init` | Create `.shimrc.json` in current directory |
-| `shim add <cmd> "<message>"` | Add a command to block |
-| `shim add <cmd> "<message>" --suggest "<alt>"` | Add with suggested alternative |
-| `shim remove <cmd>` | Remove a blocked command |
-| `shim list` | Show all shims in current project |
-| `shim install` | Set up shell integration (add to .bashrc/.zshrc) |
-| `shim uninstall` | Remove shell integration |
-| `shim shell-hook` | Output shell hook code (for eval) |
+| `ribbin init` | Create `ribbin.toml` in current directory |
+| `ribbin shim` | Install shims for all commands in `ribbin.toml` |
+| `ribbin unshim` | Remove shims for commands in `ribbin.toml` |
+| `ribbin unshim --all` | Remove all shims from registry |
+| `ribbin unshim --all --search` | Search and remove all shims |
+| `ribbin activate` | Activate for current shell session |
+| `ribbin on` | Enable shims globally |
+| `ribbin off` | Disable shims globally |
 
 ## Bypass Mechanisms
 
-Multiple ways to bypass for legitimate use:
+1. **Environment variable**: `RIBBIN_BYPASS=1 tsc`
+2. **Direct sidecar**: `/usr/local/bin/tsc.ribbin-original`
 
-1. **Environment variable**: `SHIM_BYPASS=1 tsc`
-2. **Full path**: `/usr/local/bin/tsc` (bypasses PATH-based shim)
-3. **Command flag** (optional): `tsc --shim-bypass`
-
-## Open Questions
-
-### Naming
-- `shim` - simple, describes the technique
-- `block` - describes the primary use case
-- `guard` - implies protection
-- `intercept` - technical but clear
-
-### Shell Support
-- bash + zsh (priority)
-- fish (nice to have)
-- PowerShell (low priority)
-
-### Interactive Mode
-Should blocked commands offer to run the suggested command?
-```
-ERROR: Don't use 'tsc' directly.
-Suggestion: bun run typecheck
-
-Run suggested command? [Y/n]
-```
-Probably not for v1 - keep it simple.
+## Open Questions / Future Work
 
 ### Config Inheritance
-Should `.shimrc.json` in parent directories apply?
+Should `ribbin.toml` in parent directories apply?
 - Pro: Monorepo support
 - Con: Complexity, surprising behavior
 
 ### Per-command Bypass
 Allow some commands to have bypass disabled?
-```json
-{
-  "shims": {
-    "rm": {
-      "message": "Use trash-cli instead",
-      "allowBypass": false
-    }
-  }
-}
+```toml
+[shims.rm]
+action = "block"
+message = "Use trash-cli instead"
+allow_bypass = false
 ```
 
-## Implementation Phases
-
-### Phase 1: Core MVP
-- [ ] Config file reading/writing
-- [ ] Universal shim binary (checks argv[0], reads config, blocks or passes through)
-- [ ] Basic CLI: init, add, remove, list
-- [ ] Manual PATH setup instructions
-
-### Phase 2: Shell Integration
-- [ ] Shell hook generation (bash, zsh)
-- [ ] `shim install` / `shim uninstall`
-- [ ] Automatic PATH management
-
-### Phase 3: Polish
-- [ ] Config validation
-- [ ] Better error messages with colors
-- [ ] `--suggest` flag with optional "run instead?" prompt
-- [ ] fish shell support
-
-### Phase 4: Advanced
-- [ ] Config inheritance (parent directories)
-- [ ] Glob patterns for commands
-- [ ] Conditional shims (only block in certain directories)
+### Additional Actions
+- `warn`: Print warning but allow execution
+- `redirect`: Automatically run suggested command instead
 
 ## Related/Prior Art
 
@@ -188,10 +146,3 @@ Allow some commands to have bypass disabled?
 - **direnv** - Per-directory environment, shell hooks (integration pattern)
 - **husky** - Git hooks made easy (UX inspiration)
 - **asdf/mise** - Version managers with shims (similar shim technique, different purpose)
-
-## Notes
-
-- The universal shim needs to find the "real" command (the one it's shadowing)
-- Need to handle the case where the shim is the only thing in PATH
-- Consider caching config lookups for performance
-- Shell hook should be fast (runs on every prompt/cd)

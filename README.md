@@ -40,7 +40,13 @@ Download the latest release from [GitHub Releases](https://github.com/happycolli
 
 ## Quick Start
 
-1. Create a `ribbin.toml` in your project root:
+1. Initialize ribbin in your project:
+
+```bash
+ribbin init
+```
+
+2. Edit the generated `ribbin.toml` to add your shims:
 
 ```toml
 [shims.tsc]
@@ -52,19 +58,19 @@ action = "block"
 message = "This project uses pnpm"
 ```
 
-2. Install the shims:
+3. Install the shims:
 
 ```bash
 ribbin shim
 ```
 
-3. Activate ribbin for your shell:
+4. Activate ribbin for your shell:
 
 ```bash
 ribbin activate
 ```
 
-4. Enable shims globally:
+5. Enable shims globally:
 
 ```bash
 ribbin on
@@ -106,8 +112,9 @@ message = "This project uses pnpm"
 
 | Command | Description |
 |---------|-------------|
+| `ribbin init` | Create a `ribbin.toml` in the current directory |
 | `ribbin shim` | Install shims for all commands in `ribbin.toml` |
-| `ribbin unshim` | Remove all installed shims |
+| `ribbin unshim` | Remove shims for commands in `ribbin.toml` |
 | `ribbin activate` | Activate ribbin for the current shell session |
 | `ribbin on` | Enable shims globally |
 | `ribbin off` | Disable shims globally |

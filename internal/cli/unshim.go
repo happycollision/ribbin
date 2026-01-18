@@ -64,13 +64,13 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 			pathsToUnshim = append(pathsToUnshim, entry.Original)
 		}
 	} else {
-		// Find nearest ribbin.json and use commands from there
+		// Find nearest ribbin.toml and use commands from there
 		configPath, err := config.FindProjectConfig()
 		if err != nil {
 			return fmt.Errorf("failed to find project config: %w", err)
 		}
 		if configPath == "" {
-			return fmt.Errorf("no ribbin.json found in current directory or any parent directory")
+			return fmt.Errorf("no ribbin.toml found. Run 'ribbin init' to create one")
 		}
 
 		projectConfig, err := config.LoadProjectConfig(configPath)
