@@ -14,7 +14,16 @@ var initCmd = &cobra.Command{
 	Long: `Create a ribbin.toml configuration file in the current directory.
 
 The generated file contains commented examples showing how to configure
-shims for common use cases like blocking tsc or npm.
+shims for common use cases.
+
+Shim actions:
+  block    - Display error message and exit
+  warn     - Display warning but allow command to proceed
+  redirect - Execute custom script instead of original command
+
+For redirect actions, you specify a script path that receives the original
+arguments and environment variables like RIBBIN_ORIGINAL_BIN, RIBBIN_COMMAND,
+and RIBBIN_CONFIG. Relative paths resolve from ribbin.toml directory.
 
 After creating the config, edit it to add your shims, then run 'ribbin shim'
 to install them.
@@ -29,8 +38,8 @@ Example:
 const defaultConfig = `# ribbin - Command shimming tool
 # https://github.com/happycollision/ribbin
 #
-# ribbin intercepts calls to specified commands and blocks them with helpful
-# error messages. This is useful for:
+# ribbin intercepts calls to specified commands and can either block them with
+# helpful error messages or redirect them to alternative commands. This is useful for:
 #
 #   - Enforcing project conventions (e.g., "use pnpm, not npm")
 #   - Preventing AI agents from running commands directly
@@ -58,6 +67,23 @@ const defaultConfig = `# ribbin - Command shimming tool
 # action = "block"
 # message = "Use 'bat' for syntax highlighting"
 # paths = ["/bin/cat", "/usr/bin/cat"]  # Optional: only block specific paths
+
+# Example: Redirect npm to pnpm (absolute path)
+# [shims.npm]
+# action = "redirect"
+# redirect = "/usr/local/bin/pnpm"
+# message = "This project uses pnpm"
+
+# Example: Custom wrapper script (relative path)
+# [shims.node]
+# action = "redirect"
+# redirect = "./scripts/node-wrapper.sh"
+
+# Example: Enforce TypeScript project config
+# [shims.tsc]
+# action = "redirect"
+# redirect = "./scripts/typecheck.sh"
+# message = "Using project-specific TypeScript configuration"
 `
 
 func runInit(cmd *cobra.Command, args []string) error {

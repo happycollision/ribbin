@@ -24,7 +24,7 @@ For each command, ribbin:
   3. Creates a symlink to ribbin in its place
 
 When the shimmed command is later invoked, ribbin intercepts the call and
-either blocks it (showing your configured message) or passes through to
+takes the configured action (block, warn, or redirect) or passes through to
 the original binary.
 
 Example:

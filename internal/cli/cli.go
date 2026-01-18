@@ -12,11 +12,12 @@ var Version = "dev"
 var rootCmd = &cobra.Command{
 	Use:   "ribbin",
 	Short: "Command shimming tool",
-	Long: `ribbin blocks direct tool calls and redirects to project-specific alternatives.
+	Long: `ribbin intercepts commands and can block, warn, or redirect them.
 
-It intercepts calls to specified commands (like tsc, npm, cat) and displays
-helpful error messages explaining what to use instead. This helps enforce
-project conventions for both humans and AI agents.
+It intercepts calls to specified commands (like tsc, npm, cat) and takes
+configured actions: display error messages (block), show warnings (warn),
+or execute custom scripts (redirect). This helps enforce project conventions
+for both humans and AI agents.
 
 Quick start:
   ribbin init      Create a ribbin.toml config file

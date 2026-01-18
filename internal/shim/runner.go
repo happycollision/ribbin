@@ -63,14 +63,35 @@ func Run(argv0 string, args []string) error {
 		return execOriginal(originalPath, args)
 	}
 
-	// 8. If action="block" -> print message, exit 1
-	if shimConfig.Action == "block" {
+	// 8. Handle action based on config
+	switch shimConfig.Action {
+	case "block":
 		printBlockMessage(cmdName, shimConfig.Message)
 		os.Exit(1)
-	}
+		return nil // unreachable, but satisfies compiler
 
-	// 9. Otherwise -> passthrough
-	return execOriginal(originalPath, args)
+	case "redirect":
+		// Validate redirect field is not empty
+		if shimConfig.Redirect == "" {
+			fmt.Fprintf(os.Stderr, "ribbin: redirect action specified but no redirect script configured for '%s', using original\n", cmdName)
+			return execOriginal(originalPath, args)
+		}
+
+		// Resolve redirect script path
+		scriptPath, err := resolveRedirectScript(shimConfig.Redirect, configPath)
+		if err != nil {
+			// Fail-open: warn and passthrough
+			fmt.Fprintf(os.Stderr, "ribbin: redirect failed (%s), using original: %v\n", cmdName, err)
+			return execOriginal(originalPath, args)
+		}
+
+		// Execute redirect script
+		return execRedirect(scriptPath, originalPath, cmdName, args, configPath)
+
+	default:
+		// Unknown action or empty -> passthrough
+		return execOriginal(originalPath, args)
+	}
 }
 
 // isActive checks if ribbin is active (global_on OR ancestor PID in activations)
@@ -104,6 +125,24 @@ func execOriginal(path string, args []string) error {
 
 	// Replace current process with the original command
 	return syscall.Exec(path, argv, env)
+}
+
+// execRedirect executes a redirect script with ribbin environment context
+func execRedirect(scriptPath, originalPath, cmdName string, args []string, configPath string) error {
+	// Build argv: first element is the script path, followed by all arguments
+	argv := append([]string{scriptPath}, args...)
+
+	// Build environment with ribbin-specific variables
+	env := os.Environ()
+	env = append(env,
+		"RIBBIN_ORIGINAL_BIN="+originalPath,
+		"RIBBIN_COMMAND="+cmdName,
+		"RIBBIN_CONFIG="+configPath,
+		"RIBBIN_ACTION=redirect",
+	)
+
+	// Replace current process with the redirect script
+	return syscall.Exec(scriptPath, argv, env)
 }
 
 // extractCommandName extracts the command name from a path

@@ -104,9 +104,66 @@ message = "This project uses pnpm"
 
 | Field | Description |
 |-------|-------------|
-| `action` | `"block"` - Display error message and exit |
+| `action` | `"block"` - Display error message and exit, or `"redirect"` - Execute custom script |
 | `message` | Custom message explaining what to do instead |
 | `paths` | (Optional) Restrict shim to specific binary paths |
+| `redirect` | (For redirect action) Path to script to execute instead of original command |
+
+### Redirect Action
+
+Execute a custom script instead of the original command:
+
+```toml
+[shims.tsc]
+action = "redirect"
+redirect = "./scripts/typecheck-wrapper.sh"
+message = "Using project's TypeScript configuration"
+```
+
+Your redirect script receives:
+- All original arguments as script arguments
+- Environment variables:
+  - `RIBBIN_ORIGINAL_BIN` - Path to original binary (e.g., `/usr/local/bin/tsc.ribbin-original`)
+  - `RIBBIN_COMMAND` - Command name (e.g., `tsc`)
+  - `RIBBIN_CONFIG` - Path to ribbin.toml
+  - `RIBBIN_ACTION` - Always `redirect`
+
+**Example redirect script:**
+
+```bash
+#!/bin/bash
+# scripts/typecheck-wrapper.sh
+
+# Call original with modified behavior
+exec "$RIBBIN_ORIGINAL_BIN" --project tsconfig.json "$@"
+```
+
+**Path Resolution:**
+- Relative paths (e.g., `./scripts/foo.sh`) resolve relative to `ribbin.toml` directory
+- Absolute paths (e.g., `/usr/local/bin/custom`) used as-is
+- Script must be executable (`chmod +x script.sh`)
+
+**Common Use Cases:**
+- Enforce specific flags or configuration files
+- Redirect to alternative tools (npm → pnpm)
+- Add environment setup before running tools
+- Log command usage for auditing
+
+### Redirect vs Block
+
+**Use redirect when you want to:**
+- Automatically fix the command (add flags, change tool)
+- Allow the operation to proceed with modifications
+- Wrap commands with logging or environment setup
+- Provide a seamless developer experience
+
+**Use block when you want to:**
+- Prevent the operation entirely
+- Force developers to use a specific workflow
+- Ensure human/AI awareness of the correct command
+- Avoid hiding what's actually being executed
+
+Example: For TypeScript, you might redirect `tsc` to automatically add `--project tsconfig.json`, or block it to ensure developers use `pnpm run typecheck` which may do additional steps like linting.
 
 ## Commands
 

@@ -15,6 +15,8 @@ type ShimConfig struct {
 	Message string `toml:"message,omitempty"`
 	// Paths restricts the shim to specific binary paths
 	Paths []string `toml:"paths,omitempty"`
+	// Redirect specifies the alternative command to execute (for "redirect" action)
+	Redirect string `toml:"redirect,omitempty"`
 }
 
 // ProjectConfig represents a ribbin.toml project configuration file

@@ -1113,6 +1113,176 @@ message = "Use 'bun' instead"
 	t.Logf("PASSED - node was blocked as expected. Output: %s", output)
 }
 
+// TestRedirectAction tests the redirect action functionality end-to-end.
+// This test verifies that:
+// 1. Redirect scripts are invoked correctly
+// 2. Environment variables are passed (RIBBIN_ORIGINAL_BIN, RIBBIN_COMMAND, RIBBIN_CONFIG, RIBBIN_ACTION)
+// 3. Arguments are forwarded to the redirect script
+// 4. Exit codes propagate from the script to the shim
+func TestRedirectAction(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-redirect-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create directory structure
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	binDir := filepath.Join(tmpDir, "bin")
+
+	for _, dir := range []string{homeDir, projectDir, binDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	// Build ribbin binary
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	moduleRoot := findModuleRoot(t)
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Copy test fixtures from testdata/projects/redirect/ to project dir
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "redirect")
+
+	// Copy ribbin.toml
+	fixtureConfigPath := filepath.Join(fixtureDir, "ribbin.toml")
+	fixtureConfig, err := os.ReadFile(fixtureConfigPath)
+	if err != nil {
+		t.Fatalf("failed to read fixture config: %v", err)
+	}
+	configPath := filepath.Join(projectDir, "ribbin.toml")
+	if err := os.WriteFile(configPath, fixtureConfig, 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Copy redirect script
+	scriptsDir := filepath.Join(projectDir, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		t.Fatalf("failed to create scripts dir: %v", err)
+	}
+	fixtureScriptPath := filepath.Join(fixtureDir, "scripts", "test-redirect.sh")
+	fixtureScript, err := os.ReadFile(fixtureScriptPath)
+	if err != nil {
+		t.Fatalf("failed to read fixture script: %v", err)
+	}
+	scriptPath := filepath.Join(scriptsDir, "test-redirect.sh")
+	if err := os.WriteFile(scriptPath, fixtureScript, 0755); err != nil {
+		t.Fatalf("failed to write script: %v", err)
+	}
+
+	// Create the original echo command
+	echoCmdPath := filepath.Join(binDir, "echo")
+	echoCmdContent := `#!/bin/sh
+echo "ORIGINAL_ECHO: $@"
+exit 0
+`
+	if err := os.WriteFile(echoCmdPath, []byte(echoCmdContent), 0755); err != nil {
+		t.Fatalf("failed to create echo command: %v", err)
+	}
+
+	// Install shim
+	registry := &config.Registry{
+		Shims:       make(map[string]config.ShimEntry),
+		Activations: make(map[int]config.ActivationEntry),
+		GlobalOn:    true, // Enable globally
+	}
+
+	if err := shim.Install(echoCmdPath, ribbinPath, registry, configPath); err != nil {
+		t.Fatalf("failed to install shim: %v", err)
+	}
+
+	// Save registry
+	registryDir := filepath.Join(homeDir, ".config", "ribbin")
+	if err := os.MkdirAll(registryDir, 0755); err != nil {
+		t.Fatalf("failed to create registry dir: %v", err)
+	}
+	registryPath := filepath.Join(registryDir, "registry.json")
+	data, _ := json.MarshalIndent(registry, "", "  ")
+	if err := os.WriteFile(registryPath, data, 0644); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	// Change to project directory (where ribbin.toml is)
+	os.Chdir(projectDir)
+
+	// Execute the shimmed echo command with arguments
+	cmd := exec.Command("echo", "arg1", "arg2", "arg3")
+	cmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err := cmd.CombinedOutput()
+
+	// Command should succeed (exit 0)
+	if err != nil {
+		t.Errorf("redirect script should exit 0: %v\nOutput: %s", err, output)
+	}
+
+	outputStr := string(output)
+	t.Logf("Redirect output: %s", outputStr)
+
+	// Verify output contains expected markers
+	if !contains(outputStr, "REDIRECT_CALLED=true") {
+		t.Error("output should contain REDIRECT_CALLED=true")
+	}
+
+	// Verify environment variables are set
+	if !contains(outputStr, "RIBBIN_ORIGINAL_BIN=") {
+		t.Error("output should contain RIBBIN_ORIGINAL_BIN")
+	}
+	if !contains(outputStr, "RIBBIN_COMMAND=") {
+		t.Error("output should contain RIBBIN_COMMAND")
+	}
+	if !contains(outputStr, "RIBBIN_CONFIG=") {
+		t.Error("output should contain RIBBIN_CONFIG")
+	}
+	if !contains(outputStr, "RIBBIN_ACTION=redirect") {
+		t.Error("output should contain RIBBIN_ACTION=redirect")
+	}
+
+	// Verify arguments are forwarded
+	if !contains(outputStr, "ARGS=arg1 arg2 arg3") {
+		t.Error("output should contain forwarded arguments: ARGS=arg1 arg2 arg3")
+	}
+
+	// Test with RIBBIN_BYPASS - should execute original echo
+	cmd = exec.Command("echo", "bypass-test")
+	cmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+		"RIBBIN_BYPASS=1",
+	)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("bypass should work: %v\nOutput: %s", err, output)
+	}
+	if !contains(string(output), "ORIGINAL_ECHO") {
+		t.Errorf("bypass should execute original echo, got: %s", output)
+	}
+	t.Logf("Bypass test passed: %s", output)
+
+	t.Log("Redirect action test completed successfully!")
+}
+
 // TestRegistryPersistence tests registry save/load cycle
 func TestRegistryPersistence(t *testing.T) {
 	tmpHome, err := os.MkdirTemp("", "ribbin-registry-test-*")
