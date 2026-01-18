@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-01-18
+
+### Added
+- `ribbin init` command to create `ribbin.toml` configuration file
+- Comprehensive README documentation
+
+### Fixed
+- Error messages now correctly reference `ribbin.toml` instead of `ribbin.json`
+
 ## [0.1.0-alpha.1] - 2026-01-18
 
 ### Added
