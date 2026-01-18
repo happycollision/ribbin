@@ -11,5 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation of ribbin CLI
 - Commands: `shim`, `unshim`, `on`, `off`, `activate`
 - TOML-based project configuration (`ribbin.toml`)
-- Docker-based test suite for safe testing
 - Process ancestry checking for shell-scoped activation
+
+### Internal
+- Docker-based test suite for safe testing
