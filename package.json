@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --outdir dist --target node",
-    "test": "bun test"
+    "test": "bun test",
+    "typecheck": "TSC=ok tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest"
