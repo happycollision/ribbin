@@ -27,31 +27,47 @@ func SidecarPath(binaryPath string) (string, error) {
 // 4. Create symlink {path} -> ribbinPath
 // 5. Update registry
 func Install(binaryPath, ribbinPath string, registry *config.Registry, configPath string) error {
+	// Log privileged operations
+	if os.Getuid() == 0 {
+		security.LogPrivilegedOperation("shim_install", binaryPath, true, nil)
+	}
+
+	// Deferred audit logging for install result
+	var installErr error
+	defer func() {
+		security.LogShimInstall(binaryPath, installErr == nil, installErr)
+	}()
+
 	// 1. ACQUIRE LOCK FIRST (prevents concurrent modifications)
 	lock, err := security.AcquireLock(binaryPath, 10*time.Second)
 	if err != nil {
-		return fmt.Errorf("cannot acquire lock: %w", err)
+		installErr = fmt.Errorf("cannot acquire lock: %w", err)
+		return installErr
 	}
 	defer lock.Release()
 
 	// 2. VALIDATE PATHS (within lock)
 	if err := security.ValidateBinaryPath(binaryPath); err != nil {
-		return fmt.Errorf("invalid binary path: %w", err)
+		installErr = fmt.Errorf("invalid binary path: %w", err)
+		return installErr
 	}
 	if err := security.ValidateBinaryPath(ribbinPath); err != nil {
-		return fmt.Errorf("invalid ribbin path: %w", err)
+		installErr = fmt.Errorf("invalid ribbin path: %w", err)
+		return installErr
 	}
 
 	// 2a. VALIDATE SYMLINKS (if binary is a symlink)
 	info, err := os.Lstat(binaryPath)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("cannot stat binary: %w", err)
+		installErr = fmt.Errorf("cannot stat binary: %w", err)
+		return installErr
 	}
 	if info != nil && info.Mode()&os.ModeSymlink != 0 {
 		// Binary is a symlink - validate it's safe
 		finalTarget, err := security.ValidateSymlinkForShimming(binaryPath)
 		if err != nil {
-			return err
+			installErr = err
+			return installErr
 		}
 
 		// Get symlink info for user warning
@@ -68,30 +84,36 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 
 	sidecarPath, err := SidecarPath(binaryPath)
 	if err != nil {
-		return err
+		installErr = err
+		return installErr
 	}
 
 	// 2b. ENSURE NO SYMLINKS IN SIDECAR PATH (prevent TOCTOU attacks)
 	if err := security.NoSymlinksInPath(filepath.Dir(sidecarPath)); err != nil {
-		return fmt.Errorf("unsafe parent directory (contains symlinks): %w", err)
+		installErr = fmt.Errorf("unsafe parent directory (contains symlinks): %w", err)
+		return installErr
 	}
 
 	// 3. GET FILE INFO (for later verification)
 	binaryInfo, err := security.GetFileInfo(binaryPath)
 	if err != nil {
-		return fmt.Errorf("cannot stat binary: %w", err)
+		installErr = fmt.Errorf("cannot stat binary: %w", err)
+		return installErr
 	}
 
 	// 4. CHECK IF ALREADY SHIMMED (within lock)
 	if _, err := os.Lstat(sidecarPath); err == nil {
-		return fmt.Errorf("binary %s is already shimmed (sidecar exists at %s)", binaryPath, sidecarPath)
+		installErr = fmt.Errorf("binary %s is already shimmed (sidecar exists at %s)", binaryPath, sidecarPath)
+		return installErr
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to check sidecar path %s: %w", sidecarPath, err)
+		installErr = fmt.Errorf("failed to check sidecar path %s: %w", sidecarPath, err)
+		return installErr
 	}
 
 	// 5. VERIFY BINARY UNCHANGED (prevent race)
 	if err := security.VerifyFileUnchanged(binaryPath, binaryInfo); err != nil {
-		return fmt.Errorf("binary changed during operation: %w", err)
+		installErr = fmt.Errorf("binary changed during operation: %w", err)
+		return installErr
 	}
 
 	// 6. ATOMIC RENAME (using O_EXCL)
@@ -99,26 +121,31 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 		if os.IsPermission(err) {
 			// Provide context-aware error message based on directory category
 			if security.IsCriticalSystemBinary(binaryPath) {
-				return fmt.Errorf("permission denied: %s\n\nCANNOT shim critical system binary %s for security reasons",
+				installErr = fmt.Errorf("permission denied: %s\n\nCANNOT shim critical system binary %s for security reasons",
 					binaryPath, filepath.Base(binaryPath))
+				return installErr
 			}
 
 			category, _ := security.GetDirectoryCategory(binaryPath)
 			if category == security.CategoryForbidden {
-				return fmt.Errorf("permission denied: %s\n\nDirectory %s is protected and cannot be shimmed",
+				installErr = fmt.Errorf("permission denied: %s\n\nDirectory %s is protected and cannot be shimmed",
 					binaryPath, filepath.Dir(binaryPath))
+				return installErr
 			}
 
 			cmdName := filepath.Base(binaryPath)
-			return fmt.Errorf("permission denied: %s\n\nIf you understand the security implications:\n  sudo ribbin shim %s --confirm-system-dir",
+			installErr = fmt.Errorf("permission denied: %s\n\nIf you understand the security implications:\n  sudo ribbin shim %s --confirm-system-dir",
 				binaryPath, cmdName)
+			return installErr
 		}
-		return fmt.Errorf("cannot rename binary to sidecar: %w", err)
+		installErr = fmt.Errorf("cannot rename binary to sidecar: %w", err)
+		return installErr
 	}
 
 	// 6a. VERIFY SIDECAR IS NOT A SYMLINK (security check)
 	if err := verifySidecarNotSymlink(sidecarPath); err != nil {
-		return err
+		installErr = err
+		return installErr
 	}
 
 	// 7. CREATE SYMLINK (rollback on failure)
@@ -126,12 +153,15 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 		// ROLLBACK: restore original
 		rollbackErr := os.Rename(sidecarPath, binaryPath)
 		if rollbackErr != nil {
-			return fmt.Errorf("cannot create symlink (and rollback failed: %v): %w", rollbackErr, err)
+			installErr = fmt.Errorf("cannot create symlink (and rollback failed: %v): %w", rollbackErr, err)
+			return installErr
 		}
 		if os.IsPermission(err) {
-			return fmt.Errorf("permission denied: cannot create symlink at %s (try with sudo)", binaryPath)
+			installErr = fmt.Errorf("permission denied: cannot create symlink at %s (try with sudo)", binaryPath)
+			return installErr
 		}
-		return fmt.Errorf("failed to create symlink at %s: %w", binaryPath, err)
+		installErr = fmt.Errorf("failed to create symlink at %s: %w", binaryPath, err)
+		return installErr
 	}
 
 	// 8. UPDATE REGISTRY (within lock)
@@ -165,51 +195,72 @@ func verifySidecarNotSymlink(sidecarPath string) error {
 // 3. Rename {path}.ribbin-original back to {path}
 // 4. Remove from registry
 func Uninstall(binaryPath string, registry *config.Registry) error {
+	// Log privileged operations
+	if os.Getuid() == 0 {
+		security.LogPrivilegedOperation("shim_uninstall", binaryPath, true, nil)
+	}
+
+	// Deferred audit logging for uninstall result
+	var uninstallErr error
+	defer func() {
+		security.LogShimUninstall(binaryPath, uninstallErr == nil, uninstallErr)
+	}()
+
 	// ACQUIRE LOCK
 	lock, err := security.AcquireLock(binaryPath, 10*time.Second)
 	if err != nil {
-		return fmt.Errorf("cannot acquire lock: %w", err)
+		uninstallErr = fmt.Errorf("cannot acquire lock: %w", err)
+		return uninstallErr
 	}
 	defer lock.Release()
 
 	// Validate binary path
 	if err := security.ValidateBinaryPath(binaryPath); err != nil {
-		return fmt.Errorf("invalid binary path: %w", err)
+		uninstallErr = fmt.Errorf("invalid binary path: %w", err)
+		return uninstallErr
 	}
 
 	sidecarPath, err := SidecarPath(binaryPath)
 	if err != nil {
-		return err
+		uninstallErr = err
+		return uninstallErr
 	}
 
 	// Verify it's a shim (check symlink)
 	info, err := os.Lstat(binaryPath)
 	if err != nil {
-		return fmt.Errorf("cannot stat binary: %w", err)
+		uninstallErr = fmt.Errorf("cannot stat binary: %w", err)
+		return uninstallErr
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
-		return fmt.Errorf("%s is not a shim (not a symlink)", binaryPath)
+		uninstallErr = fmt.Errorf("%s is not a shim (not a symlink)", binaryPath)
+		return uninstallErr
 	}
 
 	// Verify sidecar exists
 	if _, err := os.Stat(sidecarPath); err != nil {
-		return fmt.Errorf("sidecar not found: %s", sidecarPath)
+		uninstallErr = fmt.Errorf("sidecar not found: %s", sidecarPath)
+		return uninstallErr
 	}
 
 	// Remove symlink
 	if err := os.Remove(binaryPath); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("permission denied: cannot remove symlink at %s (try with sudo)", binaryPath)
+			uninstallErr = fmt.Errorf("permission denied: cannot remove symlink at %s (try with sudo)", binaryPath)
+			return uninstallErr
 		}
-		return fmt.Errorf("cannot remove symlink: %w", err)
+		uninstallErr = fmt.Errorf("cannot remove symlink: %w", err)
+		return uninstallErr
 	}
 
 	// ATOMIC RENAME sidecar back to original
 	if err := security.AtomicRename(sidecarPath, binaryPath); err != nil {
 		if os.IsPermission(err) {
-			return fmt.Errorf("permission denied: cannot restore original at %s (try with sudo)", binaryPath)
+			uninstallErr = fmt.Errorf("permission denied: cannot restore original at %s (try with sudo)", binaryPath)
+			return uninstallErr
 		}
-		return fmt.Errorf("cannot restore original binary: %w", err)
+		uninstallErr = fmt.Errorf("cannot restore original binary: %w", err)
+		return uninstallErr
 	}
 
 	// Update registry

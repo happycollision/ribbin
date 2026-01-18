@@ -13,6 +13,9 @@ import (
 func ValidateBinaryPath(path string) error {
 	// 1. Check for traversal sequences before canonicalization
 	if strings.Contains(path, "..") {
+		LogSecurityViolation("path traversal detected", path, map[string]string{
+			"reason": "path contains '..' sequence",
+		})
 		return fmt.Errorf("path traversal detected: %s", path)
 	}
 
@@ -39,6 +42,9 @@ func ValidateBinaryPath(path string) error {
 
 	// 4. Validate it's within expected directories (use allowlist)
 	if !isWithinAllowedDirectory(abs) {
+		LogSecurityViolation("path outside allowed directories", abs, map[string]string{
+			"original_path": path,
+		})
 		return fmt.Errorf("path outside allowed directories: %s", abs)
 	}
 
@@ -94,6 +100,10 @@ func ValidateSymlinkTarget(link string) (string, error) {
 
 	// Target must be within allowed directories
 	if !isWithinAllowedDirectory(abs) {
+		LogSecurityViolation("symlink target outside allowed directories", abs, map[string]string{
+			"symlink": link,
+			"target":  target,
+		})
 		return "", fmt.Errorf("symlink target outside allowed directories: %s", abs)
 	}
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/happycollision/ribbin/internal/config"
 	"github.com/happycollision/ribbin/internal/process"
+	"github.com/happycollision/ribbin/internal/security"
 )
 
 // Run is the main entry point for shim mode.
@@ -24,6 +25,8 @@ func Run(argv0 string, args []string) error {
 
 	// 3. Check RIBBIN_BYPASS=1 -> passthrough
 	if os.Getenv("RIBBIN_BYPASS") == "1" {
+		// Log bypass usage
+		security.LogBypassUsage(originalPath, os.Getpid())
 		return execOriginal(originalPath, args)
 	}
 
