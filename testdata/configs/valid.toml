@@ -1,0 +1,9 @@
+# Valid ribbin configuration for testing
+[shims.cat]
+action = "block"
+message = "Use 'bat' for syntax highlighting"
+paths = ["/usr/bin/cat", "/bin/cat"]
+
+[shims.npm]
+action = "block"
+message = "Use 'pnpm' instead"

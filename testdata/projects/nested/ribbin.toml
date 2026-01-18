@@ -1,0 +1,8 @@
+# Nested project config
+[shims.npm]
+action = "block"
+message = "Use 'pnpm' instead of npm"
+
+[shims.yarn]
+action = "block"
+message = "Use 'pnpm' instead of yarn"

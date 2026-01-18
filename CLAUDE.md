@@ -8,7 +8,9 @@ This project uses Go (managed via mise).
 
 - `make build` - Build binary to bin/ribbin
 - `make install` - Install to GOPATH/bin
-- `make test` - Run tests (in Docker)
+- `make test` - Run unit tests (in Docker container for safety)
+- `make test-coverage` - Run tests with coverage report
+- `make test-integration` - Run integration tests
 - `make clean` - Remove build artifacts
 - `go build ./cmd/ribbin` - Direct build
 
@@ -20,6 +22,8 @@ internal/cli/       # CLI commands (Cobra)
 internal/config/    # Config file parsing (TOML)
 internal/shim/      # Shim logic
 internal/process/   # PID ancestry checking
+internal/testutil/  # Test utilities
+testdata/           # Test fixtures
 ```
 
 ## Config Format

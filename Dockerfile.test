@@ -1,0 +1,13 @@
+# Test container for ribbin
+# All tests run inside this container to prevent any damage to the host machine
+FROM golang:1.23-alpine
+
+RUN apk add --no-cache bash coreutils
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+CMD ["go", "test", "-v", "./..."]

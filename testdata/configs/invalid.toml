@@ -1,0 +1,4 @@
+# Invalid TOML - missing quotes
+[shims.cat]
+action = block
+message = unquoted string
