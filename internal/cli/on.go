@@ -9,8 +9,17 @@ import (
 
 var onCmd = &cobra.Command{
 	Use:   "on",
-	Short: "Enable ribbin shims",
-	Long:  "Enable ribbin shims in the current shell session",
+	Short: "Enable ribbin shims globally",
+	Long: `Enable ribbin shims globally for all shells.
+
+When enabled globally, all shimmed commands will be intercepted regardless
+of which shell they are run from. This is useful when you always want
+protection enabled.
+
+For per-shell activation, use 'ribbin activate' instead.
+
+Example:
+  ribbin on    # Enable shims globally`,
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, err := config.LoadRegistry()
 		if err != nil {

@@ -9,8 +9,15 @@ import (
 
 var offCmd = &cobra.Command{
 	Use:   "off",
-	Short: "Disable ribbin shims",
-	Long:  "Disable ribbin shims in the current shell session",
+	Short: "Disable ribbin shims globally",
+	Long: `Disable ribbin shims globally for all shells.
+
+When disabled globally, shimmed commands will pass through to the original
+binaries without interception (unless a specific shell has been activated
+with 'ribbin activate').
+
+Example:
+  ribbin off   # Disable shims globally`,
 	Run: func(cmd *cobra.Command, args []string) {
 		registry, err := config.LoadRegistry()
 		if err != nil {

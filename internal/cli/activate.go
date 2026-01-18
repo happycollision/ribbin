@@ -13,7 +13,16 @@ import (
 var activateCmd = &cobra.Command{
 	Use:   "activate",
 	Short: "Activate ribbin for the current shell",
-	Long:  "Output shell commands to activate ribbin in the current shell session",
+	Long: `Activate ribbin for the current shell session.
+
+This registers the parent shell's PID so that shims only trigger for
+commands run from this shell (and its child processes). Use this for
+per-session activation instead of global 'ribbin on'.
+
+The activation is automatically cleaned up when the shell exits.
+
+Example:
+  ribbin activate   # Enable shims for this shell session only`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Get parent shell PID
 		shellPID := os.Getppid()

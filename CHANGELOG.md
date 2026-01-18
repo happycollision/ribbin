@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improved
+- Enhanced `--help` documentation for all commands with detailed descriptions, examples, and usage information
+- Fixed inaccurate help text for `on`/`off` commands (previously said "current shell session" but behavior is global)
+
 ### Fixed
 - Shimmed commands now work when invoked by name (e.g., `npm`) instead of requiring the full path. Previously, the shim looked for the `.ribbin-original` file in the current working directory instead of the directory containing the symlink.
 

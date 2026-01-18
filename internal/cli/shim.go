@@ -12,8 +12,23 @@ import (
 
 var shimCmd = &cobra.Command{
 	Use:   "shim",
-	Short: "Create a shim for a command",
-	Long:  "Create a shim that intercepts calls to a specific command",
+	Short: "Install shims for commands in ribbin.toml",
+	Long: `Install shims for all commands defined in the nearest ribbin.toml.
+
+This command finds the ribbin.toml in the current directory (or parent
+directories), then creates shims for each command listed in [shims.*] sections.
+
+For each command, ribbin:
+  1. Locates the original binary (via PATH or explicit paths in config)
+  2. Renames it to <original>.ribbin-original
+  3. Creates a symlink to ribbin in its place
+
+When the shimmed command is later invoked, ribbin intercepts the call and
+either blocks it (showing your configured message) or passes through to
+the original binary.
+
+Example:
+  ribbin shim    # Install shims for commands in ribbin.toml`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Step 1: Find nearest ribbin.toml
 		configPath, err := config.FindProjectConfig()

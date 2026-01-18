@@ -113,11 +113,14 @@ message = "This project uses pnpm"
 | Command | Description |
 |---------|-------------|
 | `ribbin init` | Create a `ribbin.toml` in the current directory |
-| `ribbin shim` | Install shims for all commands in `ribbin.toml` |
-| `ribbin unshim` | Remove shims for commands in `ribbin.toml` |
+| `ribbin shim` | Install shims for commands in `ribbin.toml` |
+| `ribbin unshim` | Remove shims and restore original commands |
+| `ribbin unshim --all` | Remove all shims tracked in the registry |
 | `ribbin activate` | Activate ribbin for the current shell session |
-| `ribbin on` | Enable shims globally |
-| `ribbin off` | Disable shims globally |
+| `ribbin on` | Enable shims globally (all shells) |
+| `ribbin off` | Disable shims globally (all shells) |
+
+Run `ribbin --help` or `ribbin <command> --help` for detailed usage information.
 
 ## How It Works
 

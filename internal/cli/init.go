@@ -11,8 +11,19 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize ribbin in the current directory",
-	Long:  "Create a ribbin.toml configuration file in the current directory",
-	RunE:  runInit,
+	Long: `Create a ribbin.toml configuration file in the current directory.
+
+The generated file contains commented examples showing how to configure
+shims for common use cases like blocking tsc or npm.
+
+After creating the config, edit it to add your shims, then run 'ribbin shim'
+to install them.
+
+Example:
+  ribbin init
+  # Edit ribbin.toml to configure your shims
+  ribbin shim`,
+	RunE: runInit,
 }
 
 const defaultConfig = `# ribbin configuration

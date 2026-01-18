@@ -16,14 +16,27 @@ var unshimSearch bool
 
 var unshimCmd = &cobra.Command{
 	Use:   "unshim",
-	Short: "Remove a shim for a command",
-	Long:  "Remove a previously created shim for a specific command",
-	RunE:  runUnshim,
+	Short: "Remove shims and restore original commands",
+	Long: `Remove shims and restore original commands.
+
+By default, this command removes shims only for commands listed in the
+nearest ribbin.toml. Use flags to control which shims are removed.
+
+For each shimmed command, ribbin:
+  1. Removes the symlink at the command's path
+  2. Renames <original>.ribbin-original back to <original>
+  3. Updates the registry
+
+Examples:
+  ribbin unshim              # Remove shims listed in ribbin.toml
+  ribbin unshim --all        # Remove all shims in the registry
+  ribbin unshim --all --search  # Search filesystem for any orphaned shims`,
+	RunE: runUnshim,
 }
 
 func init() {
-	unshimCmd.Flags().BoolVar(&unshimAll, "all", false, "Remove all shims")
-	unshimCmd.Flags().BoolVar(&unshimSearch, "search", false, "Search for shims to remove")
+	unshimCmd.Flags().BoolVar(&unshimAll, "all", false, "Remove all shims tracked in the registry, not just those in ribbin.toml")
+	unshimCmd.Flags().BoolVar(&unshimSearch, "search", false, "Search common binary directories for shims (use with --all)")
 }
 
 // commonBinDirs returns common binary directories to search for shims
