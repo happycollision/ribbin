@@ -230,6 +230,156 @@ message = "Use pnpm"
 	}
 }
 
+// TestShimPathResolution tests that shims work when invoked by name (not full path)
+// This tests the fix for: when running "npm" (via PATH), the shim correctly finds
+// npm.ribbin-original in the same directory as the symlink, not in the cwd.
+func TestShimPathResolution(t *testing.T) {
+	// Build ribbin binary
+	tmpDir, err := os.MkdirTemp("", "ribbin-path-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create directories
+	binDir := filepath.Join(tmpDir, "bin")
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	workDir := filepath.Join(tmpDir, "workdir") // Different from where shim lives
+
+	for _, dir := range []string{binDir, homeDir, projectDir, workDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Build ribbin into binDir
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	// Find the module root by looking for go.mod
+	moduleRoot := findModuleRoot(t)
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Create a test command in binDir
+	testCmdPath := filepath.Join(binDir, "test-cmd")
+	testCmdContent := `#!/bin/sh
+echo "SUCCESS: original test-cmd ran"
+exit 0
+`
+	if err := os.WriteFile(testCmdPath, []byte(testCmdContent), 0755); err != nil {
+		t.Fatalf("failed to create test command: %v", err)
+	}
+
+	// Create ribbin.toml in projectDir (command should passthrough since we're not in projectDir)
+	configContent := `[shims.test-cmd]
+action = "block"
+message = "blocked"
+paths = ["` + testCmdPath + `"]
+`
+	configPath := filepath.Join(projectDir, "ribbin.toml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	// Set up test environment
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	// Install shim: rename test-cmd to test-cmd.ribbin-original, symlink test-cmd -> ribbin
+	registry := &config.Registry{
+		Shims:       make(map[string]config.ShimEntry),
+		Activations: make(map[int]config.ActivationEntry),
+		GlobalOn:    false,
+	}
+
+	if err := shim.Install(testCmdPath, ribbinPath, registry, configPath); err != nil {
+		t.Fatalf("failed to install shim: %v", err)
+	}
+
+	// Save registry (with no activations, so shim should passthrough)
+	registryDir := filepath.Join(homeDir, ".config", "ribbin")
+	if err := os.MkdirAll(registryDir, 0755); err != nil {
+		t.Fatalf("failed to create registry dir: %v", err)
+	}
+	registryPath := filepath.Join(registryDir, "registry.json")
+	data, _ := json.MarshalIndent(registry, "", "  ")
+	if err := os.WriteFile(registryPath, data, 0644); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	// KEY TEST: Run "test-cmd" by name from workDir (not binDir)
+	// The shim must resolve the PATH to find test-cmd.ribbin-original in binDir
+	os.Chdir(workDir)
+
+	// Run the command by name (not full path) - this is the bug scenario
+	cmd := exec.Command("test-cmd")
+	cmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err := cmd.CombinedOutput()
+
+	// The command should succeed (passthrough to original) since:
+	// 1. No activations in registry
+	// 2. GlobalOn is false
+	// 3. We're not in a directory with ribbin.toml
+	if err != nil {
+		t.Errorf("shim should passthrough to original command, got error: %v\nOutput: %s", err, output)
+	}
+
+	if !contains(string(output), "SUCCESS") {
+		t.Errorf("expected original command output, got: %s", output)
+	}
+
+	t.Logf("Output: %s", output)
+}
+
+func findModuleRoot(t *testing.T) string {
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+
+	// Walk up until we find go.mod
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("could not find go.mod in any parent directory")
+		}
+		dir = parent
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 // TestRegistryPersistence tests registry save/load cycle
 func TestRegistryPersistence(t *testing.T) {
 	tmpHome, err := os.MkdirTemp("", "ribbin-registry-test-*")

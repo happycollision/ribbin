@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Shimmed commands now work when invoked by name (e.g., `npm`) instead of requiring the full path. Previously, the shim looked for the `.ribbin-original` file in the current working directory instead of the directory containing the symlink.
+
 ## [0.1.0-alpha.3] - 2026-01-18
 
 ### Added
