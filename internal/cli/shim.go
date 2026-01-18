@@ -30,8 +30,15 @@ When the shimmed command is later invoked, ribbin intercepts the call and
 takes the configured action (block, warn, or redirect) or passes through to
 the original binary.
 
-Example:
-  ribbin shim    # Install shims for commands in ribbin.toml`,
+Security:
+  - Critical system binaries (bash, sudo, ssh) are never shimmed
+  - System directories (/bin, /usr/bin, /sbin) are protected
+  - User directories (~/.local/bin, ~/go/bin) are allowed by default
+  - System directories like /usr/local/bin require --confirm-system-dir flag
+
+Examples:
+  ribbin shim                            # Install shims for commands in ribbin.toml
+  ribbin shim --confirm-system-dir       # Allow shimming in /usr/local/bin`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Step 1: Find nearest ribbin.toml
 		configPath, err := config.FindProjectConfig()
@@ -147,5 +154,5 @@ Example:
 
 func init() {
 	shimCmd.Flags().BoolVar(&confirmSystemDir, "confirm-system-dir", false,
-		"Confirm shimming binaries in system directories (security risk)")
+		"Allow shimming in system directories like /usr/local/bin (requires understanding security implications)")
 }
