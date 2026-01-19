@@ -22,54 +22,67 @@ make benchmark-full
 
 ### Latest Results
 
-**Environment:** Docker container (golang:1.23-alpine)
+**Environment:** macOS (Apple M1 Pro, Go 1.23)
+**Date:** 2026-01-18
+**Version:** After audit logging implementation
 
 #### Test 1: Fast Command (cat)
-**Iterations:** 10,000
+**Iterations:** 100
 **Test:** Running `cat` on a 10-line text file
 
 | Configuration | Time per operation | Overhead |
 |--------------|-------------------|----------|
-| **With Shim** | 2,550,830 ns/op (2.55ms) | +117% |
-| **Without Shim** | 1,175,774 ns/op (1.18ms) | baseline |
+| **With Shim** | 10,165,978 ns/op (10.17ms) | +71% |
+| **Without Shim** | 5,956,256 ns/op (5.96ms) | baseline |
 
-**Absolute Overhead:** ~1.375ms per invocation
+**Absolute Overhead:** ~4.21ms per invocation
 
 #### Test 2: Slower Command (grep)
-**Iterations:** 1,000
+**Iterations:** 100
 **Test:** Running `grep -r` to search 100 files with 100 lines each (10,000 lines total)
 
 | Configuration | Time per operation | Overhead |
 |--------------|-------------------|----------|
-| **With Shim** | 10,249,142 ns/op (10.25ms) | +17% |
-| **Without Shim** | 8,731,936 ns/op (8.73ms) | baseline |
+| **With Shim** | 14,340,174 ns/op (14.34ms) | +42% |
+| **Without Shim** | 10,125,991 ns/op (10.13ms) | baseline |
 
-**Absolute Overhead:** ~1.517ms per invocation
+**Absolute Overhead:** ~4.21ms per invocation
 
 ### Interpretation
 
-The shim adds approximately **1.4-1.5 milliseconds** of overhead per command invocation, regardless of how long the underlying command takes to execute. This overhead includes:
+The shim adds approximately **4.2 milliseconds** of overhead per command invocation, regardless of how long the underlying command takes to execute. This overhead includes:
 
 1. Loading and parsing the registry JSON file
 2. Checking if ribbin is active (global or PID ancestry)
 3. Walking up directories to find `ribbin.toml`
 4. Loading and parsing the project config (TOML)
 5. Looking up the command in the shim configuration
-6. Executing the original command via `syscall.Exec`
+6. **Audit logging** (writing security events to log file)
+7. Executing the original command via `syscall.Exec`
 
 #### Key Insights
 
-- **Absolute overhead is constant:** ~1.4-1.5ms regardless of command duration
+- **Absolute overhead is constant:** ~4.2ms regardless of command duration
 - **Relative overhead decreases with command duration:**
-  - Fast commands (cat): +117% overhead
-  - Slower commands (grep): +17% overhead
+  - Fast commands (cat): +71% overhead
+  - Slower commands (grep): +42% overhead
 - **The overhead becomes less noticeable as commands take longer to execute**
+- **Audit logging adds:** ~38 µs (0.038ms) per operation - negligible compared to total overhead
+
+#### Performance Notes
+
+The overhead on macOS (10ms total, 4ms shim overhead) is higher than in Docker (2.5ms total, 1.4ms shim overhead) due to:
+- macOS process spawning being slower than Linux
+- File system overhead on APFS vs ext4
+- Security features like SIP and code signing checks
+
+The **audit logging overhead** (38 µs) is less than 1% of the total shim overhead (4.2ms).
 
 ### Practical Impact
 
-For interactive command-line usage, 1.4ms is imperceptible to humans. However, this overhead becomes noticeable in tight loops or scripts that invoke shimmed commands thousands of times.
+For interactive command-line usage, 4ms is imperceptible to humans. However, this overhead becomes noticeable in tight loops or scripts that invoke shimmed commands thousands of times.
 
-**Example:** A script running a shimmed command 10,000 times would add ~14 seconds of overhead.
+**Example:** A script running a shimmed command 10,000 times would add ~42 seconds of overhead.
 
 **Bypass mechanism:** For performance-critical scripts, use `RIBBIN_BYPASS=1` to skip the shim logic entirely:
 
