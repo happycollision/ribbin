@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-echo "do not use npm" >&2
-exit 1
