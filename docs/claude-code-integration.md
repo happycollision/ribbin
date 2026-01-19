@@ -49,13 +49,20 @@ The simplest approach - prefix with `RIBBIN_BYPASS=1`:
 }
 ```
 
-### Option B: Wrapper Script with Invocation Check
+### Option B: Redirect to Wrapper Script
 
-For more control, create a wrapper script that checks how it was invoked:
+For more control, use `redirect` to a script that checks how it was invoked:
+
+```toml
+# ribbin.toml
+[shims.tsc]
+action = "redirect"
+redirect = "./scripts/tsc-wrapper.sh"
+```
 
 ```bash
 #!/bin/bash
-# scripts/typecheck.sh
+# scripts/tsc-wrapper.sh
 
 # Get the parent process name
 PARENT=$(ps -o comm= $PPID 2>/dev/null)
@@ -63,30 +70,30 @@ PARENT=$(ps -o comm= $PPID 2>/dev/null)
 # Allow if run through npm/pnpm/yarn
 case "$PARENT" in
   npm|pnpm|yarn|node)
-    # Running through package manager - allow
-    exec tsc.ribbin-original "$@"
+    # Running through package manager - call original via RIBBIN_ORIGINAL
+    exec "$RIBBIN_ORIGINAL" "$@"
     ;;
   *)
     # Direct invocation - show guidance
-    echo "Use 'pnpm run typecheck' instead of running this script directly"
+    echo "Use 'pnpm run typecheck' instead of running tsc directly"
     exit 1
     ;;
 esac
 ```
 
-Then in `package.json`:
+Then in `package.json` (no bypass needed - the wrapper handles it):
 ```json
 {
   "scripts": {
-    "typecheck": "./scripts/typecheck.sh --noEmit"
+    "typecheck": "tsc --noEmit"
   }
 }
 ```
 
 This approach:
-- Calls the original binary directly (`tsc.ribbin-original`)
+- Uses `RIBBIN_ORIGINAL` environment variable (set by ribbin for redirect scripts)
 - Checks the parent process to determine if run via package manager
-- Provides guidance even if someone tries to run the wrapper directly
+- No `RIBBIN_BYPASS` needed in package.json - the logic is in the wrapper
 
 ## Step 3: Activate Ribbin
 
