@@ -233,4 +233,218 @@ passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|
 			t.Errorf("unexpected invocationRegexp pattern: %s", tscShim.Passthrough.InvocationRegexp[0])
 		}
 	})
+
+	t.Run("loads config with scopes", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		content := `[shims.cat]
+action = "block"
+message = "Use bat"
+
+[scopes.frontend]
+path = "apps/frontend"
+extends = ["root"]
+
+[scopes.frontend.shims.npm]
+action = "block"
+message = "Use pnpm in frontend"
+
+[scopes.backend]
+path = "apps/backend"
+
+[scopes.backend.shims.yarn]
+action = "block"
+message = "Use npm in backend"
+`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		cfg, err := LoadProjectConfig(configPath)
+		if err != nil {
+			t.Fatalf("LoadProjectConfig error: %v", err)
+		}
+
+		// Check root shim
+		if _, exists := cfg.Shims["cat"]; !exists {
+			t.Error("root cat shim not found")
+		}
+
+		// Check scopes
+		if cfg.Scopes == nil {
+			t.Fatal("Scopes map is nil")
+		}
+		if len(cfg.Scopes) != 2 {
+			t.Errorf("expected 2 scopes, got %d", len(cfg.Scopes))
+		}
+
+		// Check frontend scope
+		frontend, exists := cfg.Scopes["frontend"]
+		if !exists {
+			t.Fatal("frontend scope not found")
+		}
+		if frontend.Path != "apps/frontend" {
+			t.Errorf("expected path 'apps/frontend', got '%s'", frontend.Path)
+		}
+		if len(frontend.Extends) != 1 || frontend.Extends[0] != "root" {
+			t.Errorf("unexpected extends: %v", frontend.Extends)
+		}
+		if _, exists := frontend.Shims["npm"]; !exists {
+			t.Error("frontend npm shim not found")
+		}
+
+		// Check backend scope
+		backend, exists := cfg.Scopes["backend"]
+		if !exists {
+			t.Fatal("backend scope not found")
+		}
+		if backend.Path != "apps/backend" {
+			t.Errorf("expected path 'apps/backend', got '%s'", backend.Path)
+		}
+		if len(backend.Extends) != 0 {
+			t.Errorf("expected no extends, got %v", backend.Extends)
+		}
+	})
+
+	t.Run("rejects scope with parent traversal in path", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		content := `[scopes.escape]
+path = "../outside"
+
+[scopes.escape.shims.bad]
+action = "block"
+`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		_, err = LoadProjectConfig(configPath)
+		if err == nil {
+			t.Error("expected error for path with parent traversal")
+		}
+	})
+
+	t.Run("accepts scope with empty path (defaults to .)", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		content := `[scopes.mixin]
+
+[scopes.mixin.shims.rm]
+action = "block"
+message = "Use trash"
+`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		cfg, err := LoadProjectConfig(configPath)
+		if err != nil {
+			t.Fatalf("LoadProjectConfig error: %v", err)
+		}
+
+		mixin, exists := cfg.Scopes["mixin"]
+		if !exists {
+			t.Fatal("mixin scope not found")
+		}
+		if mixin.Path != "" {
+			t.Errorf("expected empty path, got '%s'", mixin.Path)
+		}
+	})
+}
+
+func TestValidateScopePath(t *testing.T) {
+	t.Run("accepts empty path", func(t *testing.T) {
+		err := ValidateScopePath("", "/some/dir")
+		if err != nil {
+			t.Errorf("unexpected error for empty path: %v", err)
+		}
+	})
+
+	t.Run("accepts dot path", func(t *testing.T) {
+		err := ValidateScopePath(".", "/some/dir")
+		if err != nil {
+			t.Errorf("unexpected error for dot path: %v", err)
+		}
+	})
+
+	t.Run("accepts relative descendant path", func(t *testing.T) {
+		err := ValidateScopePath("apps/frontend", "/some/dir")
+		if err != nil {
+			t.Errorf("unexpected error for relative path: %v", err)
+		}
+	})
+
+	t.Run("accepts nested relative path", func(t *testing.T) {
+		err := ValidateScopePath("apps/frontend/src/components", "/some/dir")
+		if err != nil {
+			t.Errorf("unexpected error for nested path: %v", err)
+		}
+	})
+
+	t.Run("rejects parent traversal at start", func(t *testing.T) {
+		err := ValidateScopePath("../outside", "/some/dir")
+		if err == nil {
+			t.Error("expected error for parent traversal at start")
+		}
+	})
+
+	t.Run("rejects parent traversal in middle", func(t *testing.T) {
+		err := ValidateScopePath("apps/../../../outside", "/some/dir")
+		if err == nil {
+			t.Error("expected error for parent traversal in middle")
+		}
+	})
+
+	t.Run("rejects pure parent traversal", func(t *testing.T) {
+		err := ValidateScopePath("..", "/some/dir")
+		if err == nil {
+			t.Error("expected error for pure parent traversal")
+		}
+	})
+
+	t.Run("accepts absolute path under config dir", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		absPath := filepath.Join(tmpDir, "apps", "frontend")
+		err = ValidateScopePath(absPath, tmpDir)
+		if err != nil {
+			t.Errorf("unexpected error for absolute path under config dir: %v", err)
+		}
+	})
+
+	t.Run("rejects absolute path outside config dir", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		configDir := filepath.Join(tmpDir, "project")
+		outsidePath := filepath.Join(tmpDir, "other")
+
+		err = ValidateScopePath(outsidePath, configDir)
+		if err == nil {
+			t.Error("expected error for absolute path outside config dir")
+		}
+	})
 }

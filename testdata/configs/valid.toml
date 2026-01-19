@@ -13,3 +13,19 @@ message = "Use 'pnpm' instead"
 action = "block"
 message = "Use 'pnpm run typecheck' instead"
 passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|build)"] }
+
+# Scoped configurations
+[scopes.frontend]
+path = "apps/frontend"
+extends = ["root"]
+
+[scopes.frontend.shims.yarn]
+action = "block"
+message = "Use pnpm in frontend"
+
+# Mixin scope (no path, can be extended by other scopes)
+[scopes.strict-mode]
+
+[scopes.strict-mode.shims.rm]
+action = "block"
+message = "Use trash instead"
