@@ -18,6 +18,9 @@ Comprehensive documentation for ribbin, the command shimming tool.
 - [Security Overview](security.md) - Comprehensive security features
 - [Audit Logging](audit-logging.md) - Security event logging and monitoring
 
+### Integrations
+- [Claude Code Integration](claude-code-integration.md) - Using ribbin with AI coding assistants
+
 ### Performance
 - [Performance](performance.md) - Overhead measurements and benchmarks
 
@@ -102,6 +105,9 @@ message = "This project uses pnpm"
 ```
 
 ### AI Agent Guardrails
+
+See the full [Claude Code Integration Guide](claude-code-integration.md) for comprehensive setup.
+
 ```toml
 [shims.rm]
 action = "block"
@@ -109,7 +115,11 @@ message = "Use 'trash' for safe deletion"
 
 [shims.cat]
 action = "block"
-message = "Use 'bat' or the Read tool"
+message = "Use Claude Code's Read tool instead"
+
+[shims.grep]
+action = "block"
+message = "Use Claude Code's Grep tool instead"
 ```
 
 See [Use Cases](../README.md#use-cases) for more examples.
