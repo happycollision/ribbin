@@ -22,11 +22,36 @@ make benchmark-full
 
 ### Latest Results
 
-**Environment:** macOS (Apple M1 Pro, Go 1.23)
 **Date:** 2026-01-18
 **Version:** After audit logging implementation
 
-#### Test 1: Fast Command (cat)
+#### Linux (Docker, golang:1.23-alpine on ARM64)
+
+##### Test 1: Fast Command (cat)
+**Iterations:** 10,000
+**Test:** Running `cat` on a 10-line text file
+
+| Configuration | Time per operation | Overhead |
+|--------------|-------------------|----------|
+| **With Shim** | 3,041,908 ns/op (3.04ms) | +115% |
+| **Without Shim** | 1,412,829 ns/op (1.41ms) | baseline |
+
+**Absolute Overhead:** ~1.63ms per invocation
+
+##### Test 2: Slower Command (grep)
+**Iterations:** 10,000 / 1,000
+**Test:** Running `grep -r` to search 100 files with 100 lines each (10,000 lines total)
+
+| Configuration | Time per operation | Overhead |
+|--------------|-------------------|----------|
+| **With Shim** | 12,568,960 ns/op (12.57ms) | +16% |
+| **Without Shim** | 10,847,468 ns/op (10.85ms) | baseline |
+
+**Absolute Overhead:** ~1.72ms per invocation
+
+#### macOS (Apple M1 Pro, Go 1.23)
+
+##### Test 1: Fast Command (cat)
 **Iterations:** 100
 **Test:** Running `cat` on a 10-line text file
 
@@ -37,7 +62,7 @@ make benchmark-full
 
 **Absolute Overhead:** ~4.21ms per invocation
 
-#### Test 2: Slower Command (grep)
+##### Test 2: Slower Command (grep)
 **Iterations:** 100
 **Test:** Running `grep -r` to search 100 files with 100 lines each (10,000 lines total)
 
@@ -50,7 +75,14 @@ make benchmark-full
 
 ### Interpretation
 
-The shim adds approximately **4.2 milliseconds** of overhead per command invocation, regardless of how long the underlying command takes to execute. This overhead includes:
+The shim overhead varies significantly by platform but is consistent within each environment:
+
+| Platform | Overhead | Fast Command | Slow Command |
+|----------|----------|--------------|--------------|
+| **Linux (Docker)** | ~1.6-1.7ms | +115% (cat) | +16% (grep) |
+| **macOS (M1)** | ~4.2ms | +71% (cat) | +42% (grep) |
+
+This overhead includes:
 
 1. Loading and parsing the registry JSON file
 2. Checking if ribbin is active (global or PID ancestry)
@@ -62,27 +94,42 @@ The shim adds approximately **4.2 milliseconds** of overhead per command invocat
 
 #### Key Insights
 
-- **Absolute overhead is constant:** ~4.2ms regardless of command duration
+- **Linux is 2.5x faster:** 1.6ms overhead vs 4.2ms on macOS
+- **Absolute overhead is constant per platform:** Regardless of command duration
 - **Relative overhead decreases with command duration:**
-  - Fast commands (cat): +71% overhead
-  - Slower commands (grep): +42% overhead
+  - Fast commands (cat): +71-115% overhead
+  - Slower commands (grep): +16-42% overhead
 - **The overhead becomes less noticeable as commands take longer to execute**
 - **Audit logging adds:** ~38 µs (0.038ms) per operation - negligible compared to total overhead
 
-#### Performance Notes
+#### Platform Performance Comparison
 
-The overhead on macOS (10ms total, 4ms shim overhead) is higher than in Docker (2.5ms total, 1.4ms shim overhead) due to:
-- macOS process spawning being slower than Linux
-- File system overhead on APFS vs ext4
-- Security features like SIP and code signing checks
+**Why macOS is slower:**
+- Process spawning overhead: macOS fork/exec is ~2-3x slower than Linux
+- File system: APFS has higher latency than ext4 for small I/O operations
+- Security checks: macOS performs code signing and SIP validation on each exec
+- System call overhead: macOS system calls have higher base latency
 
-The **audit logging overhead** (38 µs) is less than 1% of the total shim overhead (4.2ms).
+**Audit logging overhead:**
+- Measured at **38 µs** (0.038ms) on both platforms
+- Represents **2.3%** of overhead on Linux (38µs / 1.6ms)
+- Represents **0.9%** of overhead on macOS (38µs / 4.2ms)
+- **Essentially free** compared to other operations
 
 ### Practical Impact
 
-For interactive command-line usage, 4ms is imperceptible to humans. However, this overhead becomes noticeable in tight loops or scripts that invoke shimmed commands thousands of times.
+For interactive command-line usage, the overhead is imperceptible to humans on both platforms:
+- **Linux:** 1.6ms per command
+- **macOS:** 4.2ms per command
 
-**Example:** A script running a shimmed command 10,000 times would add ~42 seconds of overhead.
+However, this overhead becomes noticeable in tight loops or scripts that invoke shimmed commands thousands of times:
+
+| Invocations | Linux Overhead | macOS Overhead |
+|-------------|----------------|----------------|
+| 100 | 0.16s | 0.42s |
+| 1,000 | 1.6s | 4.2s |
+| 10,000 | 16s | 42s |
+| 100,000 | 2.7 min | 7 min |
 
 **Bypass mechanism:** For performance-critical scripts, use `RIBBIN_BYPASS=1` to skip the shim logic entirely:
 
