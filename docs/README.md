@@ -106,20 +106,27 @@ message = "This project uses pnpm"
 
 ### AI Agent Guardrails
 
-See the full [Claude Code Integration Guide](claude-code-integration.md) for comprehensive setup.
+See the full [AI Coding Assistants Guide](claude-code-integration.md) for setup with bypass examples.
 
 ```toml
-[shims.rm]
+# Block direct tsc - guide to project script
+[shims.tsc]
 action = "block"
-message = "Use 'trash' for safe deletion"
+message = "Use 'pnpm run typecheck' to use project's tsconfig"
 
-[shims.cat]
+# Enforce package manager
+[shims.npm]
 action = "block"
-message = "Use Claude Code's Read tool instead"
+message = "This project uses pnpm"
+```
 
-[shims.grep]
-action = "block"
-message = "Use Claude Code's Grep tool instead"
+Then in `package.json`, bypass ribbin for the actual script:
+```json
+{
+  "scripts": {
+    "typecheck": "RIBBIN_BYPASS=1 tsc --noEmit"
+  }
+}
 ```
 
 See [Use Cases](../README.md#use-cases) for more examples.

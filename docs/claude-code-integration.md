@@ -14,7 +14,6 @@ You have a TypeScript project where:
 We'll set up ribbin to:
 1. **Block** direct `tsc` calls with a helpful message
 2. **Allow** `tsc` when called from `pnpm run typecheck` (via bypass)
-3. **Redirect** `cat` to `bat` for better syntax highlighting
 
 ## Step 1: Create the Configuration
 
@@ -30,18 +29,15 @@ message = """TypeScript should be run through the project script:
 
 This ensures tsconfig.json settings are used correctly.
 """
-
-# Redirect cat to bat for syntax highlighting
-[shims.cat]
-action = "redirect"
-redirect = "bat"
-message = "Using bat for syntax highlighting"
-paths = ["/bin/cat", "/usr/bin/cat"]
 ```
 
-## Step 2: Set Up the Bypass in package.json
+## Step 2: Set Up the Bypass
 
-The key insight: your `typecheck` script needs to bypass ribbin so it can actually run `tsc`:
+Your `typecheck` script needs to bypass ribbin so it can actually run `tsc`. There are two approaches:
+
+### Option A: Environment Variable Bypass
+
+The simplest approach - prefix with `RIBBIN_BYPASS=1`:
 
 ```json
 {
@@ -53,16 +49,79 @@ The key insight: your `typecheck` script needs to bypass ribbin so it can actual
 }
 ```
 
-The `RIBBIN_BYPASS=1` prefix tells ribbin to let the command through.
+### Option B: Wrapper Script with Invocation Check
 
-## Step 3: Install and Activate
+For more control, create a wrapper script that checks how it was invoked:
+
+```bash
+#!/bin/bash
+# scripts/typecheck.sh
+
+# Get the parent process name
+PARENT=$(ps -o comm= $PPID 2>/dev/null)
+
+# Allow if run through npm/pnpm/yarn
+case "$PARENT" in
+  npm|pnpm|yarn|node)
+    # Running through package manager - allow
+    exec tsc.ribbin-original "$@"
+    ;;
+  *)
+    # Direct invocation - show guidance
+    echo "Use 'pnpm run typecheck' instead of running this script directly"
+    exit 1
+    ;;
+esac
+```
+
+Then in `package.json`:
+```json
+{
+  "scripts": {
+    "typecheck": "./scripts/typecheck.sh --noEmit"
+  }
+}
+```
+
+This approach:
+- Calls the original binary directly (`tsc.ribbin-original`)
+- Checks the parent process to determine if run via package manager
+- Provides guidance even if someone tries to run the wrapper directly
+
+## Step 3: Activate Ribbin
+
+### For AI Coding Sessions
+
+If your AI assistant doesn't have a persistent shell (like Claude Code), use global activation:
+
+```bash
+ribbin on
+```
+
+This enables ribbin system-wide until you run `ribbin off`.
+
+### For Persistent Shell Sessions
+
+If your agent has a persistent shell, you can activate per-session:
+
+```bash
+ribbin activate
+```
+
+This sets up the current shell so ribbin is active. For human developers, add to your shell profile (`.bashrc`, `.zshrc`):
+
+```bash
+# Activate ribbin if available
+command -v ribbin >/dev/null && ribbin activate
+```
+
+### Installing the Shims
+
+Before activation works, you need to install the shims:
 
 ```bash
 # Install shims for commands in ribbin.toml
 ribbin shim
-
-# Activate for your shell session
-eval "$(ribbin activate)"
 ```
 
 ## What Happens Now
@@ -87,14 +146,6 @@ $ pnpm run typecheck
 > RIBBIN_BYPASS=1 tsc --noEmit
 
 # tsc runs normally with project settings
-```
-
-### `cat` redirects to `bat`:
-
-```
-$ cat src/index.ts
-# Actually runs: bat src/index.ts
-# Shows syntax-highlighted output
 ```
 
 ## How the Bypass Works
@@ -138,18 +189,6 @@ message = "This project uses pnpm. Run 'pnpm install' instead."
 [shims.yarn]
 action = "block"
 message = "This project uses pnpm. Run 'pnpm install' instead."
-
-# Better alternatives
-[shims.cat]
-action = "redirect"
-redirect = "bat"
-paths = ["/bin/cat", "/usr/bin/cat"]
-
-# Safety
-[shims.rm]
-action = "block"
-message = "Use 'trash' for safe deletion, or 'pnpm run clean' for build artifacts"
-paths = ["/bin/rm", "/usr/bin/rm"]
 ```
 
 With corresponding `package.json`:
@@ -160,8 +199,7 @@ With corresponding `package.json`:
     "typecheck": "RIBBIN_BYPASS=1 tsc --noEmit",
     "build": "RIBBIN_BYPASS=1 tsc",
     "lint": "RIBBIN_BYPASS=1 eslint src/",
-    "format": "RIBBIN_BYPASS=1 prettier --write src/",
-    "clean": "RIBBIN_BYPASS=1 rm -rf dist/"
+    "format": "RIBBIN_BYPASS=1 prettier --write src/"
   }
 }
 ```
@@ -172,11 +210,6 @@ With corresponding `package.json`:
 [shims.pip]
 action = "block"
 message = "Use 'poetry add <package>' to manage dependencies"
-
-[shims.python]
-action = "redirect"
-redirect = "poetry run python"
-message = "Running Python through Poetry's virtualenv"
 
 [shims.pytest]
 action = "block"
@@ -189,9 +222,15 @@ message = "Use 'poetry run pytest' or 'make test'"
 [shims.go]
 action = "block"
 message = "Use 'make build', 'make test', or 'make run'"
+```
 
-# Allow go through make
-# In Makefile: RIBBIN_BYPASS=1 go build ./...
+In your Makefile:
+```makefile
+build:
+	RIBBIN_BYPASS=1 go build ./...
+
+test:
+	RIBBIN_BYPASS=1 go test ./...
 ```
 
 ## Using with Claude Code
@@ -234,6 +273,7 @@ ribbin audit summary
 | `block` | Show error message, don't run command |
 | `redirect` | Run a different command instead |
 | `RIBBIN_BYPASS=1` | Skip ribbin, run original command |
+| `cmd.ribbin-original` | Call the original binary directly |
 
 ## See Also
 
