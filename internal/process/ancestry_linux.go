@@ -81,3 +81,23 @@ func ProcessExists(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	return err == nil
 }
+
+// GetParentCommand returns the command line of the parent process.
+// Returns the full command with arguments as a single string.
+func GetParentCommand() (string, error) {
+	ppid, err := getParentPID(os.Getpid())
+	if err != nil {
+		return "", err
+	}
+
+	// Read /proc/<ppid>/cmdline which contains null-separated arguments
+	cmdlinePath := "/proc/" + strconv.Itoa(ppid) + "/cmdline"
+	data, err := os.ReadFile(cmdlinePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Replace null bytes with spaces to form command line
+	cmdline := strings.ReplaceAll(string(data), "\x00", " ")
+	return strings.TrimSpace(cmdline), nil
+}

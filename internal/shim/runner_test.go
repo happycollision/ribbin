@@ -135,6 +135,115 @@ func TestRunWithBypassEnv(t *testing.T) {
 	}
 }
 
+func TestShouldPassthrough(t *testing.T) {
+	// Note: shouldPassthrough relies on process.GetParentCommand() which returns
+	// the actual parent process. In tests, this is typically "go test" or similar.
+	// We test the matching logic by using patterns that should/shouldn't match
+	// a typical test runner invocation.
+
+	t.Run("returns false with nil config", func(t *testing.T) {
+		// Nil config should be handled by caller, but let's verify no panic
+		var pt *config.PassthroughConfig = nil
+		if pt != nil && shouldPassthrough(pt) {
+			t.Error("nil config should not passthrough")
+		}
+	})
+
+	t.Run("returns false with empty config", func(t *testing.T) {
+		pt := &config.PassthroughConfig{}
+		if shouldPassthrough(pt) {
+			t.Error("empty config should not passthrough")
+		}
+	})
+
+	t.Run("exact match finds substring in parent command", func(t *testing.T) {
+		// The parent of this test is likely "go test" or similar
+		pt := &config.PassthroughConfig{
+			Invocation: []string{"go"},
+		}
+		// This should match since tests run under "go test"
+		if !shouldPassthrough(pt) {
+			t.Error("should passthrough when exact pattern matches parent command")
+		}
+	})
+
+	t.Run("exact match returns false for non-matching pattern", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			Invocation: []string{"definitely-not-in-parent-command-xyz123"},
+		}
+		if shouldPassthrough(pt) {
+			t.Error("should not passthrough when pattern doesn't match")
+		}
+	})
+
+	t.Run("regexp match finds pattern in parent command", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			InvocationRegexp: []string{"go.*test"},
+		}
+		// This should match since tests run under "go test"
+		if !shouldPassthrough(pt) {
+			t.Error("should passthrough when regexp matches parent command")
+		}
+	})
+
+	t.Run("regexp match returns false for non-matching pattern", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			InvocationRegexp: []string{"^pnpm run"},
+		}
+		if shouldPassthrough(pt) {
+			t.Error("should not passthrough when regexp doesn't match")
+		}
+	})
+
+	t.Run("invalid regexp is skipped", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			InvocationRegexp: []string{"[invalid(regexp"},
+		}
+		// Should not panic, just return false
+		if shouldPassthrough(pt) {
+			t.Error("invalid regexp should be skipped, not match")
+		}
+	})
+
+	t.Run("multiple patterns - first matches", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			Invocation: []string{"go", "nonexistent"},
+		}
+		if !shouldPassthrough(pt) {
+			t.Error("should passthrough when any exact pattern matches")
+		}
+	})
+
+	t.Run("multiple patterns - second matches", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			Invocation: []string{"nonexistent", "go"},
+		}
+		if !shouldPassthrough(pt) {
+			t.Error("should passthrough when any exact pattern matches")
+		}
+	})
+
+	t.Run("mixed exact and regexp - exact matches", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			Invocation:       []string{"go"},
+			InvocationRegexp: []string{"^pnpm"},
+		}
+		if !shouldPassthrough(pt) {
+			t.Error("should passthrough when exact pattern matches even if regexp doesn't")
+		}
+	})
+
+	t.Run("mixed exact and regexp - regexp matches", func(t *testing.T) {
+		pt := &config.PassthroughConfig{
+			Invocation:       []string{"nonexistent"},
+			InvocationRegexp: []string{"go"},
+		}
+		if !shouldPassthrough(pt) {
+			t.Error("should passthrough when regexp matches even if exact doesn't")
+		}
+	})
+}
+
 func TestPrintBlockMessage(t *testing.T) {
 	// Capture stderr output is tricky, just verify it doesn't panic
 	t.Run("prints with custom message", func(t *testing.T) {

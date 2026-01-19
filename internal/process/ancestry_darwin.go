@@ -67,3 +67,21 @@ func ProcessExists(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	return err == nil
 }
+
+// GetParentCommand returns the command line of the parent process.
+// Returns the full command with arguments as a single string.
+func GetParentCommand() (string, error) {
+	ppid, err := getParentPID(os.Getpid())
+	if err != nil {
+		return "", err
+	}
+
+	// Use ps to get the full command line
+	cmd := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(ppid))
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}

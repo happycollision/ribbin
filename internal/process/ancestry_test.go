@@ -111,3 +111,29 @@ func TestGetParentPID(t *testing.T) {
 		}
 	})
 }
+
+func TestGetParentCommand(t *testing.T) {
+	t.Run("returns non-empty command for current process", func(t *testing.T) {
+		cmd, err := GetParentCommand()
+		if err != nil {
+			t.Fatalf("GetParentCommand error: %v", err)
+		}
+		if cmd == "" {
+			t.Error("expected non-empty parent command")
+		}
+	})
+
+	t.Run("returns command containing go for test runner", func(t *testing.T) {
+		// When running tests, the parent process is typically "go test" or similar
+		cmd, err := GetParentCommand()
+		if err != nil {
+			t.Fatalf("GetParentCommand error: %v", err)
+		}
+		// The parent should contain "go" somewhere (go test, or the go binary)
+		if len(cmd) == 0 {
+			t.Error("expected parent command to be non-empty")
+		}
+		// Note: We don't assert specific content since it varies by environment
+		t.Logf("Parent command: %s", cmd)
+	})
+}

@@ -187,4 +187,50 @@ action = unquoted
 			t.Errorf("expected empty shims, got %d", len(cfg.Shims))
 		}
 	})
+
+	t.Run("loads config with passthrough", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		content := `[shims.tsc]
+action = "block"
+message = "Use pnpm run typecheck"
+passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|build)"] }
+`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		cfg, err := LoadProjectConfig(configPath)
+		if err != nil {
+			t.Fatalf("LoadProjectConfig error: %v", err)
+		}
+
+		tscShim, exists := cfg.Shims["tsc"]
+		if !exists {
+			t.Fatal("tsc shim not found")
+		}
+		if tscShim.Action != "block" {
+			t.Errorf("expected action 'block', got '%s'", tscShim.Action)
+		}
+		if tscShim.Passthrough == nil {
+			t.Fatal("passthrough config is nil")
+		}
+		if len(tscShim.Passthrough.Invocation) != 1 {
+			t.Errorf("expected 1 invocation pattern, got %d", len(tscShim.Passthrough.Invocation))
+		}
+		if tscShim.Passthrough.Invocation[0] != "pnpm run" {
+			t.Errorf("unexpected invocation pattern: %s", tscShim.Passthrough.Invocation[0])
+		}
+		if len(tscShim.Passthrough.InvocationRegexp) != 1 {
+			t.Errorf("expected 1 invocationRegexp pattern, got %d", len(tscShim.Passthrough.InvocationRegexp))
+		}
+		if tscShim.Passthrough.InvocationRegexp[0] != "pnpm (typecheck|build)" {
+			t.Errorf("unexpected invocationRegexp pattern: %s", tscShim.Passthrough.InvocationRegexp[0])
+		}
+	})
 }

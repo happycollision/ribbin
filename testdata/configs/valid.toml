@@ -7,3 +7,9 @@ paths = ["/usr/bin/cat", "/bin/cat"]
 [shims.npm]
 action = "block"
 message = "Use 'pnpm' instead"
+
+# Example with passthrough: block tsc directly, but allow via pnpm scripts
+[shims.tsc]
+action = "block"
+message = "Use 'pnpm run typecheck' instead"
+passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|build)"] }

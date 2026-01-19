@@ -9,6 +9,14 @@ import (
 	"github.com/happycollision/ribbin/internal/security"
 )
 
+// PassthroughConfig defines conditions under which a shim should pass through to the original command
+type PassthroughConfig struct {
+	// Invocation is a list of exact strings to match against the parent process invocation
+	Invocation []string `toml:"invocation,omitempty"`
+	// InvocationRegexp is a list of regular expressions to match against the parent process invocation
+	InvocationRegexp []string `toml:"invocationRegexp,omitempty"`
+}
+
 // ShimConfig defines the behavior for a shimmed command
 type ShimConfig struct {
 	// Action is the behavior when the command is invoked: "block", "warn", "redirect"
@@ -19,6 +27,8 @@ type ShimConfig struct {
 	Paths []string `toml:"paths,omitempty"`
 	// Redirect specifies the alternative command to execute (for "redirect" action)
 	Redirect string `toml:"redirect,omitempty"`
+	// Passthrough defines conditions for passing through to the original command
+	Passthrough *PassthroughConfig `toml:"passthrough,omitempty"`
 }
 
 // ProjectConfig represents a ribbin.toml project configuration file

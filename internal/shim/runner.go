@@ -3,6 +3,7 @@ package shim
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -66,7 +67,14 @@ func Run(argv0 string, args []string) error {
 		return execOriginal(originalPath, args)
 	}
 
-	// 8. Handle action based on config
+	// 8. Check passthrough conditions
+	if shimConfig.Passthrough != nil {
+		if shouldPassthrough(shimConfig.Passthrough) {
+			return execOriginal(originalPath, args)
+		}
+	}
+
+	// 9. Handle action based on config
 	switch shimConfig.Action {
 	case "block":
 		printBlockMessage(cmdName, shimConfig.Message)
@@ -213,4 +221,35 @@ func printBoxBottom(width int) {
 func printBoxLine(content string, width int) {
 	padding := width - len(content) - 2 // -2 for the leading "  "
 	fmt.Fprintf(os.Stderr, "\u2502  %s%s\u2502\n", content, strings.Repeat(" ", padding))
+}
+
+// shouldPassthrough checks if the parent process invocation matches any passthrough conditions.
+// Returns true if the shim should pass through to the original command.
+func shouldPassthrough(pt *config.PassthroughConfig) bool {
+	parentCmd, err := process.GetParentCommand()
+	if err != nil {
+		// If we can't get parent command, don't passthrough
+		return false
+	}
+
+	// Check exact matches
+	for _, pattern := range pt.Invocation {
+		if strings.Contains(parentCmd, pattern) {
+			return true
+		}
+	}
+
+	// Check regexp matches
+	for _, pattern := range pt.InvocationRegexp {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			// Invalid regex, skip it
+			continue
+		}
+		if re.MatchString(parentCmd) {
+			return true
+		}
+	}
+
+	return false
 }
