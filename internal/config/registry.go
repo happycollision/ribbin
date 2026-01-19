@@ -100,7 +100,16 @@ func (r *Registry) PruneDeadActivations() {
 func processExists(pid int) bool {
 	// Sending signal 0 checks if process exists without affecting it
 	err := syscall.Kill(pid, 0)
-	return err == nil
+	if err == nil {
+		return true
+	}
+	// EPERM means the process exists but we don't have permission to signal it
+	// (common on macOS for PID 1/launchd)
+	if err == syscall.EPERM {
+		return true
+	}
+	// ESRCH means no such process
+	return false
 }
 
 // SaveRegistry writes the registry to disk, creating directories as needed

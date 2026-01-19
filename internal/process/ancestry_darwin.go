@@ -65,7 +65,16 @@ func getParentPID(pid int) (int, error) {
 func ProcessExists(pid int) bool {
 	// On Darwin, sending signal 0 checks if process exists without affecting it
 	err := syscall.Kill(pid, 0)
-	return err == nil
+	if err == nil {
+		return true
+	}
+	// EPERM means the process exists but we don't have permission to signal it
+	// (common for PID 1/launchd)
+	if err == syscall.EPERM {
+		return true
+	}
+	// ESRCH means no such process
+	return false
 }
 
 // GetParentCommand returns the command line of the parent process.

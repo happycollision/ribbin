@@ -14,6 +14,12 @@ func TestFindProjectConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Resolve symlinks in tmpDir (on macOS, /var -> /private/var)
+	tmpDir, err = filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to resolve symlinks: %v", err)
+	}
+
 	// Save original working directory
 	origDir, err := os.Getwd()
 	if err != nil {
