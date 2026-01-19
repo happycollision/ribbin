@@ -35,9 +35,57 @@ This ensures tsconfig.json settings are used correctly.
 
 Your `typecheck` script needs to bypass ribbin so it can actually run `tsc`. There are two approaches:
 
-### Option A: Environment Variable Bypass
+### Option A: Redirect to Wrapper Script (Recommended)
 
-The simplest approach - prefix with `RIBBIN_BYPASS=1`:
+This approach keeps ribbin configuration separate from your project. Your team doesn't need to know about ribbin - you can even put `ribbin.toml` and the wrapper script in a parent directory outside the repo.
+
+```toml
+# ribbin.toml (can be in parent directory of repo)
+[shims.tsc]
+action = "redirect"
+redirect = "./scripts/tsc-wrapper.sh"
+```
+
+```bash
+#!/bin/bash
+# scripts/tsc-wrapper.sh
+
+# Check the full command line of parent process
+PARENT_CMD=$(ps -o args= $PPID 2>/dev/null)
+
+# Only allow specific sanctioned commands
+case "$PARENT_CMD" in
+  *"pnpm run typecheck"*|*"pnpm typecheck"*|*"pnpm run build"*|*"pnpm build"*)
+    # Running through approved package.json script - allow
+    exec "$RIBBIN_ORIGINAL" "$@"
+    ;;
+  *)
+    # Direct invocation or unapproved command
+    echo "Use 'pnpm run typecheck' instead of running tsc directly"
+    exit 1
+    ;;
+esac
+```
+
+Your `package.json` stays clean - no bypass needed:
+```json
+{
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  }
+}
+```
+
+This approach:
+- Keeps ribbin invisible to your team - they don't need to change anything
+- Checks for specific approved commands (not just any pnpm invocation)
+- Blocks `pnpm tsc` while allowing `pnpm run typecheck`
+- Uses `$RIBBIN_ORIGINAL` environment variable (set by ribbin for redirect scripts)
+
+### Option B: Environment Variable Bypass
+
+If you want the bypass visible in package.json (solo projects or when the team is on board):
 
 ```json
 {
@@ -49,51 +97,7 @@ The simplest approach - prefix with `RIBBIN_BYPASS=1`:
 }
 ```
 
-### Option B: Redirect to Wrapper Script
-
-For more control, use `redirect` to a script that checks how it was invoked:
-
-```toml
-# ribbin.toml
-[shims.tsc]
-action = "redirect"
-redirect = "./scripts/tsc-wrapper.sh"
-```
-
-```bash
-#!/bin/bash
-# scripts/tsc-wrapper.sh
-
-# Get the parent process name
-PARENT=$(ps -o comm= $PPID 2>/dev/null)
-
-# Allow if run through npm/pnpm/yarn
-case "$PARENT" in
-  npm|pnpm|yarn|node)
-    # Running through package manager - call original via RIBBIN_ORIGINAL
-    exec "$RIBBIN_ORIGINAL" "$@"
-    ;;
-  *)
-    # Direct invocation - show guidance
-    echo "Use 'pnpm run typecheck' instead of running tsc directly"
-    exit 1
-    ;;
-esac
-```
-
-Then in `package.json` (no bypass needed - the wrapper handles it):
-```json
-{
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  }
-}
-```
-
-This approach:
-- Uses `RIBBIN_ORIGINAL` environment variable (set by ribbin for redirect scripts)
-- Checks the parent process to determine if run via package manager
-- No `RIBBIN_BYPASS` needed in package.json - the logic is in the wrapper
+This is simpler but requires modifying package.json and makes ribbin visible to all contributors.
 
 ## Step 3: Activate Ribbin
 
