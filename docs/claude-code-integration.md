@@ -9,18 +9,16 @@ You have a TypeScript project where:
 - Developers (and AI assistants) sometimes run `tsc` directly, missing project settings
 - You want to guide toward the correct workflow, not just block
 
-## Solution Overview
+## Two Approaches
 
-We'll set up ribbin to:
-1. **Block** direct `tsc` calls with a helpful message
-2. **Allow** `tsc` when called from `pnpm run typecheck` (via bypass)
+There are two ways to set this up, depending on whether your team uses ribbin:
 
-## Step 1: Create the Configuration
+### Approach A: Team Uses Ribbin (Simpler)
 
-Create `ribbin.toml` in your project root:
+If your team is on board with ribbin, use `action = "block"` with `RIBBIN_BYPASS` in package.json.
 
+**ribbin.toml:**
 ```toml
-# Block direct tsc usage - guide to project script
 [shims.tsc]
 action = "block"
 message = """TypeScript should be run through the project script:
@@ -31,24 +29,33 @@ This ensures tsconfig.json settings are used correctly.
 """
 ```
 
-## Step 2: Set Up the Bypass
+**package.json:**
+```json
+{
+  "scripts": {
+    "typecheck": "RIBBIN_BYPASS=1 tsc --noEmit",
+    "typecheck:watch": "RIBBIN_BYPASS=1 tsc --noEmit --watch",
+    "build": "RIBBIN_BYPASS=1 tsc"
+  }
+}
+```
 
-Your `typecheck` script needs to bypass ribbin so it can actually run `tsc`. There are two approaches:
+Direct `tsc` calls are blocked. The `RIBBIN_BYPASS=1` prefix in package.json lets the scripts through.
 
-### Option A: Redirect to Wrapper Script (Recommended)
+### Approach B: Keep Ribbin Invisible to Team
 
-This approach keeps ribbin configuration separate from your project. Your team doesn't need to know about ribbin - you can even put `ribbin.toml` and the wrapper script in a parent directory outside the repo.
+If you want to use ribbin personally without changing the shared codebase, use `action = "redirect"` to a wrapper script. You can even put `ribbin.toml` and the wrapper in a parent directory outside the repo.
 
+**ribbin.toml** (can be in parent directory):
 ```toml
-# ribbin.toml (can be in parent directory of repo)
 [shims.tsc]
 action = "redirect"
 redirect = "./scripts/tsc-wrapper.sh"
 ```
 
+**scripts/tsc-wrapper.sh** (can be in parent directory):
 ```bash
 #!/bin/bash
-# scripts/tsc-wrapper.sh
 
 # Check the full command line of parent process
 PARENT_CMD=$(ps -o args= $PPID 2>/dev/null)
@@ -67,7 +74,7 @@ case "$PARENT_CMD" in
 esac
 ```
 
-Your `package.json` stays clean - no bypass needed:
+**package.json** (unchanged):
 ```json
 {
   "scripts": {
@@ -78,28 +85,11 @@ Your `package.json` stays clean - no bypass needed:
 ```
 
 This approach:
-- Keeps ribbin invisible to your team - they don't need to change anything
-- Checks for specific approved commands (not just any pnpm invocation)
-- Blocks `pnpm tsc` while allowing `pnpm run typecheck`
+- Keeps ribbin invisible to your team
+- Checks for specific approved commands (blocks `pnpm tsc` while allowing `pnpm run typecheck`)
 - Uses `$RIBBIN_ORIGINAL` environment variable (set by ribbin for redirect scripts)
 
-### Option B: Environment Variable Bypass
-
-If you want the bypass visible in package.json (solo projects or when the team is on board):
-
-```json
-{
-  "scripts": {
-    "typecheck": "RIBBIN_BYPASS=1 tsc --noEmit",
-    "typecheck:watch": "RIBBIN_BYPASS=1 tsc --noEmit --watch",
-    "build": "RIBBIN_BYPASS=1 tsc"
-  }
-}
-```
-
-This is simpler but requires modifying package.json and makes ribbin visible to all contributors.
-
-## Step 3: Activate Ribbin
+## Activating Ribbin
 
 ### For AI Coding Sessions
 
