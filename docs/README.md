@@ -18,6 +18,9 @@ Comprehensive documentation for ribbin, the command shimming tool.
 - [Security Overview](security.md) - Comprehensive security features
 - [Audit Logging](audit-logging.md) - Security event logging and monitoring
 
+### Performance
+- [Performance](performance.md) - Overhead measurements and benchmarks
+
 ## Configuration
 
 ### Basic Configuration
