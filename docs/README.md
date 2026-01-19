@@ -19,7 +19,7 @@ Comprehensive documentation for ribbin, the command shimming tool.
 - [Audit Logging](audit-logging.md) - Security event logging and monitoring
 
 ### Integrations
-- [AI Coding Assistants](claude-code-integration.md) - Practical guide with bypass examples
+- [AI Coding Agents](agent-integration.md) - Practical guide with bypass examples
 
 ### Performance
 - [Performance](performance.md) - Overhead measurements and benchmarks
@@ -106,7 +106,7 @@ message = "This project uses pnpm"
 
 ### AI Agent Guardrails
 
-See the full [AI Coding Assistants Guide](claude-code-integration.md) for setup with bypass examples.
+See the full [AI Coding Agents Guide](agent-integration.md) for setup with bypass examples.
 
 ```toml
 # Block direct tsc - guide to project script

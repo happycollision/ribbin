@@ -1,21 +1,21 @@
-# Practical Guide: Using Ribbin with AI Coding Assistants
+# Practical Guide: Using Ribbin with AI Coding Agents
 
-This guide demonstrates ribbin's key features through a practical example: enforcing TypeScript project conventions when working with Claude Code or other AI assistants.
+This guide demonstrates ribbin's key features through a practical example: enforcing TypeScript project conventions when working with AI coding agents.
 
 ## The Problem
 
 You have a TypeScript project where:
 - `tsc` should use your project's `tsconfig.json` via `pnpm run typecheck`
-- Developers (and AI assistants) sometimes run `tsc` directly, missing project settings
+- AI agents sometimes run `tsc` directly, missing project settings
 - You want to guide toward the correct workflow, not just block
 
 ## Two Approaches
 
-There are two ways to set this up, depending on whether your team uses ribbin:
+There are two ways to set this up:
 
-### Approach A: Team Uses Ribbin (Simpler)
+### Approach A: Modify Package Scripts (Simpler)
 
-If your team is on board with ribbin, use `action = "block"` with `RIBBIN_BYPASS` in package.json.
+Use `action = "block"` with `RIBBIN_BYPASS` in package.json.
 
 **ribbin.toml:**
 ```toml
@@ -42,9 +42,9 @@ This ensures tsconfig.json settings are used correctly.
 
 Direct `tsc` calls are blocked. The `RIBBIN_BYPASS=1` prefix in package.json lets the scripts through.
 
-### Approach B: Keep Ribbin Invisible to Team
+### Approach B: Keep Codebase Unchanged
 
-If you want to use ribbin personally without changing the shared codebase, use `action = "redirect"` to a wrapper script. You can even put `ribbin.toml` and the wrapper in a parent directory outside the repo.
+If you don't want to modify shared files like package.json, use `action = "redirect"` to a wrapper script. You can put `ribbin.toml` and the wrapper in a parent directory outside the repo.
 
 **ribbin.toml** (can be in parent directory):
 ```toml
@@ -85,7 +85,7 @@ esac
 ```
 
 This approach:
-- Keeps ribbin invisible to your team
+- Keeps the codebase unchanged
 - Checks for specific approved commands (blocks `pnpm tsc` while allowing `pnpm run typecheck`)
 - Uses `$RIBBIN_ORIGINAL` environment variable (set by ribbin for redirect scripts)
 
@@ -109,12 +109,7 @@ If your agent has a persistent shell, you can activate per-session:
 ribbin activate
 ```
 
-This sets up the current shell so ribbin is active. For human developers, add to your shell profile (`.bashrc`, `.zshrc`):
-
-```bash
-# Activate ribbin if available
-command -v ribbin >/dev/null && ribbin activate
-```
+This sets up the current shell so ribbin is active.
 
 ### Installing the Shims
 
@@ -160,8 +155,8 @@ When ribbin intercepts a command, it checks:
 This allows your npm scripts to use the actual tools while direct invocation is still controlled.
 
 ```
-Developer runs: tsc           → BLOCKED (no bypass)
-pnpm runs:      tsc           → ALLOWED (RIBBIN_BYPASS=1 set by script)
+Agent runs: tsc           → BLOCKED (no bypass)
+pnpm runs:  tsc           → ALLOWED (RIBBIN_BYPASS=1 set by script)
 ```
 
 ## Real-World Configuration Examples
@@ -234,23 +229,9 @@ test:
 	RIBBIN_BYPASS=1 go test ./...
 ```
 
-## Using with Claude Code
+## Using with Agents
 
-When Claude Code encounters a blocked command, it sees the error message and can adapt. Add guidance to your `CLAUDE.md`:
-
-```markdown
-## Build Commands
-
-This project uses ribbin to enforce conventions. If a command is blocked:
-- Follow the suggestion in the error message
-- Use the project scripts in package.json
-
-Key commands:
-- Type checking: `pnpm run typecheck`
-- Building: `pnpm run build`
-- Linting: `pnpm run lint`
-- Formatting: `pnpm run format`
-```
+When an AI coding agent encounters a blocked command, it sees the error message and can adapt. No special instructions in your `CLAUDE.md` or agent configuration are needed—the block message itself teaches the agent what to do instead.
 
 ## Checking What's Blocked
 

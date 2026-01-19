@@ -4,7 +4,7 @@ Block direct tool calls and redirect to project-specific alternatives.
 
 ## The Problem
 
-AI agents (and humans) sometimes ignore project instructions and call tools directly (`tsc`, `npm`, `cat`) instead of using project-configured wrappers (`pnpm run typecheck`, `bat`). This leads to misconfigured tool runs, confusion, and repeated mistakes.
+AI agents sometimes ignore project instructions and call tools directly (`tsc`, `npm`, `cat`) instead of using project-configured wrappers (`pnpm run typecheck`, `bat`). This leads to misconfigured tool runs, confusion, and repeated mistakes.
 
 ## The Solution
 
@@ -155,15 +155,13 @@ exec "$RIBBIN_ORIGINAL_BIN" --project tsconfig.json "$@"
 - Automatically fix the command (add flags, change tool)
 - Allow the operation to proceed with modifications
 - Wrap commands with logging or environment setup
-- Provide a seamless developer experience
 
 **Use block when you want to:**
 - Prevent the operation entirely
-- Force developers to use a specific workflow
-- Ensure human/AI awareness of the correct command
+- Ensure AI agents learn the correct command via the error message
 - Avoid hiding what's actually being executed
 
-Example: For TypeScript, you might redirect `tsc` to automatically add `--project tsconfig.json`, or block it to ensure developers use `pnpm run typecheck` which may do additional steps like linting.
+Example: For TypeScript, you might redirect `tsc` to automatically add `--project tsconfig.json`, or block it to ensure agents use `pnpm run typecheck` which may do additional steps like linting.
 
 ## Commands
 
