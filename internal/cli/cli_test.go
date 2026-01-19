@@ -280,7 +280,10 @@ func TestActivateCommand(t *testing.T) {
 }
 
 func TestCommonBinDirs(t *testing.T) {
-	dirs := commonBinDirs()
+	dirs, err := commonBinDirs()
+	if err != nil {
+		t.Fatalf("commonBinDirs() error = %v", err)
+	}
 	if len(dirs) == 0 {
 		t.Error("commonBinDirs should return some directories")
 	}

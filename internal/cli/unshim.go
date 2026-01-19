@@ -2,11 +2,12 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/security"
 	"github.com/happycollision/ribbin/internal/shim"
 	"github.com/spf13/cobra"
 )
@@ -39,15 +40,21 @@ func init() {
 	unshimCmd.Flags().BoolVar(&unshimSearch, "search", false, "Search common binary directories for shims (use with --all)")
 }
 
-// commonBinDirs returns common binary directories to search for shims
-func commonBinDirs() []string {
+// commonBinDirs returns common binary directories to search for shims.
+// It uses validated home directory paths to prevent environment variable injection.
+func commonBinDirs() ([]string, error) {
+	home, err := security.ValidateHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get home directory: %w", err)
+	}
+
 	return []string{
 		"/usr/bin",
 		"/usr/local/bin",
 		"/opt/homebrew/bin",
-		os.Getenv("HOME") + "/.local/bin",
-		os.Getenv("HOME") + "/go/bin",
-	}
+		filepath.Join(home, ".local", "bin"),
+		filepath.Join(home, "go", "bin"),
+	}, nil
 }
 
 func runUnshim(cmd *cobra.Command, args []string) error {
@@ -62,7 +69,11 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 
 	if unshimAll && unshimSearch {
 		// Search common bin directories for sidecars
-		sidecars, err := shim.FindSidecars(commonBinDirs())
+		binDirs, err := commonBinDirs()
+		if err != nil {
+			return fmt.Errorf("failed to get bin directories: %w", err)
+		}
+		sidecars, err := shim.FindSidecars(binDirs)
 		if err != nil {
 			return fmt.Errorf("failed to search for sidecars: %w", err)
 		}

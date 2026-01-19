@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -36,13 +35,10 @@ type Registry struct {
 	GlobalOn bool `json:"global_on"`
 }
 
-// RegistryPath returns the path to the global registry file
+// RegistryPath returns the path to the global registry file.
+// It uses validated environment variables to prevent injection attacks.
 func RegistryPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(homeDir, ".config", "ribbin", "registry.json"), nil
+	return security.ValidateRegistryPath()
 }
 
 // LoadRegistry loads the global registry, creating an empty one if it doesn't exist
@@ -115,8 +111,7 @@ func SaveRegistry(r *Registry) error {
 	}
 
 	// Ensure directory exists (needed before lock file can be created)
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if _, err := security.EnsureConfigDir(); err != nil {
 		return err
 	}
 

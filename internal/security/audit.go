@@ -34,24 +34,15 @@ const (
 	EventRegistryUpdate    = "registry.update"
 )
 
-// GetAuditLogPath returns the path to the audit log
+// GetAuditLogPath returns the path to the audit log.
+// It uses validated environment variables to prevent injection attacks.
 func GetAuditLogPath() (string, error) {
-	// Use XDG Base Directory spec
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	stateDir, err := EnsureStateDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot get state directory: %w", err)
 	}
 
-	auditDir := filepath.Join(stateDir, "ribbin")
-	if err := os.MkdirAll(auditDir, 0700); err != nil {
-		return "", fmt.Errorf("cannot create audit directory: %w", err)
-	}
-
-	return filepath.Join(auditDir, "audit.log"), nil
+	return filepath.Join(stateDir, "audit.log"), nil
 }
 
 // LogEvent writes an audit event to the log
