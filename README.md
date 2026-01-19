@@ -176,6 +176,12 @@ Example: For TypeScript, you might redirect `tsc` to automatically add `--projec
 | `ribbin activate` | Activate ribbin for the current shell session |
 | `ribbin on` | Enable shims globally (all shells) |
 | `ribbin off` | Disable shims globally (all shells) |
+| `ribbin audit show` | View recent security audit events |
+| `ribbin audit summary` | View audit log statistics |
+| `ribbin config add` | Add a shim configuration to ribbin.toml |
+| `ribbin config remove` | Remove a shim configuration |
+| `ribbin config list` | List all configured shims |
+| `ribbin config edit` | Edit the config file |
 
 Run `ribbin --help` or `ribbin <command> --help` for detailed usage information.
 
@@ -210,6 +216,30 @@ Or use the full path to the original:
 
 - **Shell-scoped** (`ribbin activate`): Only affects the current shell and its children. Useful for development sessions.
 - **Global** (`ribbin on`/`off`): Affects all shells. Useful when you always want protection.
+
+## Audit Logging
+
+Ribbin includes comprehensive security audit logging that tracks:
+
+- Shim installations and uninstallations
+- Bypass usage (`RIBBIN_BYPASS=1`)
+- Security violations (path traversal, forbidden directories)
+- Privileged operations (commands run as root)
+
+**View recent events:**
+```bash
+ribbin audit show
+ribbin audit show --since 7d --type security.violation
+```
+
+**View summary statistics:**
+```bash
+ribbin audit summary
+```
+
+The audit log is stored at `~/.local/state/ribbin/audit.log` in JSONL format for easy parsing.
+
+For detailed documentation, see [docs/audit-logging.md](docs/audit-logging.md).
 
 ## Use Cases
 
