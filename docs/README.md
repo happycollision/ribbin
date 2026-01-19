@@ -19,7 +19,7 @@ Comprehensive documentation for ribbin, the command shimming tool.
 - [Audit Logging](audit-logging.md) - Security event logging and monitoring
 
 ### Integrations
-- [Claude Code Integration](claude-code-integration.md) - Using ribbin with AI coding assistants
+- [AI Coding Assistants](claude-code-integration.md) - Practical guide with bypass examples
 
 ### Performance
 - [Performance](performance.md) - Overhead measurements and benchmarks
