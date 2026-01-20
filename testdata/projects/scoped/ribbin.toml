@@ -28,22 +28,22 @@ message = "Use pnpm in frontend"
 action = "block"
 message = "Use trash in frontend"
 
-# Backend scope: extends root and strict-mode mixin
+# Backend scope: extends root and hardened mixin
 [scopes.backend]
 path = "apps/backend"
-extends = ["root", "root.strict-mode"]
+extends = ["root", "root.hardened"]
 
 [scopes.backend.shims.npm]
 action = "passthrough"  # Override root block - allow npm in backend
 
-# Strict-mode mixin (no path, used via extends)
-[scopes.strict-mode]
+# Hardened mixin (no path, used via extends)
+[scopes.hardened]
 
-[scopes.strict-mode.shims.rm]
+[scopes.hardened.shims.rm]
 action = "block"
-message = "Use trash (strict)"
+message = "Use trash (hardened)"
 
-[scopes.strict-mode.shims.curl]
+[scopes.hardened.shims.curl]
 action = "warn"
 message = "Consider using httpie"
 

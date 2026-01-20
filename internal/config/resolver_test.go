@@ -91,23 +91,23 @@ func TestResolveEffectiveShims_ExtendsRoot(t *testing.T) {
 }
 
 func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
-	// extends = ["root", "root.strict"] - order matters, later wins
+	// extends = ["root", "root.hardened"] - order matters, later wins
 	config := &ProjectConfig{
 		Shims: map[string]ShimConfig{
 			"cat": {Action: "warn", Message: "root cat"},
 			"rm":  {Action: "warn", Message: "root rm"},
 		},
 		Scopes: map[string]ScopeConfig{
-			"strict": {
-				// No extends, just defines stricter rules
+			"hardened": {
+				// No extends, just defines more restrictive rules
 				Shims: map[string]ShimConfig{
-					"cat": {Action: "block", Message: "strict cat"}, // stricter than root
-					"rm":  {Action: "block", Message: "strict rm"},
+					"cat": {Action: "block", Message: "hardened cat"}, // more restrictive than root
+					"rm":  {Action: "block", Message: "hardened rm"},
 				},
 			},
 			"backend": {
 				Path:    "apps/backend",
-				Extends: []string{"root", "root.strict"},
+				Extends: []string{"root", "root.hardened"},
 				Shims: map[string]ShimConfig{
 					"yarn": {Action: "block", Message: "use npm"},
 				},
@@ -122,12 +122,12 @@ func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
 
-	// cat and rm should come from strict (later in extends list)
-	if result["cat"].Message != "strict cat" {
-		t.Errorf("cat should be from strict, got %q", result["cat"].Message)
+	// cat and rm should come from hardened (later in extends list)
+	if result["cat"].Message != "hardened cat" {
+		t.Errorf("cat should be from hardened, got %q", result["cat"].Message)
 	}
-	if result["rm"].Message != "strict rm" {
-		t.Errorf("rm should be from strict, got %q", result["rm"].Message)
+	if result["rm"].Message != "hardened rm" {
+		t.Errorf("rm should be from hardened, got %q", result["rm"].Message)
 	}
 	if result["yarn"].Message != "use npm" {
 		t.Errorf("yarn should be from scope, got %q", result["yarn"].Message)
@@ -353,10 +353,10 @@ func TestResolveEffectiveShims_ExternalFileWithFragment(t *testing.T) {
 action = "warn"
 message = "team root"
 
-[scopes.strict]
-[scopes.strict.shims.team-cmd]
+[scopes.hardened]
+[scopes.hardened.shims.team-cmd]
 action = "block"
-message = "team strict"
+message = "team hardened"
 `
 	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
 		t.Fatalf("failed to write external config: %v", err)
@@ -368,7 +368,7 @@ message = "team strict"
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./team/ribbin.toml#root.strict"},
+				Extends: []string{"./team/ribbin.toml#root.hardened"},
 				Shims:   map[string]ShimConfig{},
 			},
 		},
@@ -381,12 +381,12 @@ message = "team strict"
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
 
-	// Should have team-cmd from the strict scope (block, not warn)
+	// Should have team-cmd from the hardened scope (block, not warn)
 	if result["team-cmd"].Action != "block" {
-		t.Errorf("team-cmd should be block from strict scope, got %q", result["team-cmd"].Action)
+		t.Errorf("team-cmd should be block from hardened scope, got %q", result["team-cmd"].Action)
 	}
-	if result["team-cmd"].Message != "team strict" {
-		t.Errorf("team-cmd message should be from strict, got %q", result["team-cmd"].Message)
+	if result["team-cmd"].Message != "team hardened" {
+		t.Errorf("team-cmd message should be from hardened, got %q", result["team-cmd"].Message)
 	}
 }
 
@@ -560,20 +560,20 @@ func TestResolveEffectiveShimsWithProvenance_ScopeExtendsRoot(t *testing.T) {
 }
 
 func TestResolveEffectiveShimsWithProvenance_MultipleExtends(t *testing.T) {
-	// extends = ["root", "root.strict"] - later override earlier
+	// extends = ["root", "root.hardened"] - later override earlier
 	config := &ProjectConfig{
 		Shims: map[string]ShimConfig{
 			"cat": {Action: "warn", Message: "root cat"},
 		},
 		Scopes: map[string]ScopeConfig{
-			"strict": {
+			"hardened": {
 				Shims: map[string]ShimConfig{
-					"cat": {Action: "block", Message: "strict cat"},
+					"cat": {Action: "block", Message: "hardened cat"},
 				},
 			},
 			"backend": {
 				Path:    "apps/backend",
-				Extends: []string{"root", "root.strict"},
+				Extends: []string{"root", "root.hardened"},
 				Shims:   map[string]ShimConfig{},
 			},
 		},
@@ -586,7 +586,7 @@ func TestResolveEffectiveShimsWithProvenance_MultipleExtends(t *testing.T) {
 		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
 	}
 
-	// cat should come from strict, which overrode root
+	// cat should come from hardened, which overrode root
 	catShim, ok := result["cat"]
 	if !ok {
 		t.Fatal("expected cat shim")
@@ -594,8 +594,8 @@ func TestResolveEffectiveShimsWithProvenance_MultipleExtends(t *testing.T) {
 	if catShim.Config.Action != "block" {
 		t.Errorf("cat action = %q, want %q", catShim.Config.Action, "block")
 	}
-	if catShim.Source.Fragment != "root.strict" {
-		t.Errorf("cat source fragment = %q, want %q", catShim.Source.Fragment, "root.strict")
+	if catShim.Source.Fragment != "root.hardened" {
+		t.Errorf("cat source fragment = %q, want %q", catShim.Source.Fragment, "root.hardened")
 	}
 	// Should track the override chain
 	if catShim.Source.Overrode == nil {

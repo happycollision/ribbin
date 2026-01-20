@@ -24,8 +24,8 @@ action = "block"
 message = "Use pnpm in frontend"
 
 # Mixin scope (no path, can be extended by other scopes)
-[scopes.strict-mode]
+[scopes.hardened]
 
-[scopes.strict-mode.shims.rm]
+[scopes.hardened.shims.rm]
 action = "block"
 message = "Use trash instead"

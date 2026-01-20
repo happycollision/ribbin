@@ -347,14 +347,14 @@ func TestConfigShowCommand_ProvenanceChain(t *testing.T) {
 action = "warn"
 message = "root cat"
 
-[scopes.strict]
-[scopes.strict.shims.cat]
+[scopes.hardened]
+[scopes.hardened.shims.cat]
 action = "block"
-message = "strict cat"
+message = "hardened cat"
 
 [scopes.frontend]
 path = "apps/frontend"
-extends = ["root", "root.strict"]
+extends = ["root", "root.hardened"]
 
 [scopes.frontend.shims.cat]
 action = "redirect"
@@ -419,8 +419,8 @@ redirect = "bat"
 	if catShim.Source.Overrode == nil {
 		t.Fatal("cat should have overrode set")
 	}
-	if catShim.Source.Overrode.Fragment != "root.strict" {
-		t.Errorf("cat first overrode = %q, want %q", catShim.Source.Overrode.Fragment, "root.strict")
+	if catShim.Source.Overrode.Fragment != "root.hardened" {
+		t.Errorf("cat first overrode = %q, want %q", catShim.Source.Overrode.Fragment, "root.hardened")
 	}
 
 	// Should have another level of override

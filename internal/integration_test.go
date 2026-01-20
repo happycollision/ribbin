@@ -1412,7 +1412,7 @@ func TestScopedConfigMultipleExtends(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	// Backend extends root and root.strict-mode
+	// Backend extends root and root.hardened
 	backendScope := cfg.Scopes["backend"]
 	resolver := config.NewResolver()
 	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &backendScope)
@@ -1420,21 +1420,21 @@ func TestScopedConfigMultipleExtends(t *testing.T) {
 		t.Fatalf("ResolveEffectiveShims error: %v", err)
 	}
 
-	// Should have: cat (root), curl (strict-mode), rm (strict-mode wins over root)
+	// Should have: cat (root), curl (hardened), rm (hardened wins over root)
 	if _, ok := result["cat"]; !ok {
 		t.Error("backend should have cat from root")
 	}
 	if _, ok := result["curl"]; !ok {
-		t.Error("backend should have curl from strict-mode")
+		t.Error("backend should have curl from hardened")
 	}
 
-	// rm should come from strict-mode (later in extends), not root
+	// rm should come from hardened (later in extends), not root
 	rmShim := result["rm"]
 	if rmShim.Action != "block" {
-		t.Errorf("backend rm should be block (from strict-mode), got %s", rmShim.Action)
+		t.Errorf("backend rm should be block (from hardened), got %s", rmShim.Action)
 	}
-	if rmShim.Message != "Use trash (strict)" {
-		t.Errorf("backend rm message should be from strict-mode, got %s", rmShim.Message)
+	if rmShim.Message != "Use trash (hardened)" {
+		t.Errorf("backend rm message should be from hardened, got %s", rmShim.Message)
 	}
 }
 
@@ -1511,14 +1511,14 @@ func TestScopeMatching(t *testing.T) {
 	tests := []struct {
 		name          string
 		cwd           string
-		expectedScope string // empty means root (no scope match), "strict-mode" matches root dir since it has no path
+		expectedScope string // empty means root (no scope match), "hardened" matches root dir since it has no path
 	}{
-		{"root dir", fixtureDir, "strict-mode"}, // strict-mode has no path, defaults to ".", matches config dir
+		{"root dir", fixtureDir, "hardened"}, // hardened has no path, defaults to ".", matches config dir
 		{"frontend dir", filepath.Join(fixtureDir, "apps", "frontend"), "frontend"},
 		{"frontend subdir", filepath.Join(fixtureDir, "apps", "frontend", "src"), "frontend"},
 		{"backend dir", filepath.Join(fixtureDir, "apps", "backend"), "backend"},
 		{"external dir", filepath.Join(fixtureDir, "external"), "external-test"},
-		{"unmatched dir", filepath.Join(fixtureDir, "some", "other"), "strict-mode"}, // strict-mode matches because path defaults to "."
+		{"unmatched dir", filepath.Join(fixtureDir, "some", "other"), "hardened"}, // hardened matches because path defaults to "."
 	}
 
 	for _, tt := range tests {

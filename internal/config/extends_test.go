@@ -32,9 +32,9 @@ func TestParseExtendsRef_LocalReferences(t *testing.T) {
 		},
 		{
 			name:         "root with hyphenated scope",
-			ref:          "root.strict-mode",
+			ref:          "root.hardened",
 			wantFilePath: "",
-			wantFragment: "root.strict-mode",
+			wantFragment: "root.hardened",
 			wantIsLocal:  true,
 		},
 		{
@@ -112,9 +112,9 @@ func TestParseExtendsRef_RelativeFilePaths(t *testing.T) {
 		},
 		{
 			name:         "current dir with subdirectory",
-			ref:          "./configs/base.toml#root.strict",
+			ref:          "./configs/base.toml#root.hardened",
 			wantFilePath: "/project/config/configs/base.toml",
-			wantFragment: "root.strict",
+			wantFragment: "root.hardened",
 			wantIsLocal:  false,
 		},
 	}
@@ -245,7 +245,7 @@ func TestIsLocalRef(t *testing.T) {
 	}{
 		{"root", true},
 		{"root.backend", true},
-		{"root.strict-mode", true},
+		{"root.hardened", true},
 		{"root.", false},           // incomplete
 		{"rootish", false},         // not "root" or "root."
 		{"./root", false},          // file path
