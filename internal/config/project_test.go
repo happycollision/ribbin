@@ -37,7 +37,7 @@ func TestFindProjectConfig(t *testing.T) {
 		}
 
 		configPath := filepath.Join(projectDir, "ribbin.toml")
-		if err := os.WriteFile(configPath, []byte("[shims]\n"), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
@@ -63,7 +63,7 @@ func TestFindProjectConfig(t *testing.T) {
 		}
 
 		configPath := filepath.Join(parentDir, "ribbin.toml")
-		if err := os.WriteFile(configPath, []byte("[shims]\n"), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
@@ -110,7 +110,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.curl]
+		content := `[wrappers.curl]
 action = "block"
 message = "Use the project API client"
 paths = ["/bin/curl", "/usr/bin/curl"]
@@ -124,11 +124,11 @@ paths = ["/bin/curl", "/usr/bin/curl"]
 			t.Fatalf("LoadProjectConfig error: %v", err)
 		}
 
-		if cfg.Shims == nil {
-			t.Fatal("Shims map is nil")
+		if cfg.Wrappers == nil {
+			t.Fatal("Wrappers map is nil")
 		}
 
-		curlShim, exists := cfg.Shims["curl"]
+		curlShim, exists := cfg.Wrappers["curl"]
 		if !exists {
 			t.Fatal("curl shim not found")
 		}
@@ -159,7 +159,7 @@ paths = ["/bin/curl", "/usr/bin/curl"]
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		// Invalid TOML - unquoted string value
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = unquoted
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -180,7 +180,7 @@ action = unquoted
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims]
+		content := `[wrappers]
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -191,8 +191,8 @@ action = unquoted
 			t.Fatalf("LoadProjectConfig error: %v", err)
 		}
 
-		if len(cfg.Shims) != 0 {
-			t.Errorf("expected empty shims, got %d", len(cfg.Shims))
+		if len(cfg.Wrappers) != 0 {
+			t.Errorf("expected empty wrappers, got %d", len(cfg.Wrappers))
 		}
 	})
 
@@ -204,7 +204,7 @@ action = unquoted
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.tsc]
+		content := `[wrappers.tsc]
 action = "block"
 message = "Use pnpm run typecheck"
 passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|build)"] }
@@ -218,7 +218,7 @@ passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|
 			t.Fatalf("LoadProjectConfig error: %v", err)
 		}
 
-		tscShim, exists := cfg.Shims["tsc"]
+		tscShim, exists := cfg.Wrappers["tsc"]
 		if !exists {
 			t.Fatal("tsc shim not found")
 		}
@@ -250,7 +250,7 @@ passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.curl]
+		content := `[wrappers.curl]
 action = "block"
 message = "Use the API client"
 
@@ -258,14 +258,14 @@ message = "Use the API client"
 path = "apps/frontend"
 extends = ["root"]
 
-[scopes.frontend.shims.npm]
+[scopes.frontend.wrappers.npm]
 action = "block"
 message = "Use pnpm in frontend"
 
 [scopes.backend]
 path = "apps/backend"
 
-[scopes.backend.shims.yarn]
+[scopes.backend.wrappers.yarn]
 action = "block"
 message = "Use npm in backend"
 `
@@ -278,9 +278,9 @@ message = "Use npm in backend"
 			t.Fatalf("LoadProjectConfig error: %v", err)
 		}
 
-		// Check root shim
-		if _, exists := cfg.Shims["curl"]; !exists {
-			t.Error("root curl shim not found")
+		// Check root wrapper
+		if _, exists := cfg.Wrappers["curl"]; !exists {
+			t.Error("root curl wrapper not found")
 		}
 
 		// Check scopes
@@ -302,8 +302,8 @@ message = "Use npm in backend"
 		if len(frontend.Extends) != 1 || frontend.Extends[0] != "root" {
 			t.Errorf("unexpected extends: %v", frontend.Extends)
 		}
-		if _, exists := frontend.Shims["npm"]; !exists {
-			t.Error("frontend npm shim not found")
+		if _, exists := frontend.Wrappers["npm"]; !exists {
+			t.Error("frontend npm wrapper not found")
 		}
 
 		// Check backend scope
@@ -330,7 +330,7 @@ message = "Use npm in backend"
 		content := `[scopes.escape]
 path = "../outside"
 
-[scopes.escape.shims.bad]
+[scopes.escape.wrappers.bad]
 action = "block"
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -353,7 +353,7 @@ action = "block"
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		content := `[scopes.mixin]
 
-[scopes.mixin.shims.rm]
+[scopes.mixin.wrappers.rm]
 action = "block"
 message = "Use trash"
 `

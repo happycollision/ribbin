@@ -1,16 +1,16 @@
 # Test fixture for scoped configurations
-# Tests: root shims, scopes with path, extends, passthrough override
+# Tests: root wrappers, scopes with path, extends, passthrough override
 
-# Root-level shims (available to scopes that extend root)
-[shims.cat]
+# Root-level wrappers (available to scopes that extend root)
+[wrappers.cat]
 action = "block"
 message = "Use 'bat' instead"
 
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use 'pnpm' instead"
 
-[shims.rm]
+[wrappers.rm]
 action = "warn"
 message = "Be careful with rm"
 
@@ -19,12 +19,12 @@ message = "Be careful with rm"
 path = "apps/frontend"
 extends = ["root"]
 
-[scopes.frontend.shims.yarn]
+[scopes.frontend.wrappers.yarn]
 action = "block"
 message = "Use pnpm in frontend"
 
 # Frontend also overrides rm to block (stricter)
-[scopes.frontend.shims.rm]
+[scopes.frontend.wrappers.rm]
 action = "block"
 message = "Use trash in frontend"
 
@@ -33,17 +33,17 @@ message = "Use trash in frontend"
 path = "apps/backend"
 extends = ["root", "root.hardened"]
 
-[scopes.backend.shims.npm]
+[scopes.backend.wrappers.npm]
 action = "passthrough"  # Override root block - allow npm in backend
 
 # Hardened mixin (no path, used via extends)
 [scopes.hardened]
 
-[scopes.hardened.shims.rm]
+[scopes.hardened.wrappers.rm]
 action = "block"
 message = "Use trash (hardened)"
 
-[scopes.hardened.shims.curl]
+[scopes.hardened.wrappers.curl]
 action = "warn"
 message = "Consider using httpie"
 

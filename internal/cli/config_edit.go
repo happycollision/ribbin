@@ -76,7 +76,7 @@ func runConfigEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Verify command exists
-	existingShim, exists := cfg.Shims[cmdName]
+	existingShim, exists := cfg.Wrappers[cmdName]
 	if !exists {
 		return fmt.Errorf("command '%s' is not configured. Use 'ribbin config add' to create it.", cmdName)
 	}

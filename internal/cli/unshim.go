@@ -103,7 +103,7 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 		}
 
 		// For each command in project config, find its path in registry
-		for commandName := range projectConfig.Shims {
+		for commandName := range projectConfig.Wrappers {
 			if entry, ok := registry.Wrappers[commandName]; ok {
 				pathsToUnshim = append(pathsToUnshim, entry.Original)
 			} else {

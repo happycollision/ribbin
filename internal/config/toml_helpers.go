@@ -17,18 +17,18 @@ func AddShim(configPath, cmdName string, shimConfig ShimConfig) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Initialize shims map if nil
-	if config.Shims == nil {
-		config.Shims = make(map[string]ShimConfig)
+	// Initialize wrappers map if nil
+	if config.Wrappers == nil {
+		config.Wrappers = make(map[string]ShimConfig)
 	}
 
 	// Check if command already exists
-	if _, exists := config.Shims[cmdName]; exists {
+	if _, exists := config.Wrappers[cmdName]; exists {
 		return fmt.Errorf("shim for command '%s' already exists", cmdName)
 	}
 
 	// Add new shim
-	config.Shims[cmdName] = shimConfig
+	config.Wrappers[cmdName] = shimConfig
 
 	// Write atomically with backup
 	return atomicWrite(configPath, config)
@@ -44,12 +44,12 @@ func RemoveShim(configPath, cmdName string) error {
 	}
 
 	// Check if command exists
-	if _, exists := config.Shims[cmdName]; !exists {
+	if _, exists := config.Wrappers[cmdName]; !exists {
 		return fmt.Errorf("shim for command '%s' not found", cmdName)
 	}
 
 	// Remove shim
-	delete(config.Shims, cmdName)
+	delete(config.Wrappers, cmdName)
 
 	// Write atomically with backup
 	return atomicWrite(configPath, config)
@@ -65,12 +65,12 @@ func UpdateShim(configPath, cmdName string, shimConfig ShimConfig) error {
 	}
 
 	// Check if command exists
-	if _, exists := config.Shims[cmdName]; !exists {
+	if _, exists := config.Wrappers[cmdName]; !exists {
 		return fmt.Errorf("shim for command '%s' not found", cmdName)
 	}
 
 	// Update shim
-	config.Shims[cmdName] = shimConfig
+	config.Wrappers[cmdName] = shimConfig
 
 	// Write atomically with backup
 	return atomicWrite(configPath, config)

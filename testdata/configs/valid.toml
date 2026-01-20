@@ -1,15 +1,15 @@
 # Valid ribbin configuration for testing
-[shims.curl]
+[wrappers.curl]
 action = "block"
 message = "Use the project's API client instead"
 paths = ["/usr/bin/curl", "/bin/curl"]
 
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use 'pnpm' instead"
 
 # Example with passthrough: block tsc directly, but allow via pnpm scripts
-[shims.tsc]
+[wrappers.tsc]
 action = "block"
 message = "Use 'pnpm run typecheck' instead"
 passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|build)"] }
@@ -19,13 +19,13 @@ passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|
 path = "apps/frontend"
 extends = ["root"]
 
-[scopes.frontend.shims.yarn]
+[scopes.frontend.wrappers.yarn]
 action = "block"
 message = "Use pnpm in frontend"
 
 # Mixin scope (no path, can be extended by other scopes)
 [scopes.hardened]
 
-[scopes.hardened.shims.rm]
+[scopes.hardened.wrappers.rm]
 action = "block"
 message = "Use trash instead"

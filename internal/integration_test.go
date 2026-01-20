@@ -79,7 +79,7 @@ exit 1
 	}
 
 	// Step 2: Create ribbin.toml
-	configContent := `[shims.test-cmd]
+	configContent := `[wrappers.test-cmd]
 action = "block"
 message = "Use 'proper-cmd' instead"
 paths = ["` + testBinaryPath + `"]
@@ -201,7 +201,7 @@ func TestConfigDiscovery(t *testing.T) {
 
 	// Create config in project root
 	configPath := filepath.Join(projectDir, "ribbin.toml")
-	configContent := `[shims.npm]
+	configContent := `[wrappers.npm]
 action = "block"
 message = "Use pnpm"
 `
@@ -228,7 +228,7 @@ message = "Use pnpm"
 	if err != nil {
 		t.Fatalf("LoadProjectConfig error: %v", err)
 	}
-	if _, exists := cfg.Shims["npm"]; !exists {
+	if _, exists := cfg.Wrappers["npm"]; !exists {
 		t.Error("npm shim should exist")
 	}
 }
@@ -277,7 +277,7 @@ exit 0
 	}
 
 	// Create ribbin.toml in projectDir (command should passthrough since we're not in projectDir)
-	configContent := `[shims.test-cmd]
+	configContent := `[wrappers.test-cmd]
 action = "block"
 message = "blocked"
 paths = ["` + testCmdPath + `"]
@@ -520,7 +520,7 @@ exec "` + dummyPath + `" "$@"
 
 	// Create ribbin.toml
 	cmdName := filepath.Base(nodeShimPath)
-	configContent := `[shims.` + cmdName + `]
+	configContent := `[wrappers.` + cmdName + `]
 action = "block"
 message = "Use something else"
 paths = ["` + nodeShimPath + `"]
@@ -720,7 +720,7 @@ exec "` + realNodePath + `" "$@"
 	}
 
 	// Create ribbin.toml that blocks node
-	configContent := `[shims.node]
+	configContent := `[wrappers.node]
 action = "block"
 message = "Use 'bun' instead of node"
 paths = ["` + nodeShimPath + `"]
@@ -894,7 +894,7 @@ exit 0
 	}
 
 	// Create ribbin.toml in project root (NOT in the deep subdirectory)
-	configContent := `[shims.test-cmd]
+	configContent := `[wrappers.test-cmd]
 action = "block"
 message = "This command is blocked - config found in parent!"
 `
@@ -1053,7 +1053,7 @@ exec "` + realNodePath + `" "$@"
 	}
 
 	// Create ribbin.toml
-	configContent := `[shims.node]
+	configContent := `[wrappers.node]
 action = "block"
 message = "Use 'bun' instead"
 `
@@ -1328,10 +1328,10 @@ func TestRegistryPersistence(t *testing.T) {
 	if !loaded.GlobalActive {
 		t.Error("GlobalOn should be true")
 	}
-	if len(loaded.Shims) != 2 {
-		t.Errorf("expected 2 shims, got %d", len(loaded.Shims))
+	if len(loaded.Wrappers) != 2 {
+		t.Errorf("expected 2 shims, got %d", len(loaded.Wrappers))
 	}
-	if loaded.Shims["cat"].Original != "/usr/bin/cat" {
+	if loaded.Wrappers["cat"].Original != "/usr/bin/cat" {
 		t.Error("cat shim Original mismatch")
 	}
 }
@@ -1701,7 +1701,7 @@ exit 0
 
 	// Create scoped config
 	configContent := `
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use pnpm instead"
 
@@ -1709,7 +1709,7 @@ message = "Use pnpm instead"
 path = "apps/backend"
 extends = ["root"]
 
-[scopes.backend.shims.npm]
+[scopes.backend.wrappers.npm]
 action = "passthrough"
 `
 	configPath := filepath.Join(projectDir, "ribbin.toml")

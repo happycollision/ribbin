@@ -537,7 +537,7 @@ func TestAttack_Scenario_MaliciousConfigInParent(t *testing.T) {
 
 	// Malicious config targeting bash
 	maliciousConfig := `
-[shims.bash]
+[wrappers.bash]
 action = "block"
 paths = ["/usr/bin/bash"]
 message = "gotcha"

@@ -12,14 +12,14 @@ import (
 func TestResolveEffectiveShims_IsolatedScope(t *testing.T) {
 	// Scope with no extends should only have its own shims
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "block", Message: "root cat"},
 		},
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path: "apps/frontend",
 				// No extends - isolated
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},
 			},
@@ -48,7 +48,7 @@ func TestResolveEffectiveShims_IsolatedScope(t *testing.T) {
 func TestResolveEffectiveShims_ExtendsRoot(t *testing.T) {
 	// Scope extends root - gets root shims + own shims, own wins on conflict
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat":  {Action: "block", Message: "root cat"},
 			"grep": {Action: "warn", Message: "root grep"},
 		},
@@ -56,7 +56,7 @@ func TestResolveEffectiveShims_ExtendsRoot(t *testing.T) {
 			"backend": {
 				Path:    "apps/backend",
 				Extends: []string{"root"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"cat":  {Action: "redirect", Message: "backend cat"}, // overrides root
 					"yarn": {Action: "block", Message: "use npm"},
 				},
@@ -95,14 +95,14 @@ func TestResolveEffectiveShims_ExtendsRoot(t *testing.T) {
 func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
 	// extends = ["root", "root.hardened"] - order matters, later wins
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "warn", Message: "root cat"},
 			"rm":  {Action: "warn", Message: "root rm"},
 		},
 		Scopes: map[string]ScopeConfig{
 			"hardened": {
 				// No extends, just defines more restrictive rules
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"cat": {Action: "block", Message: "hardened cat"}, // more restrictive than root
 					"rm":  {Action: "block", Message: "hardened rm"},
 				},
@@ -110,7 +110,7 @@ func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
 			"backend": {
 				Path:    "apps/backend",
 				Extends: []string{"root", "root.hardened"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"yarn": {Action: "block", Message: "use npm"},
 				},
 			},
@@ -139,20 +139,20 @@ func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
 func TestResolveEffectiveShims_RecursiveExtends(t *testing.T) {
 	// Scope A extends scope B which extends root
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "warn", Message: "root cat"},
 		},
 		Scopes: map[string]ScopeConfig{
 			"base": {
 				Extends: []string{"root"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "base npm"},
 				},
 			},
 			"frontend": {
 				Path:    "apps/frontend",
 				Extends: []string{"root.base"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"yarn": {Action: "block", Message: "frontend yarn"},
 				},
 			},
@@ -187,11 +187,11 @@ func TestResolveEffectiveShims_CycleDetection(t *testing.T) {
 		Scopes: map[string]ScopeConfig{
 			"a": {
 				Extends: []string{"root.b"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 			"b": {
 				Extends: []string{"root.a"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 		},
 	}
@@ -213,7 +213,7 @@ func TestResolveEffectiveShims_SelfCycle(t *testing.T) {
 		Scopes: map[string]ScopeConfig{
 			"self": {
 				Extends: []string{"root.self"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 		},
 	}
@@ -232,13 +232,13 @@ func TestResolveEffectiveShims_SelfCycle(t *testing.T) {
 func TestResolveEffectiveShims_NilScope(t *testing.T) {
 	// nil scope means resolve root shims only
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat":  {Action: "block", Message: "root cat"},
 			"grep": {Action: "warn", Message: "root grep"},
 		},
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},
 			},
@@ -268,7 +268,7 @@ func TestResolveEffectiveShims_ScopeNotFound(t *testing.T) {
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Extends: []string{"root.nonexistent"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 		},
 	}
@@ -295,7 +295,7 @@ func TestResolveEffectiveShims_ExternalFile(t *testing.T) {
 	}
 	externalPath := filepath.Join(externalDir, "ribbin.toml")
 	externalContent := `
-[shims.external-cmd]
+[wrappers.external-cmd]
 action = "block"
 message = "from external"
 `
@@ -306,14 +306,14 @@ message = "from external"
 	// Create main config that extends external
 	mainPath := filepath.Join(tmpDir, "ribbin.toml")
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "block", Message: "main cat"},
 		},
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
 				Extends: []string{"./external/ribbin.toml"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},
 			},
@@ -351,12 +351,12 @@ func TestResolveEffectiveShims_ExternalFileWithFragment(t *testing.T) {
 	}
 	externalPath := filepath.Join(teamDir, "ribbin.toml")
 	externalContent := `
-[shims.team-cmd]
+[wrappers.team-cmd]
 action = "warn"
 message = "team root"
 
 [scopes.hardened]
-[scopes.hardened.shims.team-cmd]
+[scopes.hardened.wrappers.team-cmd]
 action = "block"
 message = "team hardened"
 `
@@ -371,7 +371,7 @@ message = "team hardened"
 			"frontend": {
 				Path:    "apps/frontend",
 				Extends: []string{"./team/ribbin.toml#root.hardened"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 		},
 	}
@@ -403,7 +403,7 @@ func TestResolver_ConfigCaching(t *testing.T) {
 	}
 	externalPath := filepath.Join(externalDir, "ribbin.toml")
 	externalContent := `
-[shims.ext]
+[wrappers.ext]
 action = "block"
 message = "external"
 `
@@ -416,11 +416,11 @@ message = "external"
 		Scopes: map[string]ScopeConfig{
 			"a": {
 				Extends: []string{"./external/ribbin.toml"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 			"b": {
 				Extends: []string{"./external/ribbin.toml"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 		},
 	}
@@ -456,7 +456,7 @@ message = "external"
 
 func TestResolveEffectiveShimsWithProvenance_RootOnly(t *testing.T) {
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat":  {Action: "block", Message: "root cat"},
 			"grep": {Action: "warn", Message: "root grep"},
 		},
@@ -494,7 +494,7 @@ func TestResolveEffectiveShimsWithProvenance_RootOnly(t *testing.T) {
 
 func TestResolveEffectiveShimsWithProvenance_ScopeExtendsRoot(t *testing.T) {
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat":  {Action: "block", Message: "root cat"},
 			"grep": {Action: "warn", Message: "root grep"},
 		},
@@ -502,7 +502,7 @@ func TestResolveEffectiveShimsWithProvenance_ScopeExtendsRoot(t *testing.T) {
 			"frontend": {
 				Path:    "apps/frontend",
 				Extends: []string{"root"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"cat":  {Action: "redirect", Message: "frontend cat"}, // overrides root
 					"yarn": {Action: "block", Message: "use npm"},
 				},
@@ -564,19 +564,19 @@ func TestResolveEffectiveShimsWithProvenance_ScopeExtendsRoot(t *testing.T) {
 func TestResolveEffectiveShimsWithProvenance_MultipleExtends(t *testing.T) {
 	// extends = ["root", "root.hardened"] - later override earlier
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "warn", Message: "root cat"},
 		},
 		Scopes: map[string]ScopeConfig{
 			"hardened": {
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"cat": {Action: "block", Message: "hardened cat"},
 				},
 			},
 			"backend": {
 				Path:    "apps/backend",
 				Extends: []string{"root", "root.hardened"},
-				Shims:   map[string]ShimConfig{},
+				Wrappers:   map[string]ShimConfig{},
 			},
 		},
 	}
@@ -618,7 +618,7 @@ func TestResolveEffectiveShimsWithProvenance_ExternalFile(t *testing.T) {
 	}
 	externalPath := filepath.Join(externalDir, "ribbin.toml")
 	externalContent := `
-[shims.external-cmd]
+[wrappers.external-cmd]
 action = "block"
 message = "from external"
 `
@@ -632,7 +632,7 @@ message = "from external"
 			"frontend": {
 				Path:    "apps/frontend",
 				Extends: []string{"./external/ribbin.toml"},
-				Shims: map[string]ShimConfig{
+				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},
 			},
@@ -675,7 +675,7 @@ message = "from external"
 
 func TestFindMatchingScope_NoScopes(t *testing.T) {
 	config := &ProjectConfig{
-		Shims: map[string]ShimConfig{
+		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "block"},
 		},
 	}

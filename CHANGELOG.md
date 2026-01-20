@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Config format**: `[shims.*]` renamed to `[wrappers.*]` in ribbin.toml for consistency with internal naming
+
 ### Internal
 - Registry structure updated for three-tier activation model: `wrappers`, `shell_activations`, `config_activations`, `global_active`
 - Helper methods added: `AddConfigActivation`, `RemoveConfigActivation`, `AddShellActivation`, `RemoveShellActivation`, `ClearConfigActivations`, `ClearShellActivations`
+- Config struct: `ShimConfig` → `WrapperConfig` (with alias for backwards compatibility)
+- TOML tags: `[shims.*]` → `[wrappers.*]` throughout codebase
 - `make release VERSION=x.y.z` command to automate releases
 - GitHub release notes now include installation instructions and changelog content
 

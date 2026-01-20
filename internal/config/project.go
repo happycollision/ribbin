@@ -22,13 +22,13 @@ type PassthroughConfig struct {
 	InvocationRegexp []string `toml:"invocationRegexp,omitempty"`
 }
 
-// ShimConfig defines the behavior for a shimmed command
-type ShimConfig struct {
+// WrapperConfig defines the behavior for a wrapped command
+type WrapperConfig struct {
 	// Action is the behavior when the command is invoked: "block", "warn", "redirect"
 	Action string `toml:"action"`
 	// Message is displayed when the command is blocked or warned
 	Message string `toml:"message,omitempty"`
-	// Paths restricts the shim to specific binary paths
+	// Paths restricts the wrapper to specific binary paths
 	Paths []string `toml:"paths,omitempty"`
 	// Redirect specifies the alternative command to execute (for "redirect" action)
 	Redirect string `toml:"redirect,omitempty"`
@@ -36,20 +36,23 @@ type ShimConfig struct {
 	Passthrough *PassthroughConfig `toml:"passthrough,omitempty"`
 }
 
+// ShimConfig is an alias for backwards compatibility during migration
+type ShimConfig = WrapperConfig
+
 // ScopeConfig defines a scoped configuration that applies to a specific path
 type ScopeConfig struct {
 	// Path is the directory path this scope applies to (relative to config dir, defaults to ".")
 	Path string `toml:"path,omitempty"`
-	// Extends is a list of references to inherit shims from (see epic ribbin-3gj for syntax)
+	// Extends is a list of references to inherit wrappers from (see epic ribbin-3gj for syntax)
 	Extends []string `toml:"extends,omitempty"`
-	// Shims maps command names to their shim configurations within this scope
-	Shims map[string]ShimConfig `toml:"shims"`
+	// Wrappers maps command names to their wrapper configurations within this scope
+	Wrappers map[string]WrapperConfig `toml:"wrappers"`
 }
 
 // ProjectConfig represents a ribbin.toml project configuration file
 type ProjectConfig struct {
-	// Shims maps command names to their shim configurations (root-level shims)
-	Shims map[string]ShimConfig `toml:"shims"`
+	// Wrappers maps command names to their wrapper configurations (root-level wrappers)
+	Wrappers map[string]WrapperConfig `toml:"wrappers"`
 	// Scopes maps scope names to their scoped configurations
 	Scopes map[string]ScopeConfig `toml:"scopes"`
 }

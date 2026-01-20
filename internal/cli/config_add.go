@@ -69,7 +69,7 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if command already exists
-	if _, exists := cfg.Shims[cmdName]; exists {
+	if _, exists := cfg.Wrappers[cmdName]; exists {
 		return fmt.Errorf("shim for command '%s' already exists. Use 'ribbin config edit' to modify it.", cmdName)
 	}
 

@@ -1,4 +1,4 @@
 # Basic project config
-[shims.tsc]
+[wrappers.tsc]
 action = "block"
 message = "Use 'pnpm run typecheck' instead"

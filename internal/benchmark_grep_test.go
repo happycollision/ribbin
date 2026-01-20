@@ -95,7 +95,7 @@ exec ` + realGrepPath + ` "$@"
 
 	// Create ribbin.toml (grep is NOT blocked - it's passthrough)
 	// This tests the overhead of the shim decision logic
-	configContent := `[shims.grep]
+	configContent := `[wrappers.grep]
 action = "passthrough"
 message = ""
 `

@@ -53,34 +53,34 @@ const defaultConfig = `# ribbin - Command shimming tool
 # Bypass: Set RIBBIN_BYPASS=1 to run the original command when needed.
 
 # Example: Block direct tsc usage (use project's typecheck script instead)
-# [shims.tsc]
+# [wrappers.tsc]
 # action = "block"
 # message = "Use 'pnpm run typecheck' instead - it uses the project's tsconfig"
 
 # Example: Enforce pnpm in this project
-# [shims.npm]
+# [wrappers.npm]
 # action = "block"
 # message = "This project uses pnpm. Run 'pnpm install' instead."
 
 # Example: Block curl, suggest project API client
-# [shims.curl]
+# [wrappers.curl]
 # action = "block"
 # message = "Use the project's API client at ./scripts/api.sh instead"
 # paths = ["/bin/curl", "/usr/bin/curl"]  # Optional: only block specific paths
 
 # Example: Redirect npm to pnpm (absolute path)
-# [shims.npm]
+# [wrappers.npm]
 # action = "redirect"
 # redirect = "/usr/local/bin/pnpm"
 # message = "This project uses pnpm"
 
 # Example: Custom wrapper script (relative path)
-# [shims.node]
+# [wrappers.node]
 # action = "redirect"
 # redirect = "./scripts/node-wrapper.sh"
 
 # Example: Enforce TypeScript project config
-# [shims.tsc]
+# [wrappers.tsc]
 # action = "redirect"
 # redirect = "./scripts/typecheck.sh"
 # message = "Using project-specific TypeScript configuration"

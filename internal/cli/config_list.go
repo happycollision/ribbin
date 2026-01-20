@@ -53,15 +53,15 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if config is empty
-	if len(cfg.Shims) == 0 {
+	if len(cfg.Wrappers) == 0 {
 		fmt.Println("No shims configured")
 		return nil
 	}
 
 	// Filter by command if specified
-	shims := cfg.Shims
+	shims := cfg.Wrappers
 	if configListCommand != "" {
-		if shimCfg, ok := cfg.Shims[configListCommand]; ok {
+		if shimCfg, ok := cfg.Wrappers[configListCommand]; ok {
 			shims = map[string]config.ShimConfig{
 				configListCommand: shimCfg,
 			}

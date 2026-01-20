@@ -1,9 +1,9 @@
 # External config file for testing extends from external files
 
-[shims.external-cmd]
+[wrappers.external-cmd]
 action = "block"
 message = "External command blocked"
 
-[shims.shared-tool]
+[wrappers.shared-tool]
 action = "warn"
 message = "Shared tool warning from external"

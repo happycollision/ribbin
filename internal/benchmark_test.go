@@ -84,7 +84,7 @@ exec ` + realCatPath + ` "$@"
 
 	// Create ribbin.toml (cat is NOT blocked - it's passthrough)
 	// This tests the overhead of the shim decision logic
-	configContent := `[shims.cat]
+	configContent := `[wrappers.cat]
 action = "passthrough"
 message = ""
 `

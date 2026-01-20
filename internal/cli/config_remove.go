@@ -52,7 +52,7 @@ func runConfigRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Verify command exists in config
-	shimCfg, exists := cfg.Shims[cmdName]
+	shimCfg, exists := cfg.Wrappers[cmdName]
 	if !exists {
 		return fmt.Errorf("command '%s' is not configured", cmdName)
 	}

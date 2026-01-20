@@ -70,9 +70,9 @@ func (r *Resolver) resolveEffectiveShimsInternal(
 	configDir := filepath.Dir(configPath)
 	result := make(map[string]ShimConfig)
 
-	// If no scope, return root shims directly
+	// If no scope, return root wrappers directly
 	if scope == nil {
-		for name, shim := range config.Shims {
+		for name, shim := range config.Wrappers {
 			result[name] = shim
 		}
 		return result, nil
@@ -101,8 +101,8 @@ func (r *Resolver) resolveEffectiveShimsInternal(
 		}
 	}
 
-	// Merge scope's own shims (overrides all extends)
-	for name, shim := range scope.Shims {
+	// Merge scope's own wrappers (overrides all extends)
+	for name, shim := range scope.Wrappers {
 		result[name] = shim
 	}
 
@@ -125,9 +125,9 @@ func (r *Resolver) resolveLocalRef(
 	defer func() { visited[visitKey] = false }()
 
 	if fragment == "root" {
-		// Return root shims directly (no recursion needed for root)
+		// Return root wrappers directly (no recursion needed for root)
 		result := make(map[string]ShimConfig)
-		for name, shim := range config.Shims {
+		for name, shim := range config.Wrappers {
 			result[name] = shim
 		}
 		return result, nil
@@ -172,12 +172,12 @@ func (r *Resolver) resolveEntireFile(
 ) (map[string]ShimConfig, error) {
 	result := make(map[string]ShimConfig)
 
-	// Start with root shims
-	for name, shim := range config.Shims {
+	// Start with root wrappers
+	for name, shim := range config.Wrappers {
 		result[name] = shim
 	}
 
-	// Merge each scope's effective shims
+	// Merge each scope's effective wrappers
 	for _, scope := range config.Scopes {
 		scopeCopy := scope
 		scopeShims, err := r.resolveEffectiveShimsInternal(config, configPath, &scopeCopy, visited)
@@ -289,9 +289,9 @@ func (r *Resolver) resolveWithProvenanceInternal(
 		fragment = "root." + scopeName
 	}
 
-	// If no scope, return root shims directly with provenance
+	// If no scope, return root wrappers directly with provenance
 	if scope == nil {
-		for name, shim := range config.Shims {
+		for name, shim := range config.Wrappers {
 			result[name] = ResolvedShim{
 				Config: shim,
 				Source: ShimSource{
@@ -331,8 +331,8 @@ func (r *Resolver) resolveWithProvenanceInternal(
 		}
 	}
 
-	// Merge scope's own shims (overrides all extends)
-	for name, shim := range scope.Shims {
+	// Merge scope's own wrappers (overrides all extends)
+	for name, shim := range scope.Wrappers {
 		newResolved := ResolvedShim{
 			Config: shim,
 			Source: ShimSource{
@@ -366,9 +366,9 @@ func (r *Resolver) resolveLocalRefWithProvenance(
 	defer func() { visited[visitKey] = false }()
 
 	if fragment == "root" {
-		// Return root shims directly with provenance
+		// Return root wrappers directly with provenance
 		result := make(map[string]ResolvedShim)
-		for name, shim := range config.Shims {
+		for name, shim := range config.Wrappers {
 			result[name] = ResolvedShim{
 				Config: shim,
 				Source: ShimSource{
@@ -419,8 +419,8 @@ func (r *Resolver) resolveEntireFileWithProvenance(
 ) (map[string]ResolvedShim, error) {
 	result := make(map[string]ResolvedShim)
 
-	// Start with root shims
-	for name, shim := range config.Shims {
+	// Start with root wrappers
+	for name, shim := range config.Wrappers {
 		result[name] = ResolvedShim{
 			Config: shim,
 			Source: ShimSource{
@@ -430,7 +430,7 @@ func (r *Resolver) resolveEntireFileWithProvenance(
 		}
 	}
 
-	// Merge each scope's effective shims
+	// Merge each scope's effective wrappers
 	for scopeName, scope := range config.Scopes {
 		scopeCopy := scope
 		scopeShims, err := r.resolveWithProvenanceInternal(config, configPath, &scopeCopy, scopeName, visited)

@@ -41,9 +41,9 @@ func CreateTempConfig(t *testing.T, dir string, cfg *config.ProjectConfig) strin
 	t.Helper()
 	path := filepath.Join(dir, "ribbin.toml")
 
-	content := "[shims]\n"
-	for name, shim := range cfg.Shims {
-		content += "[shims." + name + "]\n"
+	content := "[wrappers]\n"
+	for name, shim := range cfg.Wrappers {
+		content += "[wrappers." + name + "]\n"
 		content += "action = \"" + shim.Action + "\"\n"
 		if shim.Message != "" {
 			content += "message = \"" + shim.Message + "\"\n"

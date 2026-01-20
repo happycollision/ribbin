@@ -18,7 +18,7 @@ func TestAddShim(t *testing.T) {
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		// Create initial empty config
-		if err := os.WriteFile(configPath, []byte("[shims]\n"), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
@@ -39,7 +39,7 @@ func TestAddShim(t *testing.T) {
 			t.Fatalf("failed to load config: %v", err)
 		}
 
-		catShim, exists := cfg.Shims["cat"]
+		catShim, exists := cfg.Wrappers["cat"]
 		if !exists {
 			t.Fatal("cat shim not found after adding")
 		}
@@ -69,7 +69,7 @@ func TestAddShim(t *testing.T) {
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		// Create config with existing shim
-		content := `[shims.tsc]
+		content := `[wrappers.tsc]
 action = "block"
 message = "Use pnpm run typecheck"
 `
@@ -93,12 +93,12 @@ message = "Use pnpm run typecheck"
 			t.Fatalf("failed to load config: %v", err)
 		}
 
-		if len(cfg.Shims) != 2 {
-			t.Errorf("expected 2 shims, got %d", len(cfg.Shims))
+		if len(cfg.Wrappers) != 2 {
+			t.Errorf("expected 2 shims, got %d", len(cfg.Wrappers))
 		}
 
 		// Verify original shim still exists
-		tscShim, exists := cfg.Shims["tsc"]
+		tscShim, exists := cfg.Wrappers["tsc"]
 		if !exists {
 			t.Error("original tsc shim was lost")
 		}
@@ -107,7 +107,7 @@ message = "Use pnpm run typecheck"
 		}
 
 		// Verify new shim was added
-		catShim, exists := cfg.Shims["cat"]
+		catShim, exists := cfg.Wrappers["cat"]
 		if !exists {
 			t.Error("cat shim was not added")
 		}
@@ -124,7 +124,7 @@ message = "Use pnpm run typecheck"
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 message = "Already exists"
 `
@@ -152,7 +152,7 @@ message = "Already exists"
 		if err != nil {
 			t.Fatalf("failed to load config: %v", err)
 		}
-		if cfg.Shims["cat"].Message != "Already exists" {
+		if cfg.Wrappers["cat"].Message != "Already exists" {
 			t.Error("original config was modified")
 		}
 	})
@@ -186,7 +186,7 @@ func TestRemoveShim(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 message = "Test block message"
 `
@@ -205,7 +205,7 @@ message = "Test block message"
 			t.Fatalf("failed to load config: %v", err)
 		}
 
-		if _, exists := cfg.Shims["cat"]; exists {
+		if _, exists := cfg.Wrappers["cat"]; exists {
 			t.Error("cat shim still exists after removal")
 		}
 
@@ -224,11 +224,11 @@ message = "Test block message"
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 message = "Test block message"
 
-[shims.tsc]
+[wrappers.tsc]
 action = "block"
 message = "Use pnpm run typecheck"
 `
@@ -247,11 +247,11 @@ message = "Use pnpm run typecheck"
 			t.Fatalf("failed to load config: %v", err)
 		}
 
-		if _, exists := cfg.Shims["cat"]; exists {
+		if _, exists := cfg.Wrappers["cat"]; exists {
 			t.Error("cat shim still exists after removal")
 		}
 
-		tscShim, exists := cfg.Shims["tsc"]
+		tscShim, exists := cfg.Wrappers["tsc"]
 		if !exists {
 			t.Error("tsc shim was incorrectly removed")
 		}
@@ -268,7 +268,7 @@ message = "Use pnpm run typecheck"
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -290,7 +290,7 @@ action = "block"
 		if err != nil {
 			t.Fatalf("failed to load config: %v", err)
 		}
-		if _, exists := cfg.Shims["cat"]; !exists {
+		if _, exists := cfg.Wrappers["cat"]; !exists {
 			t.Error("original shim was incorrectly removed")
 		}
 	})
@@ -320,7 +320,7 @@ func TestUpdateShim(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 message = "Test block message"
 `
@@ -345,7 +345,7 @@ message = "Test block message"
 			t.Fatalf("failed to load config: %v", err)
 		}
 
-		catShim, exists := cfg.Shims["cat"]
+		catShim, exists := cfg.Wrappers["cat"]
 		if !exists {
 			t.Fatal("cat shim not found after update")
 		}
@@ -374,11 +374,11 @@ message = "Test block message"
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 message = "Test block message"
 
-[shims.tsc]
+[wrappers.tsc]
 action = "block"
 message = "Use pnpm run typecheck"
 `
@@ -402,12 +402,12 @@ message = "Use pnpm run typecheck"
 			t.Fatalf("failed to load config: %v", err)
 		}
 
-		catShim := cfg.Shims["cat"]
+		catShim := cfg.Wrappers["cat"]
 		if catShim.Action != "warn" {
 			t.Error("cat shim was not updated")
 		}
 
-		tscShim := cfg.Shims["tsc"]
+		tscShim := cfg.Wrappers["tsc"]
 		if tscShim.Action != "block" || tscShim.Message != "Use pnpm run typecheck" {
 			t.Error("tsc shim was incorrectly modified")
 		}
@@ -421,7 +421,7 @@ message = "Use pnpm run typecheck"
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[wrappers.cat]
 action = "block"
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -472,7 +472,7 @@ func TestAtomicWrite(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		originalContent := `[shims.cat]
+		originalContent := `[wrappers.cat]
 action = "block"
 `
 		if err := os.WriteFile(configPath, []byte(originalContent), 0644); err != nil {
@@ -480,7 +480,7 @@ action = "block"
 		}
 
 		config := &ProjectConfig{
-			Shims: map[string]ShimConfig{
+			Wrappers: map[string]ShimConfig{
 				"cat": {Action: "warn"},
 			},
 		}
@@ -512,7 +512,7 @@ action = "block"
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 
 		config := &ProjectConfig{
-			Shims: map[string]ShimConfig{
+			Wrappers: map[string]ShimConfig{
 				"cat": {Action: "block", Message: "test"},
 			},
 		}
@@ -528,7 +528,7 @@ action = "block"
 			t.Fatalf("validation failed: %v", err)
 		}
 
-		if cfg.Shims["cat"].Action != "block" {
+		if cfg.Wrappers["cat"].Action != "block" {
 			t.Error("written config doesn't match expected")
 		}
 	})
@@ -546,7 +546,7 @@ action = "block"
 		// We can't easily force a validation failure with the current structure,
 		// but we can verify temp files are cleaned up in normal operation
 		config := &ProjectConfig{
-			Shims: map[string]ShimConfig{
+			Wrappers: map[string]ShimConfig{
 				"cat": {Action: "block"},
 			},
 		}
@@ -571,12 +571,12 @@ action = "block"
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		if err := os.WriteFile(configPath, []byte("[shims]\n"), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
 		config := &ProjectConfig{
-			Shims: map[string]ShimConfig{
+			Wrappers: map[string]ShimConfig{
 				"cat": {Action: "block"},
 			},
 		}

@@ -19,7 +19,7 @@ var shimCmd = &cobra.Command{
 	Long: `Install shims for all commands defined in the nearest ribbin.toml.
 
 This command finds the ribbin.toml in the current directory (or parent
-directories), then creates shims for each command listed in [shims.*] sections.
+directories), then creates shims for each command listed in [wrappers.*] sections.
 
 For each command, ribbin:
   1. Locates the original binary (via PATH or explicit paths in config)
@@ -94,7 +94,7 @@ Examples:
 		var shimmed, skipped, failed int
 		var refusedOutsideRepo []string
 
-		for name, shimCfg := range projectConfig.Shims {
+		for name, shimCfg := range projectConfig.Wrappers {
 			var paths []string
 
 			// If Paths is empty, resolve via shim.ResolveCommand

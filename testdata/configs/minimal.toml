@@ -1,2 +1,2 @@
-# Minimal valid config - empty shims
-[shims]
+# Minimal valid config - empty wrappers
+[wrappers]

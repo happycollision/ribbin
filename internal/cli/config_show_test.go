@@ -37,11 +37,11 @@ func TestConfigShowCommand_RootShimsOnly(t *testing.T) {
 
 	// Create a simple config with root shims only
 	configContent := `
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use pnpm instead"
 
-[shims.cat]
+[wrappers.cat]
 action = "warn"
 message = "Consider using bat"
 `
@@ -96,7 +96,7 @@ func TestConfigShowCommand_ScopeMatching(t *testing.T) {
 
 	// Create a config with scopes
 	configContent := `
-[shims.cat]
+[wrappers.cat]
 action = "warn"
 message = "root cat"
 
@@ -104,11 +104,11 @@ message = "root cat"
 path = "apps/frontend"
 extends = ["root"]
 
-[scopes.frontend.shims.npm]
+[scopes.frontend.wrappers.npm]
 action = "block"
 message = "Use pnpm"
 
-[scopes.frontend.shims.cat]
+[scopes.frontend.wrappers.cat]
 action = "block"
 message = "frontend cat override"
 `
@@ -171,7 +171,7 @@ func TestConfigShowCommand_JSONOutput(t *testing.T) {
 	defer cleanup()
 
 	configContent := `
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use pnpm"
 `
@@ -234,11 +234,11 @@ func TestConfigShowCommand_CommandFilter(t *testing.T) {
 	defer cleanup()
 
 	configContent := `
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use pnpm"
 
-[shims.cat]
+[wrappers.cat]
 action = "warn"
 message = "Use bat"
 `
@@ -283,7 +283,7 @@ func TestConfigShowCommand_CommandNotFound(t *testing.T) {
 	defer cleanup()
 
 	configContent := `
-[shims.npm]
+[wrappers.npm]
 action = "block"
 message = "Use pnpm"
 `
@@ -345,12 +345,12 @@ func TestConfigShowCommand_ProvenanceChain(t *testing.T) {
 
 	// Create a config with multiple layers of extends
 	configContent := `
-[shims.cat]
+[wrappers.cat]
 action = "warn"
 message = "root cat"
 
 [scopes.hardened]
-[scopes.hardened.shims.cat]
+[scopes.hardened.wrappers.cat]
 action = "block"
 message = "hardened cat"
 
@@ -358,7 +358,7 @@ message = "hardened cat"
 path = "apps/frontend"
 extends = ["root", "root.hardened"]
 
-[scopes.frontend.shims.cat]
+[scopes.frontend.wrappers.cat]
 action = "redirect"
 message = "frontend cat"
 redirect = "bat"

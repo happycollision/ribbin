@@ -278,8 +278,8 @@ func getEffectiveShimConfig(projectConfig *config.ProjectConfig, configPath stri
 	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		// Fall back to root shims if we can't get CWD
-		shimConfig, exists := projectConfig.Shims[cmdName]
+		// Fall back to root wrappers if we can't get CWD
+		shimConfig, exists := projectConfig.Wrappers[cmdName]
 		return shimConfig, exists
 	}
 
@@ -290,8 +290,8 @@ func getEffectiveShimConfig(projectConfig *config.ProjectConfig, configPath stri
 	resolver := config.NewResolver()
 	effectiveShims, err := resolver.ResolveEffectiveShims(projectConfig, configPath, matchingScope)
 	if err != nil {
-		// If resolution fails, fall back to root shims
-		shimConfig, exists := projectConfig.Shims[cmdName]
+		// If resolution fails, fall back to root wrappers
+		shimConfig, exists := projectConfig.Wrappers[cmdName]
 		return shimConfig, exists
 	}
 

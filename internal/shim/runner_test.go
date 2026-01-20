@@ -395,13 +395,13 @@ func TestFindBestMatchingScope(t *testing.T) {
 
 	t.Run("CWD in scope path - scope applies", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{
+			Wrappers: map[string]config.ShimConfig{
 				"cat": {Action: "block", Message: "root cat"},
 			},
 			Scopes: map[string]config.ScopeConfig{
 				"src": {
 					Path: "src",
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "src cat"},
 					},
 				},
@@ -419,17 +419,17 @@ func TestFindBestMatchingScope(t *testing.T) {
 
 	t.Run("multiple scopes match - deepest path wins", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{},
+			Wrappers: map[string]config.ShimConfig{},
 			Scopes: map[string]config.ScopeConfig{
 				"src": {
 					Path: "src",
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "src cat"},
 					},
 				},
 				"src-components": {
 					Path: "src/components",
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "components cat"},
 					},
 				},
@@ -447,13 +447,13 @@ func TestFindBestMatchingScope(t *testing.T) {
 
 	t.Run("no scope matches - returns nil (root shims used)", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{
+			Wrappers: map[string]config.ShimConfig{
 				"cat": {Action: "block", Message: "root cat"},
 			},
 			Scopes: map[string]config.ScopeConfig{
 				"src": {
 					Path: "src",
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "src cat"},
 					},
 				},
@@ -469,11 +469,11 @@ func TestFindBestMatchingScope(t *testing.T) {
 
 	t.Run("scope without path - defaults to config directory", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{},
+			Wrappers: map[string]config.ShimConfig{},
 			Scopes: map[string]config.ScopeConfig{
 				"default": {
 					Path: "", // Empty path defaults to "."
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "default cat"},
 					},
 				},
@@ -492,11 +492,11 @@ func TestFindBestMatchingScope(t *testing.T) {
 
 	t.Run("explicit dot path matches like empty path", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{},
+			Wrappers: map[string]config.ShimConfig{},
 			Scopes: map[string]config.ScopeConfig{
 				"root-scope": {
 					Path: ".",
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "root scope cat"},
 					},
 				},
@@ -533,13 +533,13 @@ func TestGetEffectiveShimConfig(t *testing.T) {
 
 	t.Run("returns root shim when no scope matches", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{
+			Wrappers: map[string]config.ShimConfig{
 				"cat": {Action: "block", Message: "root cat message"},
 			},
 			Scopes: map[string]config.ScopeConfig{
 				"src": {
 					Path: "src",
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "src cat message"},
 					},
 				},
@@ -563,14 +563,14 @@ func TestGetEffectiveShimConfig(t *testing.T) {
 
 	t.Run("returns scope shim when scope matches", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{
+			Wrappers: map[string]config.ShimConfig{
 				"cat": {Action: "block", Message: "root cat message"},
 			},
 			Scopes: map[string]config.ScopeConfig{
 				"src": {
 					Path:    "src",
 					Extends: []string{"root"}, // Explicitly extend root to inherit root shims
-					Shims: map[string]config.ShimConfig{
+					Wrappers: map[string]config.ShimConfig{
 						"cat": {Action: "block", Message: "src cat message"}, // Override root
 					},
 				},
@@ -594,7 +594,7 @@ func TestGetEffectiveShimConfig(t *testing.T) {
 
 	t.Run("returns false for non-existent command", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
-			Shims: map[string]config.ShimConfig{
+			Wrappers: map[string]config.ShimConfig{
 				"cat": {Action: "block", Message: "root cat"},
 			},
 			Scopes: map[string]config.ScopeConfig{},
@@ -673,28 +673,28 @@ func TestScopeMatchingIntegration(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "ribbin.toml")
 
 	projectConfig := &config.ProjectConfig{
-		Shims: map[string]config.ShimConfig{
+		Wrappers: map[string]config.ShimConfig{
 			"npm": {Action: "block", Message: "Use pnpm at root"},
 		},
 		Scopes: map[string]config.ScopeConfig{
 			"frontend": {
 				Path:    "frontend",
 				Extends: []string{"root"}, // Inherit root, then override
-				Shims: map[string]config.ShimConfig{
+				Wrappers: map[string]config.ShimConfig{
 					"npm": {Action: "passthrough"}, // Allow npm in frontend
 				},
 			},
 			"frontend-src": {
 				Path:    "frontend/src",
 				Extends: []string{"root"}, // Inherit root, then override
-				Shims: map[string]config.ShimConfig{
+				Wrappers: map[string]config.ShimConfig{
 					"npm": {Action: "block", Message: "No npm in src"},
 				},
 			},
 			"backend": {
 				Path:    "backend",
 				Extends: []string{"root"}, // Inherit root, then override
-				Shims: map[string]config.ShimConfig{
+				Wrappers: map[string]config.ShimConfig{
 					"npm": {Action: "redirect", Redirect: "./scripts/backend-npm.sh"},
 				},
 			},
