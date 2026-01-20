@@ -25,10 +25,14 @@ func Run(argv0 string, args []string) error {
 		return fmt.Errorf("original binary not found at %s", originalPath)
 	}
 
+	// Extract command name from argv0 (needed for verbose logging)
+	cmdName := extractCommandName(argv0)
+
 	// 3. Check RIBBIN_BYPASS=1 -> passthrough
 	if os.Getenv("RIBBIN_BYPASS") == "1" {
 		// Log bypass usage
 		security.LogBypassUsage(originalPath, os.Getpid())
+		verboseLogDecision(cmdName, "PASS", "RIBBIN_BYPASS=1")
 		return execOriginal(originalPath, args)
 	}
 
@@ -36,11 +40,13 @@ func Run(argv0 string, args []string) error {
 	registry, err := config.LoadRegistry()
 	if err != nil {
 		// If we can't load registry, passthrough
+		verboseLogDecision(cmdName, "PASS", "registry not found")
 		return execOriginal(originalPath, args)
 	}
 
 	// 5. If not active -> passthrough
 	if !isActive(registry) {
+		verboseLogDecision(cmdName, "PASS", "ribbin not active")
 		return execOriginal(originalPath, args)
 	}
 
@@ -48,6 +54,7 @@ func Run(argv0 string, args []string) error {
 	configPath, err := config.FindProjectConfig()
 	if err != nil || configPath == "" {
 		// No config found -> passthrough
+		verboseLogDecision(cmdName, "PASS", "no ribbin.toml found")
 		return execOriginal(originalPath, args)
 	}
 
@@ -55,22 +62,22 @@ func Run(argv0 string, args []string) error {
 	projectConfig, err := config.LoadProjectConfig(configPath)
 	if err != nil {
 		// Can't load config -> passthrough
+		verboseLogDecision(cmdName, "PASS", fmt.Sprintf("config load failed: %v", err))
 		return execOriginal(originalPath, args)
 	}
-
-	// Extract command name from argv0
-	cmdName := extractCommandName(argv0)
 
 	// 8. Determine effective shims based on scope matching
 	shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, cmdName)
 	if !exists {
 		// Command not in config -> passthrough
+		verboseLogDecision(cmdName, "PASS", "no shim configured")
 		return execOriginal(originalPath, args)
 	}
 
 	// 9. Check passthrough conditions
 	if shimConfig.Passthrough != nil {
 		if shouldPassthrough(shimConfig.Passthrough) {
+			verboseLogDecision(cmdName, "PASS", "parent process matched passthrough rule")
 			return execOriginal(originalPath, args)
 		}
 	}
@@ -78,17 +85,20 @@ func Run(argv0 string, args []string) error {
 	// 10. Handle action based on config
 	switch shimConfig.Action {
 	case "block":
+		verboseLogDecision(cmdName, "BLOCKED", shimConfig.Message)
 		printBlockMessage(cmdName, shimConfig.Message)
 		os.Exit(1)
 		return nil // unreachable, but satisfies compiler
 
 	case "passthrough":
 		// Explicit passthrough action - execute original binary
+		verboseLogDecision(cmdName, "PASS", "explicit passthrough action")
 		return execOriginal(originalPath, args)
 
 	case "redirect":
 		// Validate redirect field is not empty
 		if shimConfig.Redirect == "" {
+			verboseLogDecision(cmdName, "PASS", "redirect action but no script configured")
 			fmt.Fprintf(os.Stderr, "ribbin: redirect action specified but no redirect script configured for '%s', using original\n", cmdName)
 			return execOriginal(originalPath, args)
 		}
@@ -97,15 +107,18 @@ func Run(argv0 string, args []string) error {
 		scriptPath, err := resolveRedirectScript(shimConfig.Redirect, configPath)
 		if err != nil {
 			// Fail-open: warn and passthrough
+			verboseLogDecision(cmdName, "PASS", fmt.Sprintf("redirect failed: %v", err))
 			fmt.Fprintf(os.Stderr, "ribbin: redirect failed (%s), using original: %v\n", cmdName, err)
 			return execOriginal(originalPath, args)
 		}
 
 		// Execute redirect script
+		verboseLogDecision(cmdName, "REDIRECT", shimConfig.Redirect)
 		return execRedirect(scriptPath, originalPath, cmdName, args, configPath)
 
 	default:
 		// Unknown action or empty -> passthrough
+		verboseLogDecision(cmdName, "PASS", "no action specified")
 		return execOriginal(originalPath, args)
 	}
 }
