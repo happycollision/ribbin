@@ -230,6 +230,44 @@ ribbin uses a three-tier activation system:
 
 Use `ribbin status` to see current activation state and `ribbin deactivate` with corresponding flags to turn off.
 
+## Recovery
+
+If ribbin was uninstalled before running `ribbin unwrap`, your original binaries are still safe! The originals are stored alongside their paths with a `.ribbin-original` suffix.
+
+### Using ribbin recover
+
+If ribbin is still installed:
+
+```bash
+ribbin recover
+```
+
+This searches common binary directories for wrapped binaries and restores them.
+
+### If ribbin is not installed
+
+The easiest approach is to reinstall ribbin temporarily:
+
+```bash
+go install github.com/happycollision/ribbin/cmd/ribbin@latest
+ribbin recover
+# Then uninstall if desired
+```
+
+### Manual Recovery
+
+You can restore binaries manually. This is essentially what `ribbin recover` does (the real code has additional safety checks):
+
+```bash
+# Find wrapped binaries
+ls /usr/local/bin/*.ribbin-original ~/.local/bin/*.ribbin-original
+
+# For each one found, restore it:
+rm /usr/local/bin/tsc                                    # Remove symlink
+mv /usr/local/bin/tsc.ribbin-original /usr/local/bin/tsc # Restore original
+rm -f /usr/local/bin/tsc.ribbin-meta                     # Clean up metadata
+```
+
 ## Audit Logging
 
 Ribbin includes comprehensive security audit logging that tracks:
@@ -278,10 +316,11 @@ make scenario SCENARIO=basic            # Run specific scenario directly
 | Scenario | Description |
 |----------|-------------|
 | `basic` | Block and redirect actions with local wrapper commands |
+| `extends` | Config inheritance from mixins and external files |
 | `local-dev-mode` | Simulates ribbin in node_modules/.bin - tests repo-only shimming |
 | `mixed-permissions` | Demonstrates allowed vs forbidden directory security |
+| `recovery` | Test recovery command |
 | `scopes` | Directory-based configs (monorepo style) |
-| `extends` | Config inheritance from mixins and external files |
 
 Inside the scenario shell, ribbin is pre-installed and you can test commands interactively. Type `exit` to leave.
 

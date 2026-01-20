@@ -105,10 +105,11 @@ make scenario SCENARIO=basic            # Run specific scenario directly
 | Scenario | Description |
 |----------|-------------|
 | `basic` | Block and redirect actions with local wrapper commands |
+| `extends` | Config inheritance from mixins and external files |
 | `local-dev-mode` | Simulates ribbin in node_modules/.bin - tests repo-only shimming |
 | `mixed-permissions` | Demonstrates allowed vs forbidden directory security |
+| `recovery` | Test recovery command |
 | `scopes` | Directory-based configs (monorepo style) |
-| `extends` | Config inheritance from mixins and external files |
 
 Inside the scenario shell, ribbin is pre-installed and you can test wrap/unwrap/activate commands. Type `exit` to leave.
 
