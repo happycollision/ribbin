@@ -40,18 +40,18 @@ Only specific directories are allowed for shimming to prevent critical system mo
 - User-local binaries (`~/.local/bin`, `~/bin`)
 - Project-local binaries (`./bin`, `./node_modules/.bin`)
 - Homebrew locations (`/usr/local/bin`, `/opt/homebrew/bin`)
-- System package managers (`/usr/bin`, `/usr/local/bin` with confirmation)
 
-**Forbidden Categories:**
+**Requires Confirmation (`--confirm-system-dir`):**
+- Core system directories (`/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`)
 - System configuration (`/etc`)
-- Kernel interfaces (`/sys`, `/proc`, `/dev`)
-- Core system binaries (`/bin`, `/sbin`)
-- Boot files (`/boot`)
+- macOS system (`/System`)
 
-**Critical System Binaries (Always Blocked):**
+**Critical System Binaries (Always Blocked by Name):**
 - Shell: `bash`, `sh`, `zsh`, `fish`
-- System: `sudo`, `su`, `login`, `init`, `systemd`
-- Core utilities: `chmod`, `chown`, `rm`, `mv`, `cp`
+- Privilege escalation: `sudo`, `su`, `doas`
+- Remote access: `ssh`, `sshd`
+- Authentication: `login`, `passwd`
+- System init: `init`, `systemd`, `launchd`
 
 **Implementation:** [internal/security/allowlist.go](../internal/security/allowlist.go)
 
@@ -183,14 +183,16 @@ Operations that require elevated privileges are logged and warned about.
 
 **Example:**
 ```bash
-# Attempting to shim system directory
+# Attempting to shim system directory without flag
 ribbin shim /usr/bin/cat
 
 # Output:
-# permission denied: /usr/bin/cat
+# shimming /usr/bin/cat requires explicit confirmation
 #
-# If you understand the security implications:
-#   sudo ribbin shim cat --confirm-system-dir
+# Use --confirm-system-dir flag if you understand the security implications
+
+# With flag - allowed (if you have write permission)
+sudo ribbin shim --confirm-system-dir
 ```
 
 All privileged operations are logged to the audit log with the `elevated` flag set.

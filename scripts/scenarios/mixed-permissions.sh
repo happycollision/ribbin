@@ -1,11 +1,10 @@
 #!/bin/bash
-# Description: Mixed permission levels (allowed, confirmation-required, forbidden)
+# Description: Mixed permission levels (allowed, confirmation-required)
 
 set -e
 
 SCENARIO_DIR="$HOME/scenario"
 LOCAL_BIN="$HOME/.local/bin"
-SYSTEM_BIN="/usr/local/bin"
 
 echo "Setting up mixed-permissions scenario..."
 echo ""
@@ -41,52 +40,54 @@ action = "block"
 message = "Use 'npm run tool' instead"
 paths = ["$LOCAL_BIN/my-tool"]
 
-# REQUIRES CONFIRMATION: /usr/local/bin - needs --confirm-system-dir
-# (In Docker, we have write access to /usr/local/bin as root built it)
-[shims.curl]
+# ALLOWED: /usr/local/bin - no confirmation needed
+[shims.jq]
 action = "warn"
-message = "Consider using httpie for better output"
-# Will try to resolve from PATH, landing in /usr/bin (forbidden) or /usr/local/bin (confirmation)
+message = "Consider using gojq for better performance"
+# Will resolve from PATH to /usr/local/bin/jq (allowed)
 
-# FORBIDDEN: /bin, /usr/bin - never allowed
+# REQUIRES CONFIRMATION: /bin, /usr/bin - needs --confirm-system-dir
 [shims.cat]
 action = "block"
 message = "Use bat instead"
-# Will try to resolve from PATH, landing in /bin/cat (forbidden)
+# Will resolve from PATH to /bin/cat (requires confirmation)
 
 [shims.ls]
 action = "warn"
 message = "Use exa for better output"
-# Will also be in /bin (forbidden)
+# Will resolve from PATH to /bin/ls (requires confirmation)
 EOF
 
 cat > README.md << 'EOF'
 # Mixed Permissions Scenario
 
-This scenario demonstrates ribbin's three permission levels:
+This scenario demonstrates ribbin's permission levels:
 
 ## Permission Levels
 
 1. **ALLOWED** - No confirmation needed
    - `~/.local/bin/*`
    - `~/go/bin/*`
+   - `/usr/local/bin/*`
+   - `/opt/homebrew/bin/*`
    - `./node_modules/.bin/*`
 
 2. **REQUIRES CONFIRMATION** - Needs `--confirm-system-dir` flag
-   - `/usr/local/bin/*`
-   - `/opt/homebrew/bin/*`
-
-3. **FORBIDDEN** - Never allowed (system directories)
    - `/bin/*`
    - `/usr/bin/*`
    - `/sbin/*`
 
+3. **ALWAYS BLOCKED** - Critical binaries blocked by name
+   - `bash`, `sh`, `zsh`, `fish` (shells)
+   - `sudo`, `su`, `doas` (privilege escalation)
+   - `ssh`, `sshd` (remote access)
+
 ## In this scenario:
 
 - `my-tool` → `~/.local/bin/my-tool` → **ALLOWED**
-- `curl` → `/usr/bin/curl` → **FORBIDDEN** (system)
-- `cat` → `/bin/cat` → **FORBIDDEN** (system)
-- `ls` → `/bin/ls` → **FORBIDDEN** (system)
+- `jq` → `/usr/local/bin/jq` → **ALLOWED**
+- `cat` → `/bin/cat` → **REQUIRES CONFIRMATION**
+- `ls` → `/bin/ls` → **REQUIRES CONFIRMATION**
 
 ## Try these commands:
 
@@ -94,24 +95,30 @@ This scenario demonstrates ribbin's three permission levels:
    ```
    ribbin shim
    ```
-   Only `my-tool` should succeed. Others should fail with security errors.
+   Only `my-tool` and `jq` should succeed. `cat` and `ls` will fail.
 
-2. Try with confirmation flag (won't help forbidden dirs):
+2. Run with confirmation flag:
    ```
    ribbin shim --confirm-system-dir
    ```
-   Still can't shim /bin/* binaries - they're in forbidden directories.
+   Now `cat` and `ls` will also be shimmed (we're root in Docker).
 
 3. Check what got shimmed:
    ```
    ls -la ~/.local/bin/
+   ls -la /bin/cat /bin/ls
+   ```
+
+4. Unshim everything:
+   ```
+   ribbin unshim
    ```
 
 ## Key insight:
 
-ribbin protects system binaries by refusing to shim them, even if you have
-write permission. This prevents accidental or malicious modification of
-critical system tools.
+ribbin allows shimming system directories with explicit confirmation.
+Critical binaries (bash, sudo, ssh, etc.) are always blocked by name,
+regardless of the --confirm-system-dir flag.
 EOF
 
 # Initial commit
@@ -125,17 +132,17 @@ echo ""
 echo "Working directory: $SCENARIO_DIR"
 echo ""
 echo "Permission levels in this config:"
-echo "  ALLOWED:    my-tool  -> ~/.local/bin/my-tool"
-echo "  FORBIDDEN:  cat      -> /bin/cat"
-echo "  FORBIDDEN:  ls       -> /bin/ls"
-echo "  FORBIDDEN:  curl     -> /usr/bin/curl"
+echo "  ALLOWED:              my-tool -> ~/.local/bin/my-tool"
+echo "  ALLOWED:              jq      -> /usr/local/bin/jq"
+echo "  REQUIRES CONFIRMATION: cat     -> /bin/cat"
+echo "  REQUIRES CONFIRMATION: ls      -> /bin/ls"
 echo ""
 echo "Try: ribbin shim"
-echo "  - my-tool will succeed (allowed directory)"
-echo "  - cat/ls/curl will fail (system directories)"
+echo "  - my-tool and jq will succeed (allowed directories)"
+echo "  - cat and ls will fail (need --confirm-system-dir)"
 echo ""
-echo "Even --confirm-system-dir won't help with /bin/*"
-echo "Those are FORBIDDEN, not just confirmation-required."
+echo "Then try: ribbin shim --confirm-system-dir"
+echo "  - All four will succeed"
 echo ""
 echo "Type 'exit' to leave the scenario."
 echo "========================================"

@@ -32,13 +32,12 @@ the original binary.
 
 Security:
   - Critical system binaries (bash, sudo, ssh) are never shimmed
-  - System directories (/bin, /usr/bin, /sbin) are protected
-  - User directories (~/.local/bin, ~/go/bin) are allowed by default
-  - System directories like /usr/local/bin require --confirm-system-dir flag
+  - User directories (~/.local/bin, ~/go/bin) and /usr/local/bin are allowed
+  - System directories (/bin, /usr/bin, /sbin) require --confirm-system-dir flag
 
 Examples:
   ribbin shim                            # Install shims for commands in ribbin.toml
-  ribbin shim --confirm-system-dir       # Allow shimming in /usr/local/bin`,
+  ribbin shim --confirm-system-dir       # Allow shimming in /bin, /usr/bin, etc.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Step 1: Check for Local Development Mode
 		// When ribbin is installed as a dev dependency (inside a git repo),

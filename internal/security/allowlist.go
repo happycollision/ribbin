@@ -41,23 +41,24 @@ func DefaultAllowlist() *AllowlistConfig {
 			filepath.Join(home, "go", "bin"),
 			filepath.Join(home, ".cargo", "bin"),
 			filepath.Join(home, "bin"),
-			"./bin",                // Project-local bin
-			"./node_modules/.bin",  // npm bins
-		},
-
-		ConfirmationDirs: []string{
+			"./bin",               // Project-local bin
+			"./node_modules/.bin", // npm bins
 			"/usr/local/bin",
 			"/opt/homebrew/bin",
 			"/opt/*/bin",
 		},
 
-		ForbiddenDirs: []string{
+		ConfirmationDirs: []string{
 			"/bin",
 			"/sbin",
 			"/usr/bin",
 			"/usr/sbin",
 			"/usr/libexec",
 			"/System",
+		},
+
+		ForbiddenDirs: []string{
+			// Empty - critical binaries are blocked by name, not directory
 		},
 
 		CriticalBinaries: []string{

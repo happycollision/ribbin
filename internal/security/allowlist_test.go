@@ -75,42 +75,42 @@ func TestGetDirectoryCategory(t *testing.T) {
 		{
 			name:     "usr local bin",
 			path:     "/usr/local/bin/tool",
-			category: CategoryRequiresConfirmation,
+			category: CategoryAllowed,
 		},
 		{
 			name:     "opt homebrew bin",
 			path:     "/opt/homebrew/bin/node",
-			category: CategoryRequiresConfirmation,
+			category: CategoryAllowed,
 		},
 		{
 			name:     "usr bin",
-			path:     "/usr/bin/bash",
-			category: CategoryForbidden,
+			path:     "/usr/bin/myapp",
+			category: CategoryRequiresConfirmation,
 		},
 		{
 			name:     "bin",
-			path:     "/bin/sh",
-			category: CategoryForbidden,
+			path:     "/bin/myapp",
+			category: CategoryRequiresConfirmation,
 		},
 		{
 			name:     "sbin",
-			path:     "/sbin/init",
-			category: CategoryForbidden,
+			path:     "/sbin/myapp",
+			category: CategoryRequiresConfirmation,
 		},
 		{
 			name:     "usr sbin",
-			path:     "/usr/sbin/sshd",
-			category: CategoryForbidden,
+			path:     "/usr/sbin/myapp",
+			category: CategoryRequiresConfirmation,
 		},
 		{
 			name:     "usr libexec",
 			path:     "/usr/libexec/something",
-			category: CategoryForbidden,
+			category: CategoryRequiresConfirmation,
 		},
 		{
 			name:     "System directory (macOS)",
 			path:     "/System/Library/something",
-			category: CategoryForbidden,
+			category: CategoryRequiresConfirmation,
 		},
 		{
 			name:     "random directory",
@@ -152,18 +152,23 @@ func TestIsAllowedDirectory(t *testing.T) {
 			allowed: true,
 		},
 		{
-			name:    "usr bin forbidden",
-			path:    "/usr/bin/bash",
-			allowed: false,
-		},
-		{
-			name:    "bin forbidden",
-			path:    "/bin/sh",
-			allowed: false,
-		},
-		{
-			name:    "usr local bin not allowed by default",
+			name:    "usr local bin allowed",
 			path:    "/usr/local/bin/tool",
+			allowed: true,
+		},
+		{
+			name:    "opt homebrew bin allowed",
+			path:    "/opt/homebrew/bin/node",
+			allowed: true,
+		},
+		{
+			name:    "usr bin not allowed",
+			path:    "/usr/bin/myapp",
+			allowed: false,
+		},
+		{
+			name:    "bin not allowed",
+			path:    "/bin/myapp",
 			allowed: false,
 		},
 	}
@@ -189,19 +194,24 @@ func TestRequiresConfirmation(t *testing.T) {
 		requires bool
 	}{
 		{
-			name:     "usr local bin requires confirmation",
+			name:     "usr local bin does not require confirmation (allowed)",
 			path:     "/usr/local/bin/tool",
-			requires: true,
-		},
-		{
-			name:     "opt homebrew bin requires confirmation",
-			path:     "/opt/homebrew/bin/node",
-			requires: true,
-		},
-		{
-			name:     "usr bin does not require confirmation (forbidden)",
-			path:     "/usr/bin/bash",
 			requires: false,
+		},
+		{
+			name:     "opt homebrew bin does not require confirmation (allowed)",
+			path:     "/opt/homebrew/bin/node",
+			requires: false,
+		},
+		{
+			name:     "usr bin requires confirmation",
+			path:     "/usr/bin/myapp",
+			requires: true,
+		},
+		{
+			name:     "bin requires confirmation",
+			path:     "/bin/myapp",
+			requires: true,
 		},
 		{
 			name:     "user bin does not require confirmation (allowed)",
@@ -243,7 +253,7 @@ func TestValidateBinaryForShim_CriticalBinary(t *testing.T) {
 	}
 }
 
-func TestValidateBinaryForShim_ForbiddenDirectory(t *testing.T) {
+func TestValidateBinaryForShim_ConfirmationDirectory(t *testing.T) {
 	tests := []struct {
 		name string
 		path string
@@ -268,31 +278,30 @@ func TestValidateBinaryForShim_ForbiddenDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Without confirmation flag - should fail
 			err := ValidateBinaryForShim(tt.path, false)
 			if err == nil {
 				t.Errorf("ValidateBinaryForShim(%s, false) expected error, got nil", tt.path)
 				return
 			}
-			if !containsString(err.Error(), "protected") && !containsString(err.Error(), "system directory") {
-				t.Errorf("ValidateBinaryForShim(%s, false) error should mention 'protected' or 'system directory', got: %v", tt.path, err)
+			if !containsString(err.Error(), "confirmation") {
+				t.Errorf("ValidateBinaryForShim(%s, false) error should mention 'confirmation', got: %v", tt.path, err)
+			}
+
+			// With confirmation flag - should succeed
+			err = ValidateBinaryForShim(tt.path, true)
+			if err != nil {
+				t.Errorf("ValidateBinaryForShim(%s, true) expected no error, got: %v", tt.path, err)
 			}
 		})
 	}
 }
 
-func TestValidateBinaryForShim_RequiresConfirmation(t *testing.T) {
-	// Without confirmation flag
+func TestValidateBinaryForShim_UsrLocalBinAllowed(t *testing.T) {
+	// /usr/local/bin is now allowed without confirmation
 	err := ValidateBinaryForShim("/usr/local/bin/myapp", false)
-	if err == nil {
-		t.Error("ValidateBinaryForShim(/usr/local/bin/myapp, false) expected error, got nil")
-	} else if !containsString(err.Error(), "confirmation") {
-		t.Errorf("ValidateBinaryForShim(/usr/local/bin/myapp, false) error should mention 'confirmation', got: %v", err)
-	}
-
-	// With confirmation flag
-	err = ValidateBinaryForShim("/usr/local/bin/myapp", true)
 	if err != nil {
-		t.Errorf("ValidateBinaryForShim(/usr/local/bin/myapp, true) expected no error, got: %v", err)
+		t.Errorf("ValidateBinaryForShim(/usr/local/bin/myapp, false) expected no error, got: %v", err)
 	}
 }
 
@@ -402,19 +411,9 @@ func TestDefaultAllowlist(t *testing.T) {
 		}
 	}
 
-	// Verify forbidden directories are included
-	forbiddenDirs := []string{"/bin", "/sbin", "/usr/bin", "/usr/sbin"}
-	for _, dir := range forbiddenDirs {
-		found := false
-		for _, forbidden := range config.ForbiddenDirs {
-			if forbidden == dir {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("DefaultAllowlist() ForbiddenDirs should include %s", dir)
-		}
+	// Verify forbidden directories is empty (critical binaries blocked by name only)
+	if len(config.ForbiddenDirs) != 0 {
+		t.Errorf("DefaultAllowlist() ForbiddenDirs should be empty, got %v", config.ForbiddenDirs)
 	}
 
 	// Verify allowed directories are included
@@ -422,6 +421,8 @@ func TestDefaultAllowlist(t *testing.T) {
 	allowedDirs := []string{
 		filepath.Join(home, ".local", "bin"),
 		filepath.Join(home, "go", "bin"),
+		"/usr/local/bin",
+		"/opt/homebrew/bin",
 	}
 	for _, dir := range allowedDirs {
 		found := false
@@ -436,8 +437,8 @@ func TestDefaultAllowlist(t *testing.T) {
 		}
 	}
 
-	// Verify confirmation directories are included
-	confirmDirs := []string{"/usr/local/bin", "/opt/homebrew/bin"}
+	// Verify confirmation directories are included (system dirs requiring --confirm-system-dir)
+	confirmDirs := []string{"/bin", "/sbin", "/usr/bin", "/usr/sbin"}
 	for _, dir := range confirmDirs {
 		found := false
 		for _, confirm := range config.ConfirmationDirs {

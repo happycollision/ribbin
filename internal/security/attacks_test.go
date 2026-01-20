@@ -246,18 +246,49 @@ func TestAttack_Allowlist_AllCriticalBinaries(t *testing.T) {
 	}
 }
 
-func TestAttack_Allowlist_ForbiddenDirectories(t *testing.T) {
-	forbiddenPaths := []string{
+func TestAttack_Allowlist_SystemDirectoriesRequireConfirmation(t *testing.T) {
+	// System directories require --confirm-system-dir flag
+	systemPaths := []string{
 		"/bin/sometool",
 		"/sbin/sometool",
 		"/usr/bin/sometool",
 		"/usr/sbin/sometool",
+		"/usr/libexec/sometool",
+		"/System/sometool",
+	}
+
+	for _, path := range systemPaths {
+		t.Run(path, func(t *testing.T) {
+			category, err := GetDirectoryCategory(path)
+			if err != nil {
+				// Error is acceptable
+				return
+			}
+			if category != CategoryRequiresConfirmation {
+				t.Errorf("should require confirmation: %s (got %v)", path, category)
+			}
+
+			// Without confirmation should fail
+			err = ValidateBinaryForShim(path, false)
+			if err == nil {
+				t.Errorf("should require confirmation flag: %s", path)
+			}
+
+			// With confirmation should succeed
+			err = ValidateBinaryForShim(path, true)
+			if err != nil {
+				t.Errorf("should allow with confirmation: %s, got error: %v", path, err)
+			}
+		})
+	}
+}
+
+func TestAttack_Allowlist_UnknownDirectoriesForbidden(t *testing.T) {
+	// Unknown directories (not in allowed or confirmation lists) are forbidden
+	forbiddenPaths := []string{
 		"/etc/sometool",
 		"/var/sometool",
-		"/sys/sometool",
-		"/proc/sometool",
-		"/dev/sometool",
-		"/boot/sometool",
+		"/tmp/sometool",
 		"/root/sometool",
 	}
 
@@ -275,27 +306,19 @@ func TestAttack_Allowlist_ForbiddenDirectories(t *testing.T) {
 	}
 }
 
-func TestAttack_Allowlist_ConfirmationRequired(t *testing.T) {
-	// These paths should require confirmation but not be outright forbidden
-	requireConfirmation := []string{
+func TestAttack_Allowlist_AllowedDirectories(t *testing.T) {
+	// These paths are now allowed without confirmation
+	allowedPaths := []string{
 		"/usr/local/bin/mytool",
 		"/opt/homebrew/bin/mytool",
-		"/opt/local/bin/mytool",
 	}
 
-	for _, path := range requireConfirmation {
+	for _, path := range allowedPaths {
 		t.Run(path, func(t *testing.T) {
-			// Without confirmation should fail
+			// Should succeed without confirmation flag
 			err := ValidateBinaryForShim(path, false)
-			if err == nil {
-				t.Errorf("should require confirmation: %s", path)
-			}
-
-			// With confirmation should succeed (unless file doesn't exist)
-			err = ValidateBinaryForShim(path, true)
-			// May fail due to file not existing, but shouldn't fail for allowlist reasons
-			if err != nil && strings.Contains(err.Error(), "confirmation") {
-				t.Errorf("should allow with confirmation: %s", path)
+			if err != nil {
+				t.Errorf("should be allowed without confirmation: %s, got error: %v", path, err)
 			}
 		})
 	}
