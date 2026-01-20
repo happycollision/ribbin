@@ -21,7 +21,7 @@ var (
 var configAddCmd = &cobra.Command{
 	Use:   "add <command>",
 	Short: "Add a new shim configuration",
-	Long: `Add a new shim configuration to ribbin.toml.
+	Long: `Add a new shim configuration to ribbin.jsonc.
 
 For block actions, specify --action block and optionally --message.
 For redirect actions, specify --action redirect and --redirect (script path).
@@ -52,14 +52,14 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("action must be either 'block' or 'redirect'")
 	}
 
-	// Find ribbin.toml
+	// Find ribbin.jsonc
 	configPath, err := config.FindProjectConfig()
 	if err != nil {
 		return fmt.Errorf("failed to find config: %w", err)
 	}
 
 	if configPath == "" {
-		return fmt.Errorf("ribbin.toml not found. Run 'ribbin init' first.")
+		return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
 	}
 
 	// Load existing config to check for duplicates

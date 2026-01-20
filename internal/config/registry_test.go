@@ -70,13 +70,13 @@ func TestLoadRegistry(t *testing.T) {
 		// Write a registry file
 		registry := Registry{
 			Wrappers: map[string]WrapperEntry{
-				"cat": {Original: "/usr/bin/cat", Config: "/project/ribbin.toml"},
+				"cat": {Original: "/usr/bin/cat", Config: "/project/ribbin.jsonc"},
 			},
 			ShellActivations: map[int]ShellActivationEntry{
 				1234: {PID: 1234, ActivatedAt: time.Now()},
 			},
 			ConfigActivations: map[string]ConfigActivationEntry{
-				"/project/ribbin.toml": {ActivatedAt: time.Now()},
+				"/project/ribbin.jsonc": {ActivatedAt: time.Now()},
 			},
 			GlobalActive: true,
 		}
@@ -261,17 +261,17 @@ func TestConfigActivationHelpers(t *testing.T) {
 	}
 
 	t.Run("AddConfigActivation adds config", func(t *testing.T) {
-		registry.AddConfigActivation("/path/to/ribbin.toml")
+		registry.AddConfigActivation("/path/to/ribbin.jsonc")
 
-		if _, exists := registry.ConfigActivations["/path/to/ribbin.toml"]; !exists {
+		if _, exists := registry.ConfigActivations["/path/to/ribbin.jsonc"]; !exists {
 			t.Error("config should be added")
 		}
 	})
 
 	t.Run("RemoveConfigActivation removes config", func(t *testing.T) {
-		registry.RemoveConfigActivation("/path/to/ribbin.toml")
+		registry.RemoveConfigActivation("/path/to/ribbin.jsonc")
 
-		if _, exists := registry.ConfigActivations["/path/to/ribbin.toml"]; exists {
+		if _, exists := registry.ConfigActivations["/path/to/ribbin.jsonc"]; exists {
 			t.Error("config should be removed")
 		}
 	})

@@ -1,0 +1,65 @@
+{
+  // Test fixture for scoped configurations
+  // Tests: root wrappers, scopes with path, extends, passthrough override
+  "wrappers": {
+    // Root-level wrappers (available to scopes that extend root)
+    "cat": {
+      "action": "block",
+      "message": "Use 'bat' instead"
+    },
+    "npm": {
+      "action": "block",
+      "message": "Use 'pnpm' instead"
+    },
+    "rm": {
+      "action": "warn",
+      "message": "Be careful with rm"
+    }
+  },
+  "scopes": {
+    // Frontend scope: extends root, adds yarn block
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root"],
+      "wrappers": {
+        "yarn": {
+          "action": "block",
+          "message": "Use pnpm in frontend"
+        },
+        // Frontend also overrides rm to block (stricter)
+        "rm": {
+          "action": "block",
+          "message": "Use trash in frontend"
+        }
+      }
+    },
+    // Backend scope: extends root and hardened mixin
+    "backend": {
+      "path": "apps/backend",
+      "extends": ["root", "root.hardened"],
+      "wrappers": {
+        "npm": {
+          "action": "passthrough"
+        }
+      }
+    },
+    // Hardened mixin (no path, used via extends)
+    "hardened": {
+      "wrappers": {
+        "rm": {
+          "action": "block",
+          "message": "Use trash (hardened)"
+        },
+        "curl": {
+          "action": "warn",
+          "message": "Consider using httpie"
+        }
+      }
+    },
+    // External scope: extends from external file
+    "external-test": {
+      "path": "external",
+      "extends": ["./external/ribbin.jsonc"]
+    }
+  }
+}

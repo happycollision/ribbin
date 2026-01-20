@@ -1,6 +1,6 @@
 # Ribbin Documentation
 
-Comprehensive documentation for ribbin, the command shimming tool.
+Comprehensive documentation for ribbin, the command wrapping tool.
 
 ## Getting Started
 
@@ -10,9 +10,9 @@ Comprehensive documentation for ribbin, the command shimming tool.
 ## Features
 
 ### Core Features
-- **Command Shimming** - Intercept and block/redirect commands
-- **Project Configuration** - Per-project `ribbin.toml` files
-- **Activation Modes** - Shell-scoped or global activation
+- **Command Wrapping** - Intercept and block/warn/redirect commands
+- **Project Configuration** - Per-project `ribbin.jsonc` files
+- **Activation Modes** - Config-scoped, shell-scoped, or global activation
 
 ### Security Features
 - [Security Overview](security.md) - Comprehensive security features
@@ -28,29 +28,44 @@ Comprehensive documentation for ribbin, the command shimming tool.
 
 ### Basic Configuration
 
-Create a `ribbin.toml` file in your project:
+Create a `ribbin.jsonc` file in your project:
 
-```toml
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' instead"
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead"
+    }
+  }
+}
 ```
 
 ### Advanced Configuration
 
 **Redirect Actions:**
-```toml
-[shims.tsc]
-action = "redirect"
-redirect = "./scripts/typecheck-wrapper.sh"
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "redirect",
+      "redirect": "./scripts/typecheck-wrapper.sh"
+    }
+  }
+}
 ```
 
 **Path Restrictions:**
-```toml
-[shims.curl]
-action = "block"
-message = "Use the project's API client instead"
-paths = ["/usr/bin/curl", "/bin/curl"]
+```jsonc
+{
+  "wrappers": {
+    "curl": {
+      "action": "block",
+      "message": "Use the project's API client instead",
+      "paths": ["/usr/bin/curl", "/bin/curl"]
+    }
+  }
+}
 ```
 
 See [Configuration Options](../README.md#configuration) for full details.
@@ -59,16 +74,19 @@ See [Configuration Options](../README.md#configuration) for full details.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `ribbin init` | Initialize ribbin.toml | [README](../README.md#quick-start) |
-| `ribbin shim` | Install shims | [README](../README.md#quick-start) |
-| `ribbin unshim` | Remove shims | [README](../README.md#commands) |
-| `ribbin activate` | Shell-scoped activation | [README](../README.md#activation-modes) |
-| `ribbin on/off` | Global activation | [README](../README.md#activation-modes) |
+| `ribbin init` | Initialize ribbin.jsonc | [README](../README.md#quick-start) |
+| `ribbin wrap` | Install wrappers | [README](../README.md#quick-start) |
+| `ribbin unwrap` | Remove wrappers | [README](../README.md#commands) |
+| `ribbin activate` | Activate ribbin (config, shell, or global) | [README](../README.md#activation-modes) |
+| `ribbin deactivate` | Deactivate ribbin | [README](../README.md#commands) |
+| `ribbin status` | Show activation status | Run `ribbin status --help` |
+| `ribbin recover` | Recover orphaned wrappers | Run `ribbin recover --help` |
 | `ribbin audit show` | View audit log | [Audit Logging](audit-logging.md) |
 | `ribbin audit summary` | View audit statistics | [Audit Logging](audit-logging.md) |
-| `ribbin config add` | Add shim config | Run `ribbin config add --help` |
-| `ribbin config remove` | Remove shim config | Run `ribbin config remove --help` |
-| `ribbin config list` | List shim configs | Run `ribbin config list --help` |
+| `ribbin config add` | Add wrapper config | Run `ribbin config add --help` |
+| `ribbin config remove` | Remove wrapper config | Run `ribbin config remove --help` |
+| `ribbin config list` | List wrapper configs | Run `ribbin config list --help` |
+| `ribbin config show` | Show effective config | Run `ribbin config show --help` |
 
 ## Security
 
@@ -91,33 +109,48 @@ Ribbin includes comprehensive security hardening:
 ## Use Cases
 
 ### TypeScript Projects
-```toml
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' - it uses the project's tsconfig"
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' - it uses the project's tsconfig"
+    }
+  }
+}
 ```
 
 ### Package Manager Enforcement
-```toml
-[shims.npm]
-action = "block"
-message = "This project uses pnpm"
+```jsonc
+{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm"
+    }
+  }
+}
 ```
 
 ### AI Agent Guardrails
 
 See the full [AI Coding Agents Guide](agent-integration.md) for setup with bypass examples.
 
-```toml
-# Block direct tsc - guide to project script
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' to use project's tsconfig"
-
-# Enforce package manager
-[shims.npm]
-action = "block"
-message = "This project uses pnpm"
+```jsonc
+{
+  "wrappers": {
+    // Block direct tsc - guide to project script
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' to use project's tsconfig"
+    },
+    // Enforce package manager
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm"
+    }
+  }
+}
 ```
 
 Then in `package.json`, bypass ribbin for the actual script:
@@ -141,7 +174,9 @@ Ribbin uses a "sidecar" approach:
 2. Symlink created: `npm` → `ribbin`
 3. When invoked, ribbin checks configuration
 4. If blocked: show error message
-5. Otherwise: exec original binary
+5. If warned: show warning, then run original
+6. If redirected: run redirect script
+7. Otherwise: exec original binary
 
 See [How It Works](../README.md#how-it-works) for details.
 
@@ -151,7 +186,7 @@ See [How It Works](../README.md#how-it-works) for details.
 ~/.local/bin/ribbin              # Ribbin binary
 ~/.config/ribbin/registry.json   # Global registry
 ~/.local/state/ribbin/audit.log  # Audit log
-project/ribbin.toml              # Project config
+project/ribbin.jsonc             # Project config
 ```
 
 ### File Locations
@@ -159,7 +194,7 @@ project/ribbin.toml              # Project config
 - **Binary**: Installed to `$GOPATH/bin` or `/usr/local/bin`
 - **Registry**: `$XDG_CONFIG_HOME/ribbin/registry.json` (default: `~/.config/ribbin/`)
 - **Audit Log**: `$XDG_STATE_HOME/ribbin/audit.log` (default: `~/.local/state/ribbin/`)
-- **Config**: `ribbin.toml` in project root
+- **Config**: `ribbin.jsonc` in project root
 
 ## Development
 
@@ -185,8 +220,8 @@ make test-coverage
 cmd/ribbin/              # CLI entry point
 internal/
   cli/                   # CLI commands (Cobra)
-  config/                # Config file parsing (TOML)
-  shim/                  # Shim logic
+  config/                # Config file parsing (JSONC)
+  wrap/                  # Wrapper logic
   security/              # Security features
     paths.go             # Path validation
     allowlist.go         # Directory allowlist
@@ -199,35 +234,36 @@ docs/                    # Documentation
 
 ## Troubleshooting
 
-### Shim Not Working
+### Wrapper Not Working
 
 1. Check if ribbin is active:
    ```bash
-   ribbin on  # or ribbin activate
+   ribbin status
+   ribbin activate --global  # or --shell
    ```
 
-2. Verify shim is installed:
+2. Verify wrapper is installed:
    ```bash
    ls -la $(which command)
    ```
 
-3. Check for ribbin.toml:
+3. Check for ribbin.jsonc:
    ```bash
-   ls ribbin.toml
+   ls ribbin.jsonc
    ```
 
 ### Permission Denied
 
 Use sudo for system directories:
 ```bash
-sudo ribbin shim curl --confirm-system-dir
+sudo ribbin wrap --confirm-system-dir
 ```
 
 Or use user-local directories:
 ```bash
 mkdir -p ~/.local/bin
 # Add ~/.local/bin to PATH
-ribbin shim ~/.local/bin/mycommand
+ribbin wrap
 ```
 
 ### Bypass Not Working

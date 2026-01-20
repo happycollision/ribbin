@@ -1,0 +1,45 @@
+{
+  // Valid ribbin configuration for testing
+  "wrappers": {
+    "curl": {
+      "action": "block",
+      "message": "Use the project's API client instead",
+      "paths": ["/usr/bin/curl", "/bin/curl"]
+    },
+    "npm": {
+      "action": "block",
+      "message": "Use 'pnpm' instead"
+    },
+    // Example with passthrough: block tsc directly, but allow via pnpm scripts
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead",
+      "passthrough": {
+        "invocation": ["pnpm run"],
+        "invocationRegexp": ["pnpm (typecheck|build)"]
+      }
+    }
+  },
+  // Scoped configurations
+  "scopes": {
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root"],
+      "wrappers": {
+        "yarn": {
+          "action": "block",
+          "message": "Use pnpm in frontend"
+        }
+      }
+    },
+    // Mixin scope (no path, can be extended by other scopes)
+    "hardened": {
+      "wrappers": {
+        "rm": {
+          "action": "block",
+          "message": "Use trash instead"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/happycollision/ribbin/ribbin.schema.json",
+  "title": "Ribbin Configuration",
+  "description": "Configuration schema for ribbin - a command shimming tool that blocks direct tool calls and redirects to project-specific alternatives",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URL for editor support"
+    },
+    "wrappers": {
+      "type": "object",
+      "description": "Root-level wrappers that apply everywhere unless overridden by a scope",
+      "additionalProperties": {
+        "$ref": "#/$defs/wrapper"
+      }
+    },
+    "scopes": {
+      "type": "object",
+      "description": "Scoped configurations that apply to specific directories",
+      "additionalProperties": {
+        "$ref": "#/$defs/scope"
+      }
+    }
+  },
+  "$defs": {
+    "wrapper": {
+      "type": "object",
+      "description": "Configuration for a wrapped command",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["block", "warn", "redirect", "passthrough"],
+          "description": "The behavior when the command is invoked: block (exit with error), warn (show warning and proceed), redirect (execute alternative command), passthrough (allow without modification)"
+        },
+        "message": {
+          "type": "string",
+          "description": "Message displayed when the command is blocked or warned"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Restrict the wrapper to specific binary paths. If not specified, resolves from PATH"
+        },
+        "redirect": {
+          "type": "string",
+          "description": "Alternative command to execute (for 'redirect' action). Relative paths are resolved from the config directory"
+        },
+        "passthrough": {
+          "$ref": "#/$defs/passthrough",
+          "description": "Conditions under which the shim should pass through to the original command"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "action": { "const": "redirect" } }
+          },
+          "then": {
+            "required": ["redirect"]
+          }
+        }
+      ]
+    },
+    "passthrough": {
+      "type": "object",
+      "description": "Conditions for passing through to the original command",
+      "properties": {
+        "invocation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Exact strings to match against the parent process invocation"
+        },
+        "invocationRegexp": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Regular expressions to match against the parent process invocation"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "description": "A scoped configuration that applies to a specific directory path",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Directory path this scope applies to (relative to config dir). Omit for mixins that can only be extended"
+        },
+        "extends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "References to inherit wrappers from. Can be 'root', 'root.scopeName', or a file path like './other.jsonc' or './other.jsonc#root.scope'"
+        },
+        "wrappers": {
+          "type": "object",
+          "description": "Wrappers specific to this scope",
+          "additionalProperties": {
+            "$ref": "#/$defs/wrapper"
+          }
+        }
+      }
+    }
+  }
+}

@@ -93,13 +93,17 @@ exec ` + realGrepPath + ` "$@"
 		b.Fatalf("failed to build ribbin: %v\n%s", err, output)
 	}
 
-	// Create ribbin.toml (grep is NOT blocked - it's passthrough)
+	// Create ribbin.jsonc (grep is NOT blocked - it's passthrough)
 	// This tests the overhead of the shim decision logic
-	configContent := `[wrappers.grep]
-action = "passthrough"
-message = ""
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	configContent := `{
+  "wrappers": {
+    "grep": {
+      "action": "passthrough",
+      "message": ""
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		b.Fatalf("failed to create config: %v", err)
 	}

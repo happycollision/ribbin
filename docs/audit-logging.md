@@ -1,6 +1,6 @@
 # Audit Logging
 
-Ribbin includes comprehensive audit logging that tracks all security-relevant operations. The audit log provides visibility into shim installations, security violations, bypass usage, and privileged operations.
+Ribbin includes comprehensive audit logging that tracks all security-relevant operations. The audit log provides visibility into wrapper installations, security violations, bypass usage, and privileged operations.
 
 ## Overview
 
@@ -26,12 +26,12 @@ The audit log tracks the following event types:
 
 | Event Type | Description | When Logged |
 |------------|-------------|-------------|
-| `shim.install` | Shim installation | When `ribbin shim` installs a shim (success or failure) |
-| `shim.uninstall` | Shim removal | When `ribbin unshim` removes a shim (success or failure) |
-| `bypass.used` | Bypass mechanism used | When `RIBBIN_BYPASS=1` is used to bypass a shim |
+| `wrap.install` | Wrapper installation | When `ribbin wrap` installs a wrapper (success or failure) |
+| `wrap.uninstall` | Wrapper removal | When `ribbin unwrap` removes a wrapper (success or failure) |
+| `bypass.used` | Bypass mechanism used | When `RIBBIN_BYPASS=1` is used to bypass a wrapper |
 | `security.violation` | Security policy violation | Path traversal detected, forbidden directory accessed, etc. |
 | `privileged.operation` | Privileged operation | Any operation performed as root |
-| `config.load` | Configuration loaded | When ribbin.toml is loaded |
+| `config.load` | Configuration loaded | When ribbin.jsonc is loaded |
 | `registry.update` | Registry updated | When the global registry is modified |
 
 ## Event Structure
@@ -41,7 +41,7 @@ Each event is a JSON object with the following fields:
 ```json
 {
   "timestamp": "2026-01-18T15:30:45Z",
-  "event": "shim.install",
+  "event": "wrap.install",
   "user": "username",
   "uid": 1000,
   "elevated": false,
@@ -60,7 +60,7 @@ Each event is a JSON object with the following fields:
 - **user**: Username (automatically set from `$USER`)
 - **uid**: User ID (automatically set)
 - **elevated**: Whether running as root (automatically set)
-- **binary**: Binary path (for shim operations)
+- **binary**: Binary path (for wrapper operations)
 - **path**: File path (for file operations)
 - **success**: Whether the operation succeeded
 - **error**: Error message (if operation failed)
@@ -110,26 +110,26 @@ The summary command will warn you if:
 
 ## Examples
 
-### Example 1: Track Shim Installations
+### Example 1: Track Wrapper Installations
 
 ```bash
-# Install a shim
-ribbin shim cat
+# Install a wrapper
+ribbin wrap
 
 # View the audit log
-ribbin audit show --type shim.install
+ribbin audit show --type wrap.install
 ```
 
 Output:
 ```
-[2026-01-18 15:30:45] ✓ shim.install: /usr/local/bin/cat
+[2026-01-18 15:30:45] ✓ wrap.install: /usr/local/bin/cat
 ```
 
 ### Example 2: Detect Security Violations
 
 ```bash
-# Attempt to shim a forbidden path
-ribbin shim /etc/passwd
+# Attempt to wrap a forbidden path (by specifying it in config)
+# ribbin.jsonc with cat pointing to /etc/passwd
 
 # View violations
 ribbin audit show --type security.violation
@@ -161,8 +161,8 @@ Output:
 ### Example 4: Monitor Privileged Operations
 
 ```bash
-# Install shim as root
-sudo ribbin shim cat
+# Install wrappers as root
+sudo ribbin wrap
 
 # View privileged operations
 ribbin audit show
@@ -171,7 +171,7 @@ ribbin audit show
 Output:
 ```
 [2026-01-18 15:33:00] ✓ privileged.operation: /usr/local/bin/cat [ROOT]
-[2026-01-18 15:33:01] ✓ shim.install: /usr/local/bin/cat [ROOT]
+[2026-01-18 15:33:01] ✓ wrap.install: /usr/local/bin/cat [ROOT]
 ```
 
 ## Querying the Log Programmatically
@@ -248,7 +248,7 @@ func main() {
 ### What Gets Logged
 
 **Logged**:
-- Shim install/uninstall operations (with full paths)
+- Wrapper install/uninstall operations (with full paths)
 - Security violations (path traversal, forbidden directories)
 - Bypass usage (with PID)
 - Privileged operations (operations run as root)
@@ -321,7 +321,7 @@ If `ribbin audit summary` shows warnings:
 ribbin audit show --type security.violation
 
 # Common causes:
-# - Attempting to shim files in /etc, /bin, /usr/bin
+# - Attempting to wrap files in /etc, /bin, /usr/bin
 # - Path traversal attempts (.. sequences)
 # - Symlink attacks
 ```
@@ -396,7 +396,7 @@ The audit log helps with:
 - **Incident Response**: Track what happened during security incidents
 - **Compliance Auditing**: Demonstrate security controls are in place
 - **Access Control**: Track privileged operations and access patterns
-- **Change Management**: Track when shims are installed/removed
+- **Change Management**: Track when wrappers are installed/removed
 
 ## API Reference
 
@@ -405,8 +405,8 @@ See [internal/security/audit.go](../internal/security/audit.go) for the full API
 ### Key Functions
 
 - `LogEvent(event *AuditEvent)`: Log a custom event
-- `LogShimInstall(binary string, success bool, err error)`: Log shim installation
-- `LogShimUninstall(binary string, success bool, err error)`: Log shim removal
+- `LogWrapInstall(binary string, success bool, err error)`: Log wrapper installation
+- `LogWrapUninstall(binary string, success bool, err error)`: Log wrapper removal
 - `LogBypassUsage(command string, pid int)`: Log bypass usage
 - `LogSecurityViolation(violation, path string, details map[string]string)`: Log security violation
 - `QueryAuditLog(query *AuditQuery) ([]*AuditEvent, error)`: Query the audit log

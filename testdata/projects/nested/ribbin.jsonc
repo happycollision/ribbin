@@ -1,0 +1,13 @@
+{
+  // Nested project config
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use 'pnpm' instead of npm"
+    },
+    "yarn": {
+      "action": "block",
+      "message": "Use 'pnpm' instead of yarn"
+    }
+  }
+}

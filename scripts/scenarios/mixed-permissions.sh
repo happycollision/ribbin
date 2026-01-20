@@ -29,33 +29,37 @@ git init -q
 git config user.email "tester@example.com"
 git config user.name "Tester"
 
-# Create a ribbin.toml with mixed permission levels
-cat > ribbin.toml << EOF
-# Mixed permissions scenario
-# This config has wrappers targeting different permission levels
-
-# ALLOWED: ~/.local/bin - no confirmation needed
-[wrappers.my-tool]
-action = "block"
-message = "Use 'npm run tool' instead"
-paths = ["$LOCAL_BIN/my-tool"]
-
-# ALLOWED: /usr/local/bin - no confirmation needed
-[wrappers.jq]
-action = "warn"
-message = "Consider using gojq for better performance"
-# Will resolve from PATH to /usr/local/bin/jq (allowed)
-
-# REQUIRES CONFIRMATION: /bin, /usr/bin - needs --confirm-system-dir
-[wrappers.cat]
-action = "block"
-message = "Use bat instead"
-# Will resolve from PATH to /bin/cat (requires confirmation)
-
-[wrappers.ls]
-action = "warn"
-message = "Use exa for better output"
-# Will resolve from PATH to /bin/ls (requires confirmation)
+# Create a ribbin.jsonc with mixed permission levels
+cat > ribbin.jsonc << EOF
+{
+  // Mixed permissions scenario
+  // This config has wrappers targeting different permission levels
+  "wrappers": {
+    // ALLOWED: ~/.local/bin - no confirmation needed
+    "my-tool": {
+      "action": "block",
+      "message": "Use 'npm run tool' instead",
+      "paths": ["$LOCAL_BIN/my-tool"]
+    },
+    // ALLOWED: /usr/local/bin - no confirmation needed
+    "jq": {
+      "action": "warn",
+      "message": "Consider using gojq for better performance"
+      // Will resolve from PATH to /usr/local/bin/jq (allowed)
+    },
+    // REQUIRES CONFIRMATION: /bin, /usr/bin - needs --confirm-system-dir
+    "cat": {
+      "action": "block",
+      "message": "Use bat instead"
+      // Will resolve from PATH to /bin/cat (requires confirmation)
+    },
+    "ls": {
+      "action": "warn",
+      "message": "Use exa for better output"
+      // Will resolve from PATH to /bin/ls (requires confirmation)
+    }
+  }
+}
 EOF
 
 cat > README.md << 'EOF'

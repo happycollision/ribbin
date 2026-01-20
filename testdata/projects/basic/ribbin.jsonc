@@ -1,0 +1,9 @@
+{
+  // Basic project config
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead"
+    }
+  }
+}

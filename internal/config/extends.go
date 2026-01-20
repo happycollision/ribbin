@@ -21,15 +21,15 @@ type ExtendsRef struct {
 }
 
 // ParseExtendsRef parses an extends reference string and returns an ExtendsRef.
-// The configDir is the directory containing the TOML file with the extends directive,
+// The configDir is the directory containing the JSONC file with the extends directive,
 // used to resolve relative file paths.
 //
 // Reference patterns:
 //   - "root" → local, fragment="root"
 //   - "root.backend" → local, fragment="root.backend"
-//   - "../other.toml" → file path resolved relative to configDir, fragment="" (entire file)
-//   - "./file.toml#root.x" → file path resolved, fragment="root.x"
-//   - "/abs/path/ribbin.toml" → absolute path, fragment=""
+//   - "../other.jsonc" → file path resolved relative to configDir, fragment="" (entire file)
+//   - "./file.jsonc#root.x" → file path resolved, fragment="root.x"
+//   - "/abs/path/ribbin.jsonc" → absolute path, fragment=""
 func ParseExtendsRef(ref string, configDir string) (*ExtendsRef, error) {
 	if ref == "" {
 		return nil, fmt.Errorf("extends reference cannot be empty")
@@ -88,8 +88,8 @@ func isLocalRef(ref string) bool {
 }
 
 // splitFileAndFragment splits a file reference into path and fragment parts.
-// e.g., "./file.toml#root.x" → ("./file.toml", "root.x")
-// e.g., "../other.toml" → ("../other.toml", "")
+// e.g., "./file.jsonc#root.x" → ("./file.jsonc", "root.x")
+// e.g., "../other.jsonc" → ("../other.jsonc", "")
 func splitFileAndFragment(ref string) (filePath, fragment string) {
 	// Find the fragment separator
 	idx := strings.LastIndex(ref, "#")

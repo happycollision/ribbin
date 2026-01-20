@@ -18,7 +18,7 @@ func TestResolveRedirectScript(t *testing.T) {
 	scriptsDir := filepath.Join(projectDir, "scripts")
 	os.MkdirAll(scriptsDir, 0755)
 
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 
 	t.Run("resolves relative path", func(t *testing.T) {
 		scriptPath := filepath.Join(scriptsDir, "test.sh")

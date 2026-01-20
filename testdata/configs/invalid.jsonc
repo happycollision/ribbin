@@ -1,0 +1,7 @@
+{
+  // Invalid JSON - missing closing brace and unquoted key
+  "wrappers": {
+    "cat": {
+      action: "block"
+      "message": "unquoted key above"
+    }

@@ -26,10 +26,10 @@ RIBBIN_BYPASS=1 cat file.txt  # Direct passthrough, no overhead
 ## What Causes the Overhead
 
 1. Load and parse registry JSON
-2. Check activation status (global or PID ancestry)
-3. Walk directories to find `ribbin.toml`
-4. Parse project config (TOML)
-5. Look up command in shim configuration
+2. Check activation status (global, shell, or config-scoped)
+3. Walk directories to find `ribbin.jsonc`
+4. Parse project config (JSONC)
+5. Look up command in wrapper configuration
 6. Audit logging (~0.04ms - negligible)
 7. Execute original command via `syscall.Exec`
 
@@ -51,12 +51,12 @@ make benchmark-all      # Both
 
 ### Linux (Docker, golang:1.23-alpine on ARM64)
 
-**Fast command (cat):** 1.96ms with shim vs 0.97ms without (+103%)
-**Slow command (grep):** 9.94ms with shim vs 8.84ms without (+12%)
+**Fast command (cat):** 1.96ms with wrapper vs 0.97ms without (+103%)
+**Slow command (grep):** 9.94ms with wrapper vs 8.84ms without (+12%)
 
 ### macOS (Apple M1 Pro)
 
-**Fast command (cat):** 11.55ms with shim vs 6.12ms without (+89%)
-**Slow command (grep):** 15.47ms with shim vs 10.58ms without (+46%)
+**Fast command (cat):** 11.55ms with wrapper vs 6.12ms without (+89%)
+**Slow command (grep):** 15.47ms with wrapper vs 10.58ms without (+46%)
 
 The absolute overhead is constant per platform. Relative overhead decreases as commands take longer.

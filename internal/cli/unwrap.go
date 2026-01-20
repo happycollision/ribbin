@@ -22,7 +22,7 @@ var unwrapCmd = &cobra.Command{
 	Short: "Remove wrappers and restore original commands",
 	Long: `Remove wrappers and restore original commands.
 
-By default, removes wrappers only for commands listed in the nearest ribbin.toml.
+By default, removes wrappers only for commands listed in the nearest ribbin.jsonc.
 You can also specify config file paths explicitly.
 
 Use flags to control which wrappers are removed:
@@ -35,7 +35,7 @@ For each wrapped command, ribbin:
   3. Updates the registry
 
 Examples:
-  ribbin unwrap                         # Remove wrappers from nearest ribbin.toml
+  ribbin unwrap                         # Remove wrappers from nearest ribbin.jsonc
   ribbin unwrap ./a.toml ./b.toml       # Remove wrappers from specific configs
   ribbin unwrap --global                # Remove all wrappers in the registry
   ribbin unwrap --global --search       # Search filesystem for any orphaned wrappers`,
@@ -43,7 +43,7 @@ Examples:
 }
 
 func init() {
-	unwrapCmd.Flags().BoolVar(&unwrapGlobal, "global", false, "Remove all wrappers tracked in the registry, not just those in ribbin.toml")
+	unwrapCmd.Flags().BoolVar(&unwrapGlobal, "global", false, "Remove all wrappers tracked in the registry, not just those in ribbin.jsonc")
 	unwrapCmd.Flags().BoolVar(&unwrapSearch, "search", false, "Search common binary directories for wrappers (use with --global)")
 }
 
@@ -109,13 +109,13 @@ func runUnwrap(cmd *cobra.Command, args []string) error {
 				configPaths = append(configPaths, absPath)
 			}
 		} else {
-			// Find nearest ribbin.toml
+			// Find nearest ribbin.jsonc
 			configPath, err := config.FindProjectConfig()
 			if err != nil {
 				return fmt.Errorf("failed to find project config: %w", err)
 			}
 			if configPath == "" {
-				return fmt.Errorf("no ribbin.toml found. Run 'ribbin init' to create one")
+				return fmt.Errorf("no ribbin.jsonc found. Run 'ribbin init' to create one")
 			}
 			configPaths = []string{configPath}
 		}

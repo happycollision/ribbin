@@ -108,7 +108,7 @@ func TestValidateBinaryPath_SymlinkToDangerousPath(t *testing.T) {
 
 func TestValidateConfigPath_ValidConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ribbin.toml")
+	configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
 	// Create a valid config file
 	err := os.WriteFile(configPath, []byte("# config"), 0644)
@@ -119,6 +119,22 @@ func TestValidateConfigPath_ValidConfig(t *testing.T) {
 	err = ValidateConfigPath(configPath)
 	if err != nil {
 		t.Errorf("unexpected error for valid config: %v", err)
+	}
+}
+
+func TestValidateConfigPath_ValidLocalConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "ribbin.local.jsonc")
+
+	// Create a valid local config file
+	err := os.WriteFile(configPath, []byte("# config"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	err = ValidateConfigPath(configPath)
+	if err != nil {
+		t.Errorf("unexpected error for valid local config: %v", err)
 	}
 }
 
@@ -136,14 +152,14 @@ func TestValidateConfigPath_WrongName(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for wrong config name")
 	}
-	if err != nil && !contains(err.Error(), "must be named ribbin.toml") {
-		t.Errorf("expected 'must be named ribbin.toml' error, got: %v", err)
+	if err != nil && !contains(err.Error(), "must be named ribbin.jsonc or ribbin.local.jsonc") {
+		t.Errorf("expected 'must be named ribbin.jsonc or ribbin.local.jsonc' error, got: %v", err)
 	}
 }
 
 func TestValidateConfigPath_WorldWritable(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ribbin.toml")
+	configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
 	// Create world-writable config (0666 = rw-rw-rw-)
 	err := os.WriteFile(configPath, []byte("# config"), 0666)

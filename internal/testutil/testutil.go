@@ -35,20 +35,27 @@ func CreateTempBinary(t *testing.T, dir, name string) string {
 	return path
 }
 
-// CreateTempConfig creates a ribbin.toml config file in the specified directory.
+// CreateTempConfig creates a ribbin.jsonc config file in the specified directory.
 // Returns the path to the config file.
 func CreateTempConfig(t *testing.T, dir string, cfg *config.ProjectConfig) string {
 	t.Helper()
-	path := filepath.Join(dir, "ribbin.toml")
+	path := filepath.Join(dir, "ribbin.jsonc")
 
-	content := "[wrappers]\n"
+	content := "{\n  \"wrappers\": {\n"
+	first := true
 	for name, shim := range cfg.Wrappers {
-		content += "[wrappers." + name + "]\n"
-		content += "action = \"" + shim.Action + "\"\n"
-		if shim.Message != "" {
-			content += "message = \"" + shim.Message + "\"\n"
+		if !first {
+			content += ",\n"
 		}
+		first = false
+		content += "    \"" + name + "\": {\n"
+		content += "      \"action\": \"" + shim.Action + "\""
+		if shim.Message != "" {
+			content += ",\n      \"message\": \"" + shim.Message + "\""
+		}
+		content += "\n    }"
 	}
+	content += "\n  }\n}\n"
 
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to create temp config: %v", err)

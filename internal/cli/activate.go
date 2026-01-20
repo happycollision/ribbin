@@ -19,7 +19,7 @@ var activateCmd = &cobra.Command{
 	Short: "Activate ribbin for configs, shell, or globally",
 	Long: `Activate ribbin interception.
 
-By default (--config), activates the nearest ribbin.toml for all shells.
+By default (--config), activates the nearest ribbin.jsonc for all shells.
 With --shell, activates all configs for the current shell only.
 With --global, activates everything everywhere.
 
@@ -125,14 +125,14 @@ Examples:
 				configPaths = append(configPaths, absPath)
 			}
 		} else {
-			// Find nearest ribbin.toml
+			// Find nearest ribbin.jsonc
 			configPath, err := config.FindProjectConfig()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error finding config: %v\n", err)
 				os.Exit(1)
 			}
 			if configPath == "" {
-				fmt.Fprintf(os.Stderr, "No ribbin.toml found. Run 'ribbin init' to create one.\n")
+				fmt.Fprintf(os.Stderr, "No ribbin.jsonc found. Run 'ribbin init' to create one.\n")
 				os.Exit(1)
 			}
 			configPaths = []string{configPath}

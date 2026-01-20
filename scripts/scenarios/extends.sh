@@ -32,106 +32,119 @@ git config user.email "tester@example.com"
 git config user.name "Tester"
 
 # Create a shared team config file (external)
-cat > team-configs/security-baseline.toml << EOF
-# Team security baseline - shared across projects
-# Other configs can extend this file
-
-[wrappers.my-rm]
-action = "block"
-message = "Use trash-cli for safety"
-paths = ["$LOCAL_BIN/my-rm"]
-
-[wrappers.my-curl]
-action = "warn"
-message = "Prefer httpie for better security headers"
-paths = ["$LOCAL_BIN/my-curl"]
-
-[wrappers.my-wget]
-action = "warn"
-message = "Use curl or httpie instead"
-paths = ["$LOCAL_BIN/my-wget"]
+cat > team-configs/security-baseline.jsonc << EOF
+{
+  // Team security baseline - shared across projects
+  // Other configs can extend this file
+  "wrappers": {
+    "my-rm": {
+      "action": "block",
+      "message": "Use trash-cli for safety",
+      "paths": ["$LOCAL_BIN/my-rm"]
+    },
+    "my-curl": {
+      "action": "warn",
+      "message": "Prefer httpie for better security headers",
+      "paths": ["$LOCAL_BIN/my-curl"]
+    },
+    "my-wget": {
+      "action": "warn",
+      "message": "Use curl or httpie instead",
+      "paths": ["$LOCAL_BIN/my-wget"]
+    }
+  }
+}
 EOF
 
 # Create another shared config for production rules
-cat > team-configs/production-hardened.toml << EOF
-# Production hardening rules
-# Use in addition to security baseline
-
-[wrappers.my-ssh]
-action = "warn"
-message = "Ensure you're using the correct SSH key for production"
-paths = ["$LOCAL_BIN/my-ssh"]
-
-[wrappers.my-docker]
-action = "warn"
-message = "Double-check you're targeting the right registry"
-paths = ["$LOCAL_BIN/my-docker"]
-
-[wrappers.my-kubectl]
-action = "warn"
-message = "Verify KUBECONFIG is set to the correct cluster"
-paths = ["$LOCAL_BIN/my-kubectl"]
+cat > team-configs/production-hardened.jsonc << EOF
+{
+  // Production hardening rules
+  // Use in addition to security baseline
+  "wrappers": {
+    "my-ssh": {
+      "action": "warn",
+      "message": "Ensure you're using the correct SSH key for production",
+      "paths": ["$LOCAL_BIN/my-ssh"]
+    },
+    "my-docker": {
+      "action": "warn",
+      "message": "Double-check you're targeting the right registry",
+      "paths": ["$LOCAL_BIN/my-docker"]
+    },
+    "my-kubectl": {
+      "action": "warn",
+      "message": "Verify KUBECONFIG is set to the correct cluster",
+      "paths": ["$LOCAL_BIN/my-kubectl"]
+    }
+  }
+}
 EOF
 
-# Create main ribbin.toml that uses extends
-cat > ribbin.toml << EOF
-# Main project config
-# Demonstrates extends from:
-# 1. External files (team shared configs)
-# 2. Internal mixins (defined in same file)
-# 3. The special "root" keyword
+# Create main ribbin.jsonc that uses extends
+cat > ribbin.jsonc << EOF
+{
+  // Main project config
+  // Demonstrates extends from:
+  // 1. External files (team shared configs)
+  // 2. Internal mixins (defined in same file)
+  // 3. The special "root" keyword
+  "scopes": {
+    // MIXIN: development (no path, for extending)
+    "development": {
+      // No path = this is a mixin, not a directory scope
+      "wrappers": {
+        "my-rm": {
+          "action": "warn",  // Softer than baseline's "block"
+          "message": "Be careful with rm in development",
+          "paths": ["$LOCAL_BIN/my-rm"]
+        }
+      }
+    },
 
-# ============================================
-# MIXIN: development (no path, for extending)
-# ============================================
-[scopes.development]
-# No path = this is a mixin, not a directory scope
+    // MIXIN: ci-mode (no path, for extending)
+    "ci-mode": {
+      "wrappers": {
+        "my-curl": {
+          "action": "passthrough",  // Allow curl in CI
+          "paths": ["$LOCAL_BIN/my-curl"]
+        },
+        "my-wget": {
+          "action": "passthrough",  // Allow wget in CI
+          "paths": ["$LOCAL_BIN/my-wget"]
+        }
+      }
+    },
 
-[scopes.development.shims.my-rm]
-action = "warn"  # Softer than baseline's "block"
-message = "Be careful with rm in development"
-paths = ["$LOCAL_BIN/my-rm"]
+    // WEB-APP SCOPE
+    // Extends: external security baseline + dev mixin
+    "web-app": {
+      "path": "projects/web-app",
+      "extends": [
+        "./team-configs/security-baseline.jsonc",  // External file
+        "root.development"                         // Internal mixin
+      ]
+    },
 
-# ============================================
-# MIXIN: ci-mode (no path, for extending)
-# ============================================
-[scopes.ci-mode]
-
-[scopes.ci-mode.shims.my-curl]
-action = "passthrough"  # Allow curl in CI
-paths = ["$LOCAL_BIN/my-curl"]
-
-[scopes.ci-mode.shims.my-wget]
-action = "passthrough"  # Allow wget in CI
-paths = ["$LOCAL_BIN/my-wget"]
-
-# ============================================
-# WEB-APP SCOPE
-# Extends: external security baseline + dev mixin
-# ============================================
-[scopes.web-app]
-path = "projects/web-app"
-extends = [
-    "./team-configs/security-baseline.toml",  # External file
-    "root.development"                          # Internal mixin
-]
-
-# ============================================
-# DATA-PIPELINE SCOPE
-# Extends: security baseline + production hardening
-# ============================================
-[scopes.data-pipeline]
-path = "projects/data-pipeline"
-extends = [
-    "./team-configs/security-baseline.toml",
-    "./team-configs/production-hardened.toml"
-]
-
-# Override: block rm entirely in data pipeline (data safety)
-[scopes.data-pipeline.shims.my-rm]
-action = "block"
-message = "NEVER use rm in data pipeline - use versioned storage"
-paths = ["$LOCAL_BIN/my-rm"]
+    // DATA-PIPELINE SCOPE
+    // Extends: security baseline + production hardening
+    "data-pipeline": {
+      "path": "projects/data-pipeline",
+      "extends": [
+        "./team-configs/security-baseline.jsonc",
+        "./team-configs/production-hardened.jsonc"
+      ],
+      // Override: block rm entirely in data pipeline (data safety)
+      "wrappers": {
+        "my-rm": {
+          "action": "block",
+          "message": "NEVER use rm in data pipeline - use versioned storage",
+          "paths": ["$LOCAL_BIN/my-rm"]
+        }
+      }
+    }
+  }
+}
 EOF
 
 # Create README files
@@ -143,46 +156,49 @@ This scenario demonstrates ribbin's `extends` feature for config inheritance.
 ## Extends Sources
 
 1. **External files** - Share configs across projects
-   ```toml
-   extends = ["./team-configs/security-baseline.toml"]
+   ```jsonc
+   "extends": ["./team-configs/security-baseline.jsonc"]
    ```
 
 2. **Internal mixins** - Scopes without `path` (can't be entered, only extended)
-   ```toml
-   [scopes.development]
-   # No path = mixin
-
-   [scopes.web-app]
-   extends = ["root.development"]  # Reference internal mixin
+   ```jsonc
+   "scopes": {
+     "development": {
+       // No path = mixin
+     },
+     "web-app": {
+       "extends": ["root.development"]  // Reference internal mixin
+     }
+   }
    ```
 
 3. **Root keyword** - Inherit from root-level wrappers
-   ```toml
-   extends = ["root"]
+   ```jsonc
+   "extends": ["root"]
    ```
 
 ## Config Structure
 
 ```
 scenario/
-├── ribbin.toml                    # Main config with mixins
+├── ribbin.jsonc                     # Main config with mixins
 ├── team-configs/
-│   ├── security-baseline.toml     # Shared security rules
-│   └── production-hardened.toml   # Production rules
+│   ├── security-baseline.jsonc      # Shared security rules
+│   └── production-hardened.jsonc    # Production rules
 └── projects/
-    ├── web-app/                   # Extends: baseline + development
-    └── data-pipeline/             # Extends: baseline + production
+    ├── web-app/                     # Extends: baseline + development
+    └── data-pipeline/               # Extends: baseline + production
 ```
 
 ## Inheritance Example
 
 **data-pipeline** extends:
-1. `security-baseline.toml` → my-rm=block, my-curl=warn, my-wget=warn
-2. `production-hardened.toml` → my-ssh=warn, my-docker=warn, my-kubectl=warn
+1. `security-baseline.jsonc` → my-rm=block, my-curl=warn, my-wget=warn
+2. `production-hardened.jsonc` → my-ssh=warn, my-docker=warn, my-kubectl=warn
 3. Local override → my-rm=block (with custom message)
 
 **web-app** extends:
-1. `security-baseline.toml` → my-rm=block, my-curl=warn
+1. `security-baseline.jsonc` → my-rm=block, my-curl=warn
 2. `development` mixin → my-rm=warn (overrides baseline's block!)
 
 ## Try these commands:
@@ -247,13 +263,13 @@ echo "Working directory: $SCENARIO_DIR"
 echo ""
 echo "Config inheritance:"
 echo ""
-echo "  team-configs/security-baseline.toml"
+echo "  team-configs/security-baseline.jsonc"
 echo "    └─ my-rm=block, my-curl=warn, my-wget=warn"
 echo ""
-echo "  team-configs/production-hardened.toml"
+echo "  team-configs/production-hardened.jsonc"
 echo "    └─ my-ssh=warn, my-docker=warn, my-kubectl=warn"
 echo ""
-echo "  ribbin.toml mixins:"
+echo "  ribbin.jsonc mixins:"
 echo "    └─ development: my-rm=warn (softer)"
 echo "    └─ ci-mode: curl/wget=passthrough"
 echo ""

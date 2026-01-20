@@ -68,11 +68,11 @@ func createTestRegistry(t *testing.T, tempHome string, registry *config.Registry
 	}
 }
 
-// createTestConfig creates a ribbin.toml in the specified directory
+// createTestConfig creates a ribbin.jsonc in the specified directory
 func createTestConfig(t *testing.T, dir string, content string) string {
 	t.Helper()
 
-	configPath := filepath.Join(dir, "ribbin.toml")
+	configPath := filepath.Join(dir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}

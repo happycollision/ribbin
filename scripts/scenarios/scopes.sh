@@ -31,80 +31,81 @@ git init -q
 git config user.email "tester@example.com"
 git config user.name "Tester"
 
-# Create a ribbin.toml with scoped configurations
-cat > ribbin.toml << EOF
-# Scopes demonstration
-# Different directories get different wrapper rules
+# Create a ribbin.jsonc with scoped configurations
+cat > ribbin.jsonc << EOF
+{
+  // Scopes demonstration
+  // Different directories get different wrapper rules
 
-# ============================================
-# ROOT LEVEL WRAPPERS
-# These apply everywhere unless overridden
-# ============================================
+  // ROOT LEVEL WRAPPERS
+  // These apply everywhere unless overridden
+  "wrappers": {
+    "my-npm": {
+      "action": "block",
+      "message": "Use 'pnpm' instead of npm",
+      "paths": ["$LOCAL_BIN/my-npm"]
+    },
+    "my-rm": {
+      "action": "warn",
+      "message": "Be careful with rm!",
+      "paths": ["$LOCAL_BIN/my-rm"]
+    }
+  },
 
-[wrappers.my-npm]
-action = "block"
-message = "Use 'pnpm' instead of npm"
-paths = ["$LOCAL_BIN/my-npm"]
+  "scopes": {
+    // FRONTEND SCOPE - Extends root + adds yarn block
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root"],
+      "wrappers": {
+        // Add yarn block specific to frontend
+        "my-yarn": {
+          "action": "block",
+          "message": "Use pnpm, not yarn, in frontend",
+          "paths": ["$LOCAL_BIN/my-yarn"]
+        },
+        // Override rm to be stricter in frontend
+        "my-rm": {
+          "action": "block",
+          "message": "Use trash-cli in frontend (rm blocked)",
+          "paths": ["$LOCAL_BIN/my-rm"]
+        }
+      }
+    },
 
-[wrappers.my-rm]
-action = "warn"
-message = "Be careful with rm!"
-paths = ["$LOCAL_BIN/my-rm"]
+    // BACKEND SCOPE - Extends root but allows npm
+    "backend": {
+      "path": "apps/backend",
+      "extends": ["root"],
+      "wrappers": {
+        // Override: allow npm in backend (for legacy reasons)
+        "my-npm": {
+          "action": "passthrough",
+          "paths": ["$LOCAL_BIN/my-npm"]
+        }
+      }
+    },
 
-# ============================================
-# FRONTEND SCOPE
-# Extends root + adds yarn block
-# ============================================
-
-[scopes.frontend]
-path = "apps/frontend"
-extends = ["root"]
-
-# Add yarn block specific to frontend
-[scopes.frontend.shims.my-yarn]
-action = "block"
-message = "Use pnpm, not yarn, in frontend"
-paths = ["$LOCAL_BIN/my-yarn"]
-
-# Override rm to be stricter in frontend
-[scopes.frontend.shims.my-rm]
-action = "block"
-message = "Use trash-cli in frontend (rm blocked)"
-paths = ["$LOCAL_BIN/my-rm"]
-
-# ============================================
-# BACKEND SCOPE
-# Extends root but allows npm
-# ============================================
-
-[scopes.backend]
-path = "apps/backend"
-extends = ["root"]
-
-# Override: allow npm in backend (for legacy reasons)
-[scopes.backend.shims.my-npm]
-action = "passthrough"
-paths = ["$LOCAL_BIN/my-npm"]
-
-# ============================================
-# SHARED PACKAGES SCOPE
-# Strictest rules
-# ============================================
-
-[scopes.shared]
-path = "packages/shared"
-extends = ["root"]
-
-# Block everything in shared packages
-[scopes.shared.shims.my-yarn]
-action = "block"
-message = "No yarn in shared packages"
-paths = ["$LOCAL_BIN/my-yarn"]
-
-[scopes.shared.shims.my-pnpm]
-action = "block"
-message = "Run from monorepo root, not package dir"
-paths = ["$LOCAL_BIN/my-pnpm"]
+    // SHARED PACKAGES SCOPE - Strictest rules
+    "shared": {
+      "path": "packages/shared",
+      "extends": ["root"],
+      "wrappers": {
+        // Block everything in shared packages
+        "my-yarn": {
+          "action": "block",
+          "message": "No yarn in shared packages",
+          "paths": ["$LOCAL_BIN/my-yarn"]
+        },
+        "my-pnpm": {
+          "action": "block",
+          "message": "Run from monorepo root, not package dir",
+          "paths": ["$LOCAL_BIN/my-pnpm"]
+        }
+      }
+    }
+  }
+}
 EOF
 
 # Create README files in each directory
@@ -117,7 +118,7 @@ This scenario demonstrates ribbin's scope-based configuration.
 
 ```
 scenario/
-├── ribbin.toml          # Config with scopes
+├── ribbin.jsonc          # Config with scopes
 ├── apps/
 │   ├── frontend/        # scope: frontend
 │   └── backend/         # scope: backend

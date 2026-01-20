@@ -36,8 +36,8 @@ func TestFindProjectConfig(t *testing.T) {
 			t.Fatalf("failed to create project dir: %v", err)
 		}
 
-		configPath := filepath.Join(projectDir, "ribbin.toml")
-		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
+		configPath := filepath.Join(projectDir, "ribbin.jsonc")
+		if err := os.WriteFile(configPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
@@ -62,8 +62,8 @@ func TestFindProjectConfig(t *testing.T) {
 			t.Fatalf("failed to create dirs: %v", err)
 		}
 
-		configPath := filepath.Join(parentDir, "ribbin.toml")
-		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
+		configPath := filepath.Join(parentDir, "ribbin.jsonc")
+		if err := os.WriteFile(configPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
@@ -99,6 +99,120 @@ func TestFindProjectConfig(t *testing.T) {
 			t.Errorf("expected empty string, got %s", found)
 		}
 	})
+
+	t.Run("prefers local config over standard config", func(t *testing.T) {
+		// Create a directory with both configs
+		projectDir := filepath.Join(tmpDir, "project-local")
+		if err := os.MkdirAll(projectDir, 0755); err != nil {
+			t.Fatalf("failed to create project dir: %v", err)
+		}
+
+		standardConfigPath := filepath.Join(projectDir, "ribbin.jsonc")
+		if err := os.WriteFile(standardConfigPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
+			t.Fatalf("failed to create standard config: %v", err)
+		}
+
+		localConfigPath := filepath.Join(projectDir, "ribbin.local.jsonc")
+		if err := os.WriteFile(localConfigPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
+			t.Fatalf("failed to create local config: %v", err)
+		}
+
+		if err := os.Chdir(projectDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+
+		found, err := FindProjectConfig()
+		if err != nil {
+			t.Fatalf("FindProjectConfig error: %v", err)
+		}
+		if found != localConfigPath {
+			t.Errorf("expected local config %s, got %s", localConfigPath, found)
+		}
+	})
+
+	t.Run("falls back to standard config when local not present", func(t *testing.T) {
+		// Create a directory with only standard config
+		projectDir := filepath.Join(tmpDir, "project-standard-only")
+		if err := os.MkdirAll(projectDir, 0755); err != nil {
+			t.Fatalf("failed to create project dir: %v", err)
+		}
+
+		standardConfigPath := filepath.Join(projectDir, "ribbin.jsonc")
+		if err := os.WriteFile(standardConfigPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
+			t.Fatalf("failed to create standard config: %v", err)
+		}
+
+		if err := os.Chdir(projectDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+
+		found, err := FindProjectConfig()
+		if err != nil {
+			t.Fatalf("FindProjectConfig error: %v", err)
+		}
+		if found != standardConfigPath {
+			t.Errorf("expected standard config %s, got %s", standardConfigPath, found)
+		}
+	})
+
+	t.Run("finds local config in parent directory", func(t *testing.T) {
+		// Create nested directories with local config in parent
+		parentDir := filepath.Join(tmpDir, "project-parent-local")
+		childDir := filepath.Join(parentDir, "src", "lib")
+		if err := os.MkdirAll(childDir, 0755); err != nil {
+			t.Fatalf("failed to create dirs: %v", err)
+		}
+
+		localConfigPath := filepath.Join(parentDir, "ribbin.local.jsonc")
+		if err := os.WriteFile(localConfigPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
+			t.Fatalf("failed to create local config: %v", err)
+		}
+
+		if err := os.Chdir(childDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+
+		found, err := FindProjectConfig()
+		if err != nil {
+			t.Fatalf("FindProjectConfig error: %v", err)
+		}
+		if found != localConfigPath {
+			t.Errorf("expected local config %s, got %s", localConfigPath, found)
+		}
+	})
+
+	t.Run("local config in child dir takes precedence over standard in parent", func(t *testing.T) {
+		// Parent has standard config, child has local config
+		parentDir := filepath.Join(tmpDir, "project-mixed")
+		childDir := filepath.Join(parentDir, "packages", "app")
+		if err := os.MkdirAll(childDir, 0755); err != nil {
+			t.Fatalf("failed to create dirs: %v", err)
+		}
+
+		// Standard config in parent
+		standardConfigPath := filepath.Join(parentDir, "ribbin.jsonc")
+		if err := os.WriteFile(standardConfigPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
+			t.Fatalf("failed to create standard config: %v", err)
+		}
+
+		// Local config in child
+		localConfigPath := filepath.Join(childDir, "ribbin.local.jsonc")
+		if err := os.WriteFile(localConfigPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
+			t.Fatalf("failed to create local config: %v", err)
+		}
+
+		if err := os.Chdir(childDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+
+		found, err := FindProjectConfig()
+		if err != nil {
+			t.Fatalf("FindProjectConfig error: %v", err)
+		}
+		if found != localConfigPath {
+			t.Errorf("expected local config in child %s, got %s", localConfigPath, found)
+		}
+	})
 }
 
 func TestLoadProjectConfig(t *testing.T) {
@@ -109,11 +223,16 @@ func TestLoadProjectConfig(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.curl]
-action = "block"
-message = "Use the project API client"
-paths = ["/bin/curl", "/usr/bin/curl"]
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "curl": {
+      "action": "block",
+      "message": "Use the project API client",
+      "paths": ["/bin/curl", "/usr/bin/curl"]
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -144,23 +263,26 @@ paths = ["/bin/curl", "/usr/bin/curl"]
 	})
 
 	t.Run("returns error for missing file", func(t *testing.T) {
-		_, err := LoadProjectConfig("/nonexistent/path/ribbin.toml")
+		_, err := LoadProjectConfig("/nonexistent/path/ribbin.jsonc")
 		if err == nil {
 			t.Error("expected error for missing file")
 		}
 	})
 
-	t.Run("returns error for invalid TOML", func(t *testing.T) {
+	t.Run("returns error for invalid JSON", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
 		if err != nil {
 			t.Fatalf("failed to create temp dir: %v", err)
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		// Invalid TOML - unquoted string value
-		content := `[wrappers.cat]
-action = unquoted
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		// Invalid JSON - unquoted key
+		content := `{
+  wrappers: {
+    "cat": { "action": "block" }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -168,19 +290,19 @@ action = unquoted
 
 		_, err = LoadProjectConfig(configPath)
 		if err == nil {
-			t.Error("expected error for invalid TOML")
+			t.Error("expected error for invalid JSON")
 		}
 	})
 
-	t.Run("handles empty shims section", func(t *testing.T) {
+	t.Run("handles empty wrappers section", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
 		if err != nil {
 			t.Fatalf("failed to create temp dir: %v", err)
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers]
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{"wrappers": {}}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -203,11 +325,19 @@ action = unquoted
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.tsc]
-action = "block"
-message = "Use pnpm run typecheck"
-passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|build)"] }
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use pnpm run typecheck",
+      "passthrough": {
+        "invocation": ["pnpm run"],
+        "invocationRegexp": ["pnpm (typecheck|build)"]
+      }
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -249,25 +379,36 @@ passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.curl]
-action = "block"
-message = "Use the API client"
-
-[scopes.frontend]
-path = "apps/frontend"
-extends = ["root"]
-
-[scopes.frontend.wrappers.npm]
-action = "block"
-message = "Use pnpm in frontend"
-
-[scopes.backend]
-path = "apps/backend"
-
-[scopes.backend.wrappers.yarn]
-action = "block"
-message = "Use npm in backend"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "curl": {
+      "action": "block",
+      "message": "Use the API client"
+    }
+  },
+  "scopes": {
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root"],
+      "wrappers": {
+        "npm": {
+          "action": "block",
+          "message": "Use pnpm in frontend"
+        }
+      }
+    },
+    "backend": {
+      "path": "apps/backend",
+      "wrappers": {
+        "yarn": {
+          "action": "block",
+          "message": "Use npm in backend"
+        }
+      }
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -326,12 +467,19 @@ message = "Use npm in backend"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[scopes.escape]
-path = "../outside"
-
-[scopes.escape.wrappers.bad]
-action = "block"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "scopes": {
+    "escape": {
+      "path": "../outside",
+      "wrappers": {
+        "bad": {
+          "action": "block"
+        }
+      }
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -350,12 +498,19 @@ action = "block"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[scopes.mixin]
-
-[scopes.mixin.wrappers.rm]
-action = "block"
-message = "Use trash"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "scopes": {
+    "mixin": {
+      "wrappers": {
+        "rm": {
+          "action": "block",
+          "message": "Use trash"
+        }
+      }
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -372,6 +527,44 @@ message = "Use trash"
 		}
 		if mixin.Path != "" {
 			t.Errorf("expected empty path, got '%s'", mixin.Path)
+		}
+	})
+
+	t.Run("loads config with comments", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  // This is a comment
+  "wrappers": {
+    "cat": {
+      "action": "block", // inline comment
+      "message": "Use bat instead"
+    }
+  }
+  /* multi-line
+     comment */
+}
+`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		cfg, err := LoadProjectConfig(configPath)
+		if err != nil {
+			t.Fatalf("LoadProjectConfig error: %v", err)
+		}
+
+		catShim, exists := cfg.Wrappers["cat"]
+		if !exists {
+			t.Fatal("cat shim not found")
+		}
+		if catShim.Action != "block" {
+			t.Errorf("expected action 'block', got '%s'", catShim.Action)
 		}
 	})
 }

@@ -1,14 +1,14 @@
 package config
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/BurntSushi/toml"
+	"github.com/tailscale/hujson"
 )
 
-// AddShim adds a new shim configuration to the ribbin.toml file.
+// AddShim adds a new shim configuration to the ribbin.jsonc file.
 // Returns an error if the command already exists.
 func AddShim(configPath, cmdName string, shimConfig ShimConfig) error {
 	// Load existing config
@@ -34,7 +34,7 @@ func AddShim(configPath, cmdName string, shimConfig ShimConfig) error {
 	return atomicWrite(configPath, config)
 }
 
-// RemoveShim removes a shim configuration from the ribbin.toml file.
+// RemoveShim removes a shim configuration from the ribbin.jsonc file.
 // Returns an error if the command doesn't exist.
 func RemoveShim(configPath, cmdName string) error {
 	// Load existing config
@@ -55,7 +55,7 @@ func RemoveShim(configPath, cmdName string) error {
 	return atomicWrite(configPath, config)
 }
 
-// UpdateShim updates an existing shim configuration in the ribbin.toml file.
+// UpdateShim updates an existing shim configuration in the ribbin.jsonc file.
 // Returns an error if the command doesn't exist.
 func UpdateShim(configPath, cmdName string, shimConfig ShimConfig) error {
 	// Load existing config
@@ -91,13 +91,13 @@ func atomicWrite(configPath string, config *ProjectConfig) error {
 		}
 	}
 
-	// Encode config to TOML
-	var buf bytes.Buffer
-	encoder := toml.NewEncoder(&buf)
-	if err := encoder.Encode(config); err != nil {
+	// Encode config to JSON with indentation
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
 		return fmt.Errorf("failed to encode config: %w", err)
 	}
-	data := buf.Bytes()
+	// Add trailing newline
+	data = append(data, '\n')
 
 	// Write to temporary file
 	tmpPath := configPath + ".tmp"
@@ -106,8 +106,21 @@ func atomicWrite(configPath string, config *ProjectConfig) error {
 	}
 
 	// Validate the written file by trying to parse it
+	testData, err := os.ReadFile(tmpPath)
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("failed to read temp file for validation: %w", err)
+	}
+
+	// Use hujson to standardize (in case we ever add comments)
+	standardJSON, err := hujson.Standardize(testData)
+	if err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("validation failed (invalid JSONC): %w", err)
+	}
+
 	var testConfig ProjectConfig
-	if _, err := toml.DecodeFile(tmpPath, &testConfig); err != nil {
+	if err := json.Unmarshal(standardJSON, &testConfig); err != nil {
 		// Cleanup temp file on validation failure
 		os.Remove(tmpPath)
 		return fmt.Errorf("validation failed: %w", err)

@@ -20,40 +20,70 @@ This project uses Go (managed via mise).
 ```
 cmd/ribbin/         # CLI entry point
 internal/cli/       # CLI commands (Cobra)
-internal/config/    # Config file parsing (TOML)
-internal/shim/      # Shim logic
+internal/config/    # Config file parsing (JSONC)
+internal/wrap/      # Wrapper logic (installer, runner)
 internal/process/   # PID ancestry checking
+internal/security/  # Path validation and security checks
 internal/testutil/  # Test utilities
 testdata/           # Test fixtures
 ```
 
 ## Config Format
 
-Project config uses TOML (`ribbin.toml`):
+Project config uses JSONC (`ribbin.jsonc`) - JSON with comments:
 
-```toml
-# Block direct tsc usage
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' instead"
-
-# Block npm - this project uses pnpm
-[shims.npm]
-action = "block"
-message = "This project uses pnpm. Run 'pnpm install' instead."
-paths = ["/usr/local/bin/npm", "/usr/bin/npm"]
+```jsonc
+{
+  "$schema": "https://github.com/happycollision/ribbin/ribbin.schema.json",
+  "wrappers": {
+    // Block direct tsc usage
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead"
+    },
+    // Block npm - this project uses pnpm
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm. Run 'pnpm install' instead.",
+      "paths": ["/usr/local/bin/npm", "/usr/bin/npm"]
+    }
+  }
+}
 ```
+
+A JSON Schema is available at `ribbin.schema.json` for editor autocompletion and validation.
+
+### User-Local Config Override
+
+Create `ribbin.local.jsonc` to define personal overrides that aren't committed to the repo. When present, this file is loaded **instead of** `ribbin.jsonc`.
+
+To extend the shared config while adding your own rules:
+
+```jsonc
+{
+  "scopes": {
+    "local": {
+      "extends": ["./ribbin.jsonc"],
+      "wrappers": {
+        // Your personal overrides here
+      }
+    }
+  }
+}
+```
+
+**Recommended**: Add `ribbin.local.jsonc` to your `.gitignore`.
 
 ## Local Development Mode
 
-When ribbin is installed as a dev dependency (e.g., in `node_modules/.bin/`), it automatically enables **Local Development Mode**. In this mode, ribbin can only shim binaries within the same git repository.
+When ribbin is installed as a dev dependency (e.g., in `node_modules/.bin/`), it automatically enables **Local Development Mode**. In this mode, ribbin can only wrap binaries within the same git repository.
 
-This protects developers from malicious packages that might try to shim system binaries.
+This protects developers from malicious packages that might try to wrap system binaries.
 
 **Detection**: ribbin checks if its own executable is inside a git repository by walking up directories looking for `.git`.
 
 **Behavior**:
-- If ribbin is inside a git repo → can only shim binaries in that repo
+- If ribbin is inside a git repo → can only wrap binaries in that repo
 - If ribbin is NOT in a git repo (global install) → normal security rules apply
 
 This works across ecosystems:
@@ -80,7 +110,7 @@ make scenario SCENARIO=basic            # Run specific scenario directly
 | `scopes` | Directory-based configs (monorepo style) |
 | `extends` | Config inheritance from mixins and external files |
 
-Inside the scenario shell, ribbin is pre-installed and you can test shim/unshim/activate commands. Type `exit` to leave.
+Inside the scenario shell, ribbin is pre-installed and you can test wrap/unwrap/activate commands. Type `exit` to leave.
 
 Scenario files are in `scripts/scenarios/`.
 

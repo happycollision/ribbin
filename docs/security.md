@@ -21,20 +21,20 @@ All file paths are validated before use to prevent path traversal attacks.
 **Example:**
 ```bash
 # Blocked - path traversal
-ribbin shim /usr/local/bin/../../etc/passwd
+ribbin wrap /usr/local/bin/../../etc/passwd
 
 # Blocked - forbidden directory
-ribbin shim /etc/shadow
+ribbin wrap /etc/shadow
 
 # Allowed - user-local directory
-ribbin shim ~/.local/bin/mycommand
+ribbin wrap ~/.local/bin/mycommand
 ```
 
 **Implementation:** [internal/security/paths.go](../internal/security/paths.go)
 
 ### 2. Directory Allowlist
 
-Only specific directories are allowed for shimming to prevent critical system modification.
+Only specific directories are allowed for wrapping to prevent critical system modification.
 
 **Allowed Categories:**
 - User-local binaries (`~/.local/bin`, `~/bin`)
@@ -87,7 +87,7 @@ Symlinks are validated to prevent attacks where an attacker creates malicious sy
 - Symlink target validation (must be in allowed directory)
 - Chain depth limits (max 10 levels)
 - No symlinks in parent directory paths
-- Warning for symlink shimming
+- Warning for symlink wrapping
 
 **Attack Scenarios Prevented:**
 
@@ -96,8 +96,9 @@ Symlinks are validated to prevent attacks where an attacker creates malicious sy
 # Attacker creates:
 ln -s /etc/passwd /usr/local/bin/mycommand
 
+# Config specifies mycommand with path /usr/local/bin/mycommand
 # Blocked - target outside allowed directories
-ribbin shim /usr/local/bin/mycommand
+ribbin wrap
 ```
 
 **Scenario 2: Parent Directory Symlink**
@@ -106,8 +107,9 @@ ribbin shim /usr/local/bin/mycommand
 ln -s /etc /tmp/fake-bin
 touch /tmp/fake-bin/passwd
 
+# Config specifies path /tmp/fake-bin/passwd
 # Blocked - parent directory contains symlink
-ribbin shim /tmp/fake-bin/passwd
+ribbin wrap
 ```
 
 **Scenario 3: Symlink Chain Attack**
@@ -118,8 +120,9 @@ ln -s link3 link2
 ... (15 levels deep)
 ln -s /etc/passwd link15
 
+# Config specifies path link1
 # Blocked - chain depth exceeds limit
-ribbin shim link1
+ribbin wrap
 ```
 
 **Implementation:** [internal/security/symlinks.go](../internal/security/symlinks.go)
@@ -129,7 +132,7 @@ ribbin shim link1
 All security-relevant operations are logged for incident response and compliance.
 
 **What Gets Logged:**
-- Shim installations/uninstalls (success and failure)
+- Wrapper installations/uninstalls (success and failure)
 - Bypass usage (`RIBBIN_BYPASS=1`)
 - Security violations (path traversal, forbidden directories)
 - Privileged operations (running as root)
@@ -183,16 +186,16 @@ Operations that require elevated privileges are logged and warned about.
 
 **Example:**
 ```bash
-# Attempting to shim system directory without flag
-ribbin shim /usr/bin/curl
+# Attempting to wrap system directory without flag
+ribbin wrap
 
 # Output:
-# shimming /usr/bin/curl requires explicit confirmation
+# wrapping /usr/bin/curl requires explicit confirmation
 #
 # Use --confirm-system-dir flag if you understand the security implications
 
 # With flag - allowed (if you have write permission)
-sudo ribbin shim --confirm-system-dir
+sudo ribbin wrap --confirm-system-dir
 ```
 
 All privileged operations are logged to the audit log with the `elevated` flag set.
@@ -201,20 +204,16 @@ All privileged operations are logged to the audit log with the `elevated` flag s
 
 ### For Users
 
-1. **Never shim critical system binaries:**
-   ```bash
-   # DON'T DO THIS
-   sudo ribbin shim bash
-   sudo ribbin shim sudo
-   ```
+1. **Never wrap critical system binaries:**
+   Critical binaries like `bash`, `sudo`, `ssh` are blocked by name and cannot be wrapped.
 
 2. **Use user-local directories when possible:**
    ```bash
-   # Good - user directory
-   ribbin shim ~/.local/bin/mycommand
+   # Good - user directory, config specifies ~/.local/bin paths
+   ribbin wrap
 
-   # Avoid - requires sudo
-   sudo ribbin shim /usr/bin/mycommand
+   # Avoid - requires sudo for system directories
+   sudo ribbin wrap --confirm-system-dir
    ```
 
 3. **Review audit logs regularly:**
@@ -285,7 +284,7 @@ Ribbin protects against:
 1. **Path Traversal Attacks**: Using `..` sequences to escape allowed directories
 2. **TOCTOU Race Conditions**: Modifying files between check and use
 3. **Symlink Attacks**: Using symlinks to target forbidden locations
-4. **Unauthorized Privilege Escalation**: Shimming critical system binaries
+4. **Unauthorized Privilege Escalation**: Wrapping critical system binaries
 5. **Directory Traversal**: Accessing files outside allowed directories
 
 ### Out of Scope

@@ -17,16 +17,16 @@ There are two ways to set this up:
 
 Use `action = "block"` with `RIBBIN_BYPASS` in package.json.
 
-**ribbin.toml:**
-```toml
-[shims.tsc]
-action = "block"
-message = """TypeScript should be run through the project script:
-
-    pnpm run typecheck
-
-This ensures tsconfig.json settings are used correctly.
-"""
+**ribbin.jsonc:**
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "TypeScript should be run through the project script:\n\n    pnpm run typecheck\n\nThis ensures tsconfig.json settings are used correctly."
+    }
+  }
+}
 ```
 
 **package.json:**
@@ -44,13 +44,18 @@ Direct `tsc` calls are blocked. The `RIBBIN_BYPASS=1` prefix in package.json let
 
 ### Approach B: Keep Codebase Unchanged
 
-If you don't want to modify shared files like package.json, use `action = "redirect"` to a wrapper script. You can put `ribbin.toml` and the wrapper in a parent directory outside the repo.
+If you don't want to modify shared files like package.json, use `action = "redirect"` to a wrapper script. You can put `ribbin.jsonc` and the wrapper in a parent directory outside the repo.
 
-**ribbin.toml** (can be in parent directory):
-```toml
-[shims.tsc]
-action = "redirect"
-redirect = "./scripts/tsc-wrapper.sh"
+**ribbin.jsonc** (can be in parent directory):
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "redirect",
+      "redirect": "./scripts/tsc-wrapper.sh"
+    }
+  }
+}
 ```
 
 **scripts/tsc-wrapper.sh** (can be in parent directory):
@@ -96,28 +101,28 @@ This approach:
 If your AI assistant doesn't have a persistent shell (like Claude Code), use global activation:
 
 ```bash
-ribbin on
+ribbin activate --global
 ```
 
-This enables ribbin system-wide until you run `ribbin off`.
+This enables ribbin system-wide until you run `ribbin deactivate --global`.
 
 ### For Persistent Shell Sessions
 
 If your agent has a persistent shell, you can activate per-session:
 
 ```bash
-ribbin activate
+ribbin activate --shell
 ```
 
 This sets up the current shell so ribbin is active.
 
-### Installing the Shims
+### Installing the Wrappers
 
-Before activation works, you need to install the shims:
+Before activation works, you need to install the wrappers:
 
 ```bash
-# Install shims for commands in ribbin.toml
-ribbin shim
+# Install wrappers for commands in ribbin.jsonc
+ribbin wrap
 ```
 
 ## What Happens Now
@@ -150,7 +155,7 @@ When ribbin intercepts a command, it checks:
 
 1. Is `RIBBIN_BYPASS=1` set in the environment?
 2. If yes, execute the original command
-3. If no, apply the configured action (block/redirect)
+3. If no, apply the configured action (block/warn/redirect)
 
 This allows your npm scripts to use the actual tools while direct invocation is still controlled.
 
@@ -163,28 +168,33 @@ pnpm runs:  tsc           → ALLOWED (RIBBIN_BYPASS=1 set by script)
 
 ### Full TypeScript Project
 
-```toml
-# TypeScript - use project scripts
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' or 'pnpm run build'"
-
-[shims.eslint]
-action = "block"
-message = "Use 'pnpm run lint' - includes project plugins"
-
-[shims.prettier]
-action = "block"
-message = "Use 'pnpm run format' - uses project config"
-
-# Package manager - this project uses pnpm
-[shims.npm]
-action = "block"
-message = "This project uses pnpm. Run 'pnpm install' instead."
-
-[shims.yarn]
-action = "block"
-message = "This project uses pnpm. Run 'pnpm install' instead."
+```jsonc
+{
+  "wrappers": {
+    // TypeScript - use project scripts
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' or 'pnpm run build'"
+    },
+    "eslint": {
+      "action": "block",
+      "message": "Use 'pnpm run lint' - includes project plugins"
+    },
+    "prettier": {
+      "action": "block",
+      "message": "Use 'pnpm run format' - uses project config"
+    },
+    // Package manager - this project uses pnpm
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm. Run 'pnpm install' instead."
+    },
+    "yarn": {
+      "action": "block",
+      "message": "This project uses pnpm. Run 'pnpm install' instead."
+    }
+  }
+}
 ```
 
 With corresponding `package.json`:
@@ -202,22 +212,32 @@ With corresponding `package.json`:
 
 ### Python Project with Poetry
 
-```toml
-[shims.pip]
-action = "block"
-message = "Use 'poetry add <package>' to manage dependencies"
-
-[shims.pytest]
-action = "block"
-message = "Use 'poetry run pytest' or 'make test'"
+```jsonc
+{
+  "wrappers": {
+    "pip": {
+      "action": "block",
+      "message": "Use 'poetry add <package>' to manage dependencies"
+    },
+    "pytest": {
+      "action": "block",
+      "message": "Use 'poetry run pytest' or 'make test'"
+    }
+  }
+}
 ```
 
 ### Go Project
 
-```toml
-[shims.go]
-action = "block"
-message = "Use 'make build', 'make test', or 'make run'"
+```jsonc
+{
+  "wrappers": {
+    "go": {
+      "action": "block",
+      "message": "Use 'make build', 'make test', or 'make run'"
+    }
+  }
+}
 ```
 
 In your Makefile:
@@ -253,6 +273,7 @@ ribbin audit summary
 | Action | Effect |
 |--------|--------|
 | `block` | Show error message, don't run command |
+| `warn` | Show warning message, then run command |
 | `redirect` | Run a different command instead |
 | `RIBBIN_BYPASS=1` | Skip ribbin, run original command |
 | `cmd.ribbin-original` | Call the original binary directly |

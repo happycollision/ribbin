@@ -17,7 +17,7 @@ var (
 var configRemoveCmd = &cobra.Command{
 	Use:   "remove <command>",
 	Short: "Remove a shim configuration",
-	Long: `Remove a shim configuration from ribbin.toml.
+	Long: `Remove a shim configuration from ribbin.jsonc.
 
 Prompts for confirmation unless --force is used.
 
@@ -35,14 +35,14 @@ func init() {
 func runConfigRemove(cmd *cobra.Command, args []string) error {
 	cmdName := args[0]
 
-	// Find ribbin.toml
+	// Find ribbin.jsonc
 	configPath, err := config.FindProjectConfig()
 	if err != nil {
 		return fmt.Errorf("failed to find config: %w", err)
 	}
 
 	if configPath == "" {
-		return fmt.Errorf("ribbin.toml not found. Run 'ribbin init' first.")
+		return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
 	}
 
 	// Load and check configuration

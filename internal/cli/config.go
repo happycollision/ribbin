@@ -6,7 +6,7 @@ import (
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Manage ribbin.toml configuration",
+	Short: "Manage ribbin.jsonc configuration",
 	Long: `Add, remove, list, edit, and show shim configurations without manual file editing.
 
 Subcommands:

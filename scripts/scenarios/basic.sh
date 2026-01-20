@@ -54,36 +54,40 @@ git init -q
 git config user.email "tester@example.com"
 git config user.name "Tester"
 
-# Create a ribbin.toml with various wrapper examples
+# Create a ribbin.jsonc with various wrapper examples
 # Using explicit paths to our local wrappers
-cat > ribbin.toml << EOF
-# Example ribbin configuration for testing
-# Try running blocked commands to see ribbin in action!
-
-# Block direct npm usage - this project uses pnpm
-[wrappers.mynpm]
-action = "block"
-message = "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead."
-paths = ["$LOCAL_BIN/mynpm"]
-
-# Block direct tsc usage - enforce project script
-[wrappers.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' instead of direct tsc"
-paths = ["$LOCAL_BIN/tsc"]
-
-# Redirect myecho to a custom script (for demonstration)
-[wrappers.myecho]
-action = "redirect"
-redirect = "./scripts/fancy-echo.sh"
-message = "Using fancy echo wrapper"
-paths = ["$LOCAL_BIN/myecho"]
-
-# Block mycurl - use the project's API client
-[wrappers.mycurl]
-action = "block"
-message = "Use the project's API client at ./scripts/api.sh instead"
-paths = ["$LOCAL_BIN/mycurl"]
+cat > ribbin.jsonc << EOF
+{
+  // Example ribbin configuration for testing
+  // Try running blocked commands to see ribbin in action!
+  "wrappers": {
+    // Block direct npm usage - this project uses pnpm
+    "mynpm": {
+      "action": "block",
+      "message": "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead.",
+      "paths": ["$LOCAL_BIN/mynpm"]
+    },
+    // Block direct tsc usage - enforce project script
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead of direct tsc",
+      "paths": ["$LOCAL_BIN/tsc"]
+    },
+    // Redirect myecho to a custom script (for demonstration)
+    "myecho": {
+      "action": "redirect",
+      "redirect": "./scripts/fancy-echo.sh",
+      "message": "Using fancy echo wrapper",
+      "paths": ["$LOCAL_BIN/myecho"]
+    },
+    // Block mycurl - use the project's API client
+    "mycurl": {
+      "action": "block",
+      "message": "Use the project's API client at ./scripts/api.sh instead",
+      "paths": ["$LOCAL_BIN/mycurl"]
+    }
+  }
+}
 EOF
 
 # Create the redirect script

@@ -536,13 +536,16 @@ func TestAttack_Scenario_MaliciousConfigInParent(t *testing.T) {
 	os.Mkdir(projectDir, 0755)
 
 	// Malicious config targeting bash
-	maliciousConfig := `
-[wrappers.bash]
-action = "block"
-paths = ["/usr/bin/bash"]
-message = "gotcha"
-`
-	configFile := filepath.Join(tmpDir, "ribbin.toml")
+	maliciousConfig := `{
+  "wrappers": {
+    "bash": {
+      "action": "block",
+      "paths": ["/usr/bin/bash"],
+      "message": "gotcha"
+    }
+  }
+}`
+	configFile := filepath.Join(tmpDir, "ribbin.jsonc")
 	os.WriteFile(configFile, []byte(maliciousConfig), 0644)
 
 	// If the config is loaded and paths validated,

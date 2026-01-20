@@ -79,43 +79,43 @@ func TestParseExtendsRef_RelativeFilePaths(t *testing.T) {
 	}{
 		{
 			name:         "relative sibling file",
-			ref:          "./other.toml",
-			wantFilePath: "/project/config/other.toml",
+			ref:          "./other.jsonc",
+			wantFilePath: "/project/config/other.jsonc",
 			wantFragment: "",
 			wantIsLocal:  false,
 		},
 		{
 			name:         "relative parent directory",
-			ref:          "../other.toml",
-			wantFilePath: "/project/other.toml",
+			ref:          "../other.jsonc",
+			wantFilePath: "/project/other.jsonc",
 			wantFragment: "",
 			wantIsLocal:  false,
 		},
 		{
 			name:         "relative with fragment",
-			ref:          "./file.toml#root",
-			wantFilePath: "/project/config/file.toml",
+			ref:          "./file.jsonc#root",
+			wantFilePath: "/project/config/file.jsonc",
 			wantFragment: "root",
 			wantIsLocal:  false,
 		},
 		{
 			name:         "relative with scope fragment",
-			ref:          "./file.toml#root.scope",
-			wantFilePath: "/project/config/file.toml",
+			ref:          "./file.jsonc#root.scope",
+			wantFilePath: "/project/config/file.jsonc",
 			wantFragment: "root.scope",
 			wantIsLocal:  false,
 		},
 		{
 			name:         "parent with subdirectory",
-			ref:          "../team-standards/ribbin.toml",
-			wantFilePath: "/project/team-standards/ribbin.toml",
+			ref:          "../team-standards/ribbin.jsonc",
+			wantFilePath: "/project/team-standards/ribbin.jsonc",
 			wantFragment: "",
 			wantIsLocal:  false,
 		},
 		{
 			name:         "current dir with subdirectory",
-			ref:          "./configs/base.toml#root.hardened",
-			wantFilePath: "/project/config/configs/base.toml",
+			ref:          "./configs/base.jsonc#root.hardened",
+			wantFilePath: "/project/config/configs/base.jsonc",
 			wantFragment: "root.hardened",
 			wantIsLocal:  false,
 		},
@@ -151,20 +151,20 @@ func TestParseExtendsRef_AbsoluteFilePaths(t *testing.T) {
 	}{
 		{
 			name:         "absolute path",
-			ref:          "/abs/path/ribbin.toml",
-			wantFilePath: "/abs/path/ribbin.toml",
+			ref:          "/abs/path/ribbin.jsonc",
+			wantFilePath: "/abs/path/ribbin.jsonc",
 			wantFragment: "",
 		},
 		{
 			name:         "absolute path with fragment",
-			ref:          "/abs/path/ribbin.toml#root",
-			wantFilePath: "/abs/path/ribbin.toml",
+			ref:          "/abs/path/ribbin.jsonc#root",
+			wantFilePath: "/abs/path/ribbin.jsonc",
 			wantFragment: "root",
 		},
 		{
 			name:         "absolute path with scope fragment",
-			ref:          "/abs/path/ribbin.toml#root.myScope",
-			wantFilePath: "/abs/path/ribbin.toml",
+			ref:          "/abs/path/ribbin.jsonc#root.myScope",
+			wantFilePath: "/abs/path/ribbin.jsonc",
 			wantFragment: "root.myScope",
 		},
 	}
@@ -203,7 +203,7 @@ func TestParseExtendsRef_Errors(t *testing.T) {
 		},
 		{
 			name:    "bare filename without prefix",
-			ref:     "other.toml",
+			ref:     "other.jsonc",
 			wantErr: "relative path must start with './' or '../'",
 		},
 		{
@@ -230,11 +230,11 @@ func TestParseExtendsRef_PathCleaning(t *testing.T) {
 	configDir := "/project/config"
 
 	// Paths with redundant components should be cleaned
-	got, err := ParseExtendsRef("./foo/../bar.toml", configDir)
+	got, err := ParseExtendsRef("./foo/../bar.jsonc", configDir)
 	if err != nil {
 		t.Fatalf("ParseExtendsRef error = %v", err)
 	}
-	want := filepath.Clean("/project/config/bar.toml")
+	want := filepath.Clean("/project/config/bar.jsonc")
 	if got.FilePath != want {
 		t.Errorf("FilePath = %q, want %q", got.FilePath, want)
 	}
@@ -253,8 +253,8 @@ func TestIsLocalRef(t *testing.T) {
 		{"./root", false},           // file path
 		{"../root", false},          // file path
 		{"/root", false},            // absolute path
-		{"other.toml", false},       // file without prefix
-		{"./file.toml#root", false}, // file with fragment
+		{"other.jsonc", false},       // file without prefix
+		{"./file.jsonc#root", false}, // file with fragment
 	}
 
 	for _, tt := range tests {
@@ -273,10 +273,10 @@ func TestSplitFileAndFragment(t *testing.T) {
 		wantFile     string
 		wantFragment string
 	}{
-		{"./file.toml", "./file.toml", ""},
-		{"./file.toml#root", "./file.toml", "root"},
-		{"./file.toml#root.scope", "./file.toml", "root.scope"},
-		{"/abs/path.toml#frag", "/abs/path.toml", "frag"},
+		{"./file.jsonc", "./file.jsonc", ""},
+		{"./file.jsonc#root", "./file.jsonc", "root"},
+		{"./file.jsonc#root.scope", "./file.jsonc", "root.scope"},
+		{"/abs/path.jsonc#frag", "/abs/path.jsonc", "frag"},
 		{"#fragment", "", "fragment"},
 		{"file#with#multiple#hashes", "file#with#multiple", "hashes"},
 	}

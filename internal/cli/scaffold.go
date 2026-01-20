@@ -41,7 +41,7 @@ func generateScriptTemplate(command string) string {
 # Environment variables provided by ribbin:
 #   RIBBIN_ORIGINAL_BIN - Path to original binary (e.g., /usr/bin/%s.ribbin-original)
 #   RIBBIN_COMMAND      - Command name (e.g., "%s")
-#   RIBBIN_CONFIG       - Path to ribbin.toml that triggered this redirect
+#   RIBBIN_CONFIG       - Path to ribbin.jsonc that triggered this redirect
 #   RIBBIN_ACTION       - Always "redirect"
 
 # Example 1: Call original command with all arguments

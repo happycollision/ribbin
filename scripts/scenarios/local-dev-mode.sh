@@ -42,30 +42,34 @@ echo "Build complete!"
 EOF
 chmod +x "$LOCAL_BIN/my-build"
 
-# Create a ribbin.toml
-cat > ribbin.toml << EOF
-# Local Development Mode demo
-# ribbin is installed in node_modules/.bin, so it can only wrap
-# binaries within this repository.
-
-# This WILL work - my-lint is inside the repo
-[wrappers.my-lint]
-action = "redirect"
-redirect = "./scripts/lint-wrapper.sh"
-message = "Using project lint wrapper"
-paths = ["$LOCAL_BIN/my-lint"]
-
-# This WILL work - my-build is inside the repo
-[wrappers.my-build]
-action = "block"
-message = "Use 'npm run build' instead"
-paths = ["$LOCAL_BIN/my-build"]
-
-# This will be REFUSED - cat is outside the repo (system binary)
-[wrappers.cat]
-action = "block"
-message = "Use bat instead"
-# No paths specified - will try to resolve from PATH (system /bin/cat)
+# Create a ribbin.jsonc
+cat > ribbin.jsonc << EOF
+{
+  // Local Development Mode demo
+  // ribbin is installed in node_modules/.bin, so it can only wrap
+  // binaries within this repository.
+  "wrappers": {
+    // This WILL work - my-lint is inside the repo
+    "my-lint": {
+      "action": "redirect",
+      "redirect": "./scripts/lint-wrapper.sh",
+      "message": "Using project lint wrapper",
+      "paths": ["$LOCAL_BIN/my-lint"]
+    },
+    // This WILL work - my-build is inside the repo
+    "my-build": {
+      "action": "block",
+      "message": "Use 'npm run build' instead",
+      "paths": ["$LOCAL_BIN/my-build"]
+    },
+    // This will be REFUSED - cat is outside the repo (system binary)
+    "cat": {
+      "action": "block",
+      "message": "Use bat instead"
+      // No paths specified - will try to resolve from PATH (system /bin/cat)
+    }
+  }
+}
 EOF
 
 # Create the redirect script

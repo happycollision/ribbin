@@ -35,7 +35,7 @@ func TestExtractCommandName(t *testing.T) {
 }
 
 func TestIsActive(t *testing.T) {
-	testConfigPath := "/test/project/ribbin.toml"
+	testConfigPath := "/test/project/ribbin.jsonc"
 
 	t.Run("returns true when GlobalActive is true (priority 1)", func(t *testing.T) {
 		registry := &config.Registry{
@@ -115,7 +115,7 @@ func TestIsActive(t *testing.T) {
 			Wrappers:         make(map[string]config.WrapperEntry),
 			ShellActivations: make(map[int]config.ShellActivationEntry),
 			ConfigActivations: map[string]config.ConfigActivationEntry{
-				"/other/project/ribbin.toml": {ActivatedAt: time.Now()},
+				"/other/project/ribbin.jsonc": {ActivatedAt: time.Now()},
 			},
 			GlobalActive: false,
 		}
@@ -471,7 +471,7 @@ func TestFindBestMatchingScope(t *testing.T) {
 		}
 	}
 
-	configPath := filepath.Join(tmpDir, "ribbin.toml")
+	configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
 	t.Run("CWD in scope path - scope applies", func(t *testing.T) {
 		projectConfig := &config.ProjectConfig{
@@ -603,7 +603,7 @@ func TestGetEffectiveShimConfig(t *testing.T) {
 		t.Fatalf("failed to create src dir: %v", err)
 	}
 
-	configPath := filepath.Join(tmpDir, "ribbin.toml")
+	configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
 	// Save current directory and change to temp dir for testing
 	originalWd, err := os.Getwd()
@@ -750,7 +750,7 @@ func TestScopeMatchingIntegration(t *testing.T) {
 		}
 	}
 
-	configPath := filepath.Join(tmpDir, "ribbin.toml")
+	configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
 	projectConfig := &config.ProjectConfig{
 		Wrappers: map[string]config.ShimConfig{

@@ -37,8 +37,8 @@ or execute custom scripts (redirect). This helps enforce project conventions
 for both humans and AI agents.
 
 Quick start:
-  ribbin init        Create a ribbin.toml config file
-  ribbin wrap        Install wrappers for commands in ribbin.toml
+  ribbin init        Create a ribbin.jsonc config file
+  ribbin wrap        Install wrappers for commands in ribbin.jsonc
   ribbin activate    Activate ribbin (config, shell, or global)
   ribbin status      Show activation status
 

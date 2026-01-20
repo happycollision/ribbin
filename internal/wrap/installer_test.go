@@ -93,7 +93,7 @@ func TestInstall(t *testing.T) {
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
-		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
+		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.jsonc")
 		if err != nil {
 			t.Fatalf("Install error: %v", err)
 		}
@@ -124,8 +124,8 @@ func TestInstall(t *testing.T) {
 		if entry.Original != binaryPath {
 			t.Errorf("registry Original should be %s, got %s", binaryPath, entry.Original)
 		}
-		if entry.Config != "/project/ribbin.toml" {
-			t.Errorf("registry Config should be /project/ribbin.toml, got %s", entry.Config)
+		if entry.Config != "/project/ribbin.jsonc" {
+			t.Errorf("registry Config should be /project/ribbin.jsonc, got %s", entry.Config)
 		}
 	})
 
@@ -152,7 +152,7 @@ func TestInstall(t *testing.T) {
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
-		installErr := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
+		installErr := Install(binaryPath, ribbinPath, registry, "/project/ribbin.jsonc")
 		if installErr == nil {
 			t.Error("expected error when binary is already shimmed")
 		}
@@ -176,7 +176,7 @@ func TestInstall(t *testing.T) {
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
-		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
+		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.jsonc")
 		if err == nil {
 			t.Error("expected error with empty ribbin path")
 		}
@@ -238,7 +238,7 @@ func TestUninstall(t *testing.T) {
 
 		registry := &config.Registry{
 			Wrappers: map[string]config.WrapperEntry{
-				"uninstall-test": {Original: binaryPath, Config: "/project/ribbin.toml"},
+				"uninstall-test": {Original: binaryPath, Config: "/project/ribbin.jsonc"},
 			},
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
@@ -570,7 +570,7 @@ func TestInstallCreatesMetadata(t *testing.T) {
 		ConfigActivations: make(map[string]config.ConfigActivationEntry),
 	}
 
-	err = Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
+	err = Install(binaryPath, ribbinPath, registry, "/project/ribbin.jsonc")
 	if err != nil {
 		t.Fatalf("Install error: %v", err)
 	}
@@ -631,7 +631,7 @@ func TestUninstallRemovesMetadata(t *testing.T) {
 
 	registry := &config.Registry{
 		Wrappers: map[string]config.WrapperEntry{
-			"uninstall-test": {Original: binaryPath, Config: "/project/ribbin.toml"},
+			"uninstall-test": {Original: binaryPath, Config: "/project/ribbin.jsonc"},
 		},
 		ShellActivations:  make(map[int]config.ShellActivationEntry),
 		ConfigActivations: make(map[string]config.ConfigActivationEntry),

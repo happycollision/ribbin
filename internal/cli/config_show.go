@@ -70,7 +70,7 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	}
 
 	if configPath == "" {
-		return fmt.Errorf("No ribbin.toml found. Run 'ribbin init' to create one.")
+		return fmt.Errorf("No ribbin.jsonc found. Run 'ribbin init' to create one.")
 	}
 
 	// Filter by command if specified

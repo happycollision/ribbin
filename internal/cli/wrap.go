@@ -15,10 +15,10 @@ var confirmSystemDir bool
 
 var wrapCmd = &cobra.Command{
 	Use:   "wrap [config-files...]",
-	Short: "Install wrappers for commands in ribbin.toml",
-	Long: `Install wrappers for all commands defined in the specified ribbin.toml files.
+	Short: "Install wrappers for commands in ribbin.jsonc",
+	Long: `Install wrappers for all commands defined in the specified ribbin.jsonc files.
 
-By default, wraps commands from the nearest ribbin.toml in the current directory
+By default, wraps commands from the nearest ribbin.jsonc in the current directory
 (or parent directories). You can also specify config file paths explicitly.
 
 For each command, ribbin:
@@ -36,7 +36,7 @@ Security:
   - System directories (/bin, /usr/bin, /sbin) require --confirm-system-dir flag
 
 Examples:
-  ribbin wrap                            # Wrap commands from nearest ribbin.toml
+  ribbin wrap                            # Wrap commands from nearest ribbin.jsonc
   ribbin wrap ./a.toml ./b.toml          # Wrap commands from specific configs
   ribbin wrap --confirm-system-dir       # Allow wrapping in /bin, /usr/bin, etc.`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -69,14 +69,14 @@ Examples:
 				configPaths = append(configPaths, absPath)
 			}
 		} else {
-			// Find nearest ribbin.toml
+			// Find nearest ribbin.jsonc
 			configPath, err := config.FindProjectConfig()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error finding config: %v\n", err)
 				os.Exit(1)
 			}
 			if configPath == "" {
-				fmt.Fprintf(os.Stderr, "No ribbin.toml found. Run 'ribbin init' to create one.\n")
+				fmt.Fprintf(os.Stderr, "No ribbin.jsonc found. Run 'ribbin init' to create one.\n")
 				os.Exit(1)
 			}
 			configPaths = []string{configPath}

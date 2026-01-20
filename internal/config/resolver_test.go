@@ -28,7 +28,7 @@ func TestResolveEffectiveShims_IsolatedScope(t *testing.T) {
 
 	scope := config.Scopes["frontend"]
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
@@ -66,7 +66,7 @@ func TestResolveEffectiveShims_ExtendsRoot(t *testing.T) {
 
 	scope := config.Scopes["backend"]
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
@@ -119,7 +119,7 @@ func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
 
 	scope := config.Scopes["backend"]
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
@@ -161,7 +161,7 @@ func TestResolveEffectiveShims_RecursiveExtends(t *testing.T) {
 
 	scope := config.Scopes["frontend"]
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
@@ -198,7 +198,7 @@ func TestResolveEffectiveShims_CycleDetection(t *testing.T) {
 
 	scope := config.Scopes["a"]
 	resolver := NewResolver()
-	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err == nil {
 		t.Fatal("expected cycle detection error")
 	}
@@ -220,7 +220,7 @@ func TestResolveEffectiveShims_SelfCycle(t *testing.T) {
 
 	scope := config.Scopes["self"]
 	resolver := NewResolver()
-	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err == nil {
 		t.Fatal("expected cycle detection error for self-reference")
 	}
@@ -246,7 +246,7 @@ func TestResolveEffectiveShims_NilScope(t *testing.T) {
 	}
 
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", nil)
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", nil)
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShims error = %v", err)
 	}
@@ -275,7 +275,7 @@ func TestResolveEffectiveShims_ScopeNotFound(t *testing.T) {
 
 	scope := config.Scopes["frontend"]
 	resolver := NewResolver()
-	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.jsonc", &scope)
 	if err == nil {
 		t.Fatal("expected error for nonexistent scope")
 	}
@@ -288,23 +288,27 @@ func TestResolveEffectiveShims_ExternalFile(t *testing.T) {
 	// Create a temporary external config file
 	tmpDir := t.TempDir()
 
-	// Create external config in a subdirectory (must be named ribbin.toml per security rules)
+	// Create external config in a subdirectory (must be named ribbin.jsonc per security rules)
 	externalDir := filepath.Join(tmpDir, "external")
 	if err := os.MkdirAll(externalDir, 0755); err != nil {
 		t.Fatalf("failed to create external dir: %v", err)
 	}
-	externalPath := filepath.Join(externalDir, "ribbin.toml")
-	externalContent := `
-[wrappers.external-cmd]
-action = "block"
-message = "from external"
+	externalPath := filepath.Join(externalDir, "ribbin.jsonc")
+	externalContent := `{
+  "wrappers": {
+    "external-cmd": {
+      "action": "block",
+      "message": "from external"
+    }
+  }
+}
 `
 	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
 		t.Fatalf("failed to write external config: %v", err)
 	}
 
 	// Create main config that extends external
-	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	mainPath := filepath.Join(tmpDir, "ribbin.jsonc")
 	config := &ProjectConfig{
 		Wrappers: map[string]ShimConfig{
 			"cat": {Action: "block", Message: "main cat"},
@@ -312,7 +316,7 @@ message = "from external"
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./external/ribbin.toml"},
+				Extends: []string{"./external/ribbin.jsonc"},
 				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},
@@ -344,33 +348,42 @@ func TestResolveEffectiveShims_ExternalFileWithFragment(t *testing.T) {
 	// Create a temporary external config file with scopes
 	tmpDir := t.TempDir()
 
-	// Create external config with a scope (in subdirectory, named ribbin.toml)
+	// Create external config with a scope (in subdirectory, named ribbin.jsonc)
 	teamDir := filepath.Join(tmpDir, "team")
 	if err := os.MkdirAll(teamDir, 0755); err != nil {
 		t.Fatalf("failed to create team dir: %v", err)
 	}
-	externalPath := filepath.Join(teamDir, "ribbin.toml")
-	externalContent := `
-[wrappers.team-cmd]
-action = "warn"
-message = "team root"
-
-[scopes.hardened]
-[scopes.hardened.wrappers.team-cmd]
-action = "block"
-message = "team hardened"
+	externalPath := filepath.Join(teamDir, "ribbin.jsonc")
+	externalContent := `{
+  "wrappers": {
+    "team-cmd": {
+      "action": "warn",
+      "message": "team root"
+    }
+  },
+  "scopes": {
+    "hardened": {
+      "wrappers": {
+        "team-cmd": {
+          "action": "block",
+          "message": "team hardened"
+        }
+      }
+    }
+  }
+}
 `
 	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
 		t.Fatalf("failed to write external config: %v", err)
 	}
 
 	// Create main config that extends specific scope from external
-	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	mainPath := filepath.Join(tmpDir, "ribbin.jsonc")
 	config := &ProjectConfig{
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./team/ribbin.toml#root.hardened"},
+				Extends: []string{"./team/ribbin.jsonc#root.hardened"},
 				Wrappers:   map[string]ShimConfig{},
 			},
 		},
@@ -396,30 +409,34 @@ func TestResolver_ConfigCaching(t *testing.T) {
 	// Verify that external configs are cached
 	tmpDir := t.TempDir()
 
-	// Create external config in subdirectory (must be named ribbin.toml)
+	// Create external config in subdirectory (must be named ribbin.jsonc)
 	externalDir := filepath.Join(tmpDir, "external")
 	if err := os.MkdirAll(externalDir, 0755); err != nil {
 		t.Fatalf("failed to create external dir: %v", err)
 	}
-	externalPath := filepath.Join(externalDir, "ribbin.toml")
-	externalContent := `
-[wrappers.ext]
-action = "block"
-message = "external"
+	externalPath := filepath.Join(externalDir, "ribbin.jsonc")
+	externalContent := `{
+  "wrappers": {
+    "ext": {
+      "action": "block",
+      "message": "external"
+    }
+  }
+}
 `
 	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
 		t.Fatalf("failed to write external config: %v", err)
 	}
 
-	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	mainPath := filepath.Join(tmpDir, "ribbin.jsonc")
 	config := &ProjectConfig{
 		Scopes: map[string]ScopeConfig{
 			"a": {
-				Extends: []string{"./external/ribbin.toml"},
+				Extends: []string{"./external/ribbin.jsonc"},
 				Wrappers:   map[string]ShimConfig{},
 			},
 			"b": {
-				Extends: []string{"./external/ribbin.toml"},
+				Extends: []string{"./external/ribbin.jsonc"},
 				Wrappers:   map[string]ShimConfig{},
 			},
 		},
@@ -463,7 +480,7 @@ func TestResolveEffectiveShimsWithProvenance_RootOnly(t *testing.T) {
 	}
 
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.toml", nil, "")
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.jsonc", nil, "")
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
 	}
@@ -481,8 +498,8 @@ func TestResolveEffectiveShimsWithProvenance_RootOnly(t *testing.T) {
 	if catShim.Config.Action != "block" {
 		t.Errorf("cat action = %q, want %q", catShim.Config.Action, "block")
 	}
-	if catShim.Source.FilePath != "/project/ribbin.toml" {
-		t.Errorf("cat source file = %q, want %q", catShim.Source.FilePath, "/project/ribbin.toml")
+	if catShim.Source.FilePath != "/project/ribbin.jsonc" {
+		t.Errorf("cat source file = %q, want %q", catShim.Source.FilePath, "/project/ribbin.jsonc")
 	}
 	if catShim.Source.Fragment != "root" {
 		t.Errorf("cat source fragment = %q, want %q", catShim.Source.Fragment, "root")
@@ -512,7 +529,7 @@ func TestResolveEffectiveShimsWithProvenance_ScopeExtendsRoot(t *testing.T) {
 
 	scope := config.Scopes["frontend"]
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.toml", &scope, "frontend")
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.jsonc", &scope, "frontend")
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
 	}
@@ -583,7 +600,7 @@ func TestResolveEffectiveShimsWithProvenance_MultipleExtends(t *testing.T) {
 
 	scope := config.Scopes["backend"]
 	resolver := NewResolver()
-	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.toml", &scope, "backend")
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.jsonc", &scope, "backend")
 	if err != nil {
 		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
 	}
@@ -616,22 +633,26 @@ func TestResolveEffectiveShimsWithProvenance_ExternalFile(t *testing.T) {
 	if err := os.MkdirAll(externalDir, 0755); err != nil {
 		t.Fatalf("failed to create external dir: %v", err)
 	}
-	externalPath := filepath.Join(externalDir, "ribbin.toml")
-	externalContent := `
-[wrappers.external-cmd]
-action = "block"
-message = "from external"
+	externalPath := filepath.Join(externalDir, "ribbin.jsonc")
+	externalContent := `{
+  "wrappers": {
+    "external-cmd": {
+      "action": "block",
+      "message": "from external"
+    }
+  }
+}
 `
 	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
 		t.Fatalf("failed to write external config: %v", err)
 	}
 
-	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	mainPath := filepath.Join(tmpDir, "ribbin.jsonc")
 	config := &ProjectConfig{
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./external/ribbin.toml"},
+				Extends: []string{"./external/ribbin.jsonc"},
 				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},

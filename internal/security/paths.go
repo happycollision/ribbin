@@ -51,8 +51,12 @@ func ValidateBinaryPath(path string) error {
 	return nil
 }
 
+// ValidConfigFileNames contains the allowed config file names.
+// ribbin.local.jsonc takes precedence over ribbin.jsonc when both exist.
+var ValidConfigFileNames = []string{"ribbin.jsonc", "ribbin.local.jsonc"}
+
 // ValidateConfigPath ensures a config file is safe to load.
-// It verifies the filename is ribbin.toml and checks file permissions.
+// It verifies the filename is a valid ribbin config name and checks file permissions.
 func ValidateConfigPath(path string) error {
 	clean := filepath.Clean(path)
 	abs, err := filepath.Abs(clean)
@@ -60,9 +64,17 @@ func ValidateConfigPath(path string) error {
 		return fmt.Errorf("cannot resolve config path: %w", err)
 	}
 
-	// Must end with ribbin.toml
-	if filepath.Base(abs) != "ribbin.toml" {
-		return fmt.Errorf("config must be named ribbin.toml, got: %s", filepath.Base(abs))
+	// Must be a valid config filename
+	baseName := filepath.Base(abs)
+	isValidName := false
+	for _, validName := range ValidConfigFileNames {
+		if baseName == validName {
+			isValidName = true
+			break
+		}
+	}
+	if !isValidName {
+		return fmt.Errorf("config must be named ribbin.jsonc or ribbin.local.jsonc, got: %s", baseName)
 	}
 
 	// Check file permissions (not world-writable)

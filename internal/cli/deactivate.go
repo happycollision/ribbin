@@ -149,14 +149,14 @@ Examples:
 				configPaths = append(configPaths, absPath)
 			}
 		} else {
-			// Find nearest ribbin.toml
+			// Find nearest ribbin.jsonc
 			configPath, err := config.FindProjectConfig()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error finding config: %v\n", err)
 				os.Exit(1)
 			}
 			if configPath == "" {
-				fmt.Fprintf(os.Stderr, "No ribbin.toml found. Run 'ribbin init' to create one.\n")
+				fmt.Fprintf(os.Stderr, "No ribbin.jsonc found. Run 'ribbin init' to create one.\n")
 				os.Exit(1)
 			}
 			configPaths = []string{configPath}

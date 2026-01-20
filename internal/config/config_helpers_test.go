@@ -16,9 +16,9 @@ func TestAddShim(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 		// Create initial empty config
-		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 
@@ -67,11 +67,16 @@ func TestAddShim(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 		// Create config with existing shim
-		content := `[wrappers.tsc]
-action = "block"
-message = "Use pnpm run typecheck"
+		content := `{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use pnpm run typecheck"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -123,10 +128,15 @@ message = "Use pnpm run typecheck"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
-message = "Already exists"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block",
+      "message": "Already exists"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -164,7 +174,7 @@ message = "Already exists"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "nonexistent.toml")
+		configPath := filepath.Join(tmpDir, "nonexistent.jsonc")
 
 		shimConfig := ShimConfig{
 			Action: "block",
@@ -185,10 +195,15 @@ func TestRemoveShim(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
-message = "Test block message"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block",
+      "message": "Test block message"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -223,14 +238,19 @@ message = "Test block message"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
-message = "Test block message"
-
-[wrappers.tsc]
-action = "block"
-message = "Use pnpm run typecheck"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block",
+      "message": "Test block message"
+    },
+    "tsc": {
+      "action": "block",
+      "message": "Use pnpm run typecheck"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -267,9 +287,14 @@ message = "Use pnpm run typecheck"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -302,7 +327,7 @@ action = "block"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "nonexistent.toml")
+		configPath := filepath.Join(tmpDir, "nonexistent.jsonc")
 
 		err = RemoveShim(configPath, "cat")
 		if err == nil {
@@ -319,10 +344,15 @@ func TestUpdateShim(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
-message = "Test block message"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block",
+      "message": "Test block message"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -373,14 +403,19 @@ message = "Test block message"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
-message = "Test block message"
-
-[wrappers.tsc]
-action = "block"
-message = "Use pnpm run typecheck"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block",
+      "message": "Test block message"
+    },
+    "tsc": {
+      "action": "block",
+      "message": "Use pnpm run typecheck"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -420,9 +455,14 @@ message = "Use pnpm run typecheck"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[wrappers.cat]
-action = "block"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		content := `{
+  "wrappers": {
+    "cat": {
+      "action": "block"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -450,7 +490,7 @@ action = "block"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "nonexistent.toml")
+		configPath := filepath.Join(tmpDir, "nonexistent.jsonc")
 
 		updatedConfig := ShimConfig{
 			Action: "warn",
@@ -471,9 +511,14 @@ func TestAtomicWrite(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		originalContent := `[wrappers.cat]
-action = "block"
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		originalContent := `{
+  "wrappers": {
+    "cat": {
+      "action": "block"
+    }
+  }
+}
 `
 		if err := os.WriteFile(configPath, []byte(originalContent), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -509,7 +554,7 @@ action = "block"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
 		config := &ProjectConfig{
 			Wrappers: map[string]ShimConfig{
@@ -533,18 +578,15 @@ action = "block"
 		}
 	})
 
-	t.Run("cleans up temp file on validation failure", func(t *testing.T) {
+	t.Run("cleans up temp file on success", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "ribbin-test-*")
 		if err != nil {
 			t.Fatalf("failed to create temp dir: %v", err)
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
 
-		// The atomicWrite function should handle this gracefully
-		// We can't easily force a validation failure with the current structure,
-		// but we can verify temp files are cleaned up in normal operation
 		config := &ProjectConfig{
 			Wrappers: map[string]ShimConfig{
 				"cat": {Action: "block"},
@@ -570,8 +612,8 @@ action = "block"
 		}
 		defer os.RemoveAll(tmpDir)
 
-		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		if err := os.WriteFile(configPath, []byte("[wrappers]\n"), 0644); err != nil {
+		configPath := filepath.Join(tmpDir, "ribbin.jsonc")
+		if err := os.WriteFile(configPath, []byte("{\"wrappers\": {}}\n"), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
 		}
 

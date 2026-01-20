@@ -21,7 +21,7 @@ var (
 var configEditCmd = &cobra.Command{
 	Use:   "edit <command>",
 	Short: "Edit an existing shim configuration",
-	Long: `Edit an existing shim configuration in ribbin.toml.
+	Long: `Edit an existing shim configuration in ribbin.jsonc.
 
 Only specified fields are updated; others remain unchanged.
 
@@ -48,14 +48,14 @@ func init() {
 func runConfigEdit(cmd *cobra.Command, args []string) error {
 	cmdName := args[0]
 
-	// Find ribbin.toml
+	// Find ribbin.jsonc
 	configPath, err := config.FindProjectConfig()
 	if err != nil {
 		return fmt.Errorf("failed to find config: %w", err)
 	}
 
 	if configPath == "" {
-		return fmt.Errorf("ribbin.toml not found. Run 'ribbin init' first.")
+		return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
 	}
 
 	// Check if at least one flag is specified

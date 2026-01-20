@@ -46,73 +46,82 @@ Download the latest release from [GitHub Releases](https://github.com/happycolli
 ribbin init
 ```
 
-2. Edit the generated `ribbin.toml` to add your shims:
+2. Edit the generated `ribbin.jsonc` to add your wrappers:
 
-```toml
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' instead"
-
-[shims.npm]
-action = "block"
-message = "This project uses pnpm"
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead"
+    },
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm"
+    }
+  }
+}
 ```
 
-3. Install the shims:
+3. Install the wrappers:
 
 ```bash
-ribbin shim
+ribbin wrap
 ```
 
-4. Activate ribbin for your shell:
+4. Activate ribbin globally:
 
 ```bash
-ribbin activate
-```
-
-5. Enable shims globally:
-
-```bash
-ribbin on
+ribbin activate --global
 ```
 
 Now when you (or an AI agent) runs `tsc` in this project, they'll see the helpful error instead.
 
 ## Configuration
 
-Create a `ribbin.toml` file in your project root:
+Create a `ribbin.jsonc` file in your project root:
 
-```toml
-# Block direct tsc usage
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' - direct tsc misses project config"
-
-# Block npm - this project uses pnpm
-[shims.npm]
-action = "block"
-message = "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead."
-paths = ["/usr/local/bin/npm", "/usr/bin/npm"]  # Optional: restrict to specific paths
+```jsonc
+{
+  "wrappers": {
+    // Block direct tsc usage
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' - direct tsc misses project config"
+    },
+    // Block npm - this project uses pnpm
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead.",
+      "paths": ["/usr/local/bin/npm", "/usr/bin/npm"]  // Optional: restrict to specific paths
+    }
+  }
+}
 ```
 
 ### Configuration Options
 
 | Field | Description |
 |-------|-------------|
-| `action` | `"block"` - Display error message and exit, or `"redirect"` - Execute custom script |
+| `action` | `"block"` - Display error message and exit, `"warn"` - Show warning but continue, or `"redirect"` - Execute custom script |
 | `message` | Custom message explaining what to do instead |
-| `paths` | (Optional) Restrict shim to specific binary paths |
+| `paths` | (Optional) Restrict wrapper to specific binary paths |
 | `redirect` | (For redirect action) Path to script to execute instead of original command |
 
 ### Redirect Action
 
 Execute a custom script instead of the original command:
 
-```toml
-[shims.tsc]
-action = "redirect"
-redirect = "./scripts/typecheck-wrapper.sh"
-message = "Using project's TypeScript configuration"
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "redirect",
+      "redirect": "./scripts/typecheck-wrapper.sh",
+      "message": "Using project's TypeScript configuration"
+    }
+  }
+}
 ```
 
 Your redirect script receives:
@@ -120,7 +129,7 @@ Your redirect script receives:
 - Environment variables:
   - `RIBBIN_ORIGINAL_BIN` - Path to original binary (e.g., `/usr/local/bin/tsc.ribbin-original`)
   - `RIBBIN_COMMAND` - Command name (e.g., `tsc`)
-  - `RIBBIN_CONFIG` - Path to ribbin.toml
+  - `RIBBIN_CONFIG` - Path to ribbin.jsonc
   - `RIBBIN_ACTION` - Always `redirect`
 
 **Example redirect script:**
@@ -134,7 +143,7 @@ exec "$RIBBIN_ORIGINAL_BIN" --project tsconfig.json "$@"
 ```
 
 **Path Resolution:**
-- Relative paths (e.g., `./scripts/foo.sh`) resolve relative to `ribbin.toml` directory
+- Relative paths (e.g., `./scripts/foo.sh`) resolve relative to `ribbin.jsonc` directory
 - Absolute paths (e.g., `/usr/local/bin/custom`) used as-is
 - Script must be executable (`chmod +x script.sh`)
 
@@ -162,18 +171,22 @@ Example: For TypeScript, you might redirect `tsc` to automatically add `--projec
 
 | Command | Description |
 |---------|-------------|
-| `ribbin init` | Create a `ribbin.toml` in the current directory |
-| `ribbin shim` | Install shims for commands in `ribbin.toml` |
-| `ribbin unshim` | Remove shims and restore original commands |
-| `ribbin unshim --all` | Remove all shims tracked in the registry |
-| `ribbin activate` | Activate ribbin for the current shell session |
-| `ribbin on` | Enable shims globally (all shells) |
-| `ribbin off` | Disable shims globally (all shells) |
+| `ribbin init` | Create a `ribbin.jsonc` in the current directory |
+| `ribbin wrap` | Install wrappers for commands in `ribbin.jsonc` |
+| `ribbin unwrap` | Remove wrappers and restore original commands |
+| `ribbin unwrap --global` | Remove all wrappers tracked in the registry |
+| `ribbin activate --shell` | Activate ribbin for the current shell session |
+| `ribbin activate --global` | Enable wrappers globally (all shells) |
+| `ribbin deactivate --global` | Disable wrappers globally |
+| `ribbin deactivate --everything` | Clear all activation state |
+| `ribbin status` | Show current activation status |
+| `ribbin recover` | Find and restore orphaned wrapped binaries |
 | `ribbin audit show` | View recent security audit events |
 | `ribbin audit summary` | View audit log statistics |
-| `ribbin config add` | Add a shim configuration to ribbin.toml |
-| `ribbin config remove` | Remove a shim configuration |
-| `ribbin config list` | List all configured shims |
+| `ribbin config add` | Add a wrapper configuration to ribbin.jsonc |
+| `ribbin config remove` | Remove a wrapper configuration |
+| `ribbin config list` | List all configured wrappers |
+| `ribbin config show` | Show effective configuration for current directory |
 | `ribbin config edit` | Edit the config file |
 
 Run `ribbin --help` or `ribbin <command> --help` for detailed usage information.
@@ -182,14 +195,16 @@ Run `ribbin --help` or `ribbin <command> --help` for detailed usage information.
 
 ribbin uses a "sidecar" approach:
 
-1. When you run `ribbin shim`, it renames the original binary (e.g., `/usr/local/bin/cat` → `/usr/local/bin/cat.ribbin-original`)
+1. When you run `ribbin wrap`, it renames the original binary (e.g., `/usr/local/bin/cat` → `/usr/local/bin/cat.ribbin-original`)
 2. A symlink to ribbin takes its place at the original path
 3. When the command is invoked, ribbin checks:
-   - Is ribbin active? (via `activate` or `on`)
-   - Is there a `ribbin.toml` in this directory (or any parent)?
-   - Is this command configured to be blocked?
+   - Is ribbin active? (via `activate --shell` or `activate --global`)
+   - Is there a `ribbin.jsonc` in this directory (or any parent)?
+   - Is this command configured to be blocked/warned/redirected?
 4. If blocked: show the error message and exit
-5. Otherwise: transparently exec the original binary
+5. If warned: show the warning and continue to original
+6. If redirected: execute the redirect script
+7. Otherwise: transparently exec the original binary
 
 ## Bypass
 
@@ -207,8 +222,13 @@ Or use the full path to the original:
 
 ## Activation Modes
 
-- **Shell-scoped** (`ribbin activate`): Only affects the current shell and its children. Useful for development sessions.
-- **Global** (`ribbin on`/`off`): Affects all shells. Useful when you always want protection.
+ribbin uses a three-tier activation system:
+
+1. **Config-scoped** (`ribbin activate ./ribbin.jsonc`): Only activates wrappers from specific config files. Most precise control.
+2. **Shell-scoped** (`ribbin activate --shell`): Activates all wrappers for the current shell and its children. Useful for development sessions.
+3. **Global** (`ribbin activate --global`): Affects all shells system-wide. Useful when you always want protection.
+
+Use `ribbin status` to see current activation state and `ribbin deactivate` with corresponding flags to turn off.
 
 ## Audit Logging
 
@@ -269,38 +289,53 @@ Inside the scenario shell, ribbin is pre-installed and you can test commands int
 
 ### TypeScript Projects
 
-```toml
-[shims.tsc]
-action = "block"
-message = "Use 'pnpm run typecheck' - it uses the project's tsconfig"
-
-[shims.node]
-action = "block"
-message = "Use 'pnpm run' or 'pnpm exec' for consistent environment"
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' - it uses the project's tsconfig"
+    },
+    "node": {
+      "action": "block",
+      "message": "Use 'pnpm run' or 'pnpm exec' for consistent environment"
+    }
+  }
+}
 ```
 
 ### Package Manager Enforcement
 
-```toml
-[shims.npm]
-action = "block"
-message = "This project uses pnpm"
-
-[shims.yarn]
-action = "block"
-message = "This project uses pnpm"
+```jsonc
+{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "This project uses pnpm"
+    },
+    "yarn": {
+      "action": "block",
+      "message": "This project uses pnpm"
+    }
+  }
+}
 ```
 
 ### AI Agent Guardrails
 
-```toml
-[shims.rm]
-action = "block"
-message = "Use 'trash' for safe deletion"
-
-[shims.curl]
-action = "block"
-message = "Use the project's API client at ./scripts/api.sh or the built-in fetch tools"
+```jsonc
+{
+  "wrappers": {
+    "rm": {
+      "action": "block",
+      "message": "Use 'trash' for safe deletion"
+    },
+    "curl": {
+      "action": "block",
+      "message": "Use the project's API client at ./scripts/api.sh or the built-in fetch tools"
+    }
+  }
+}
 ```
 
 ## Contributing

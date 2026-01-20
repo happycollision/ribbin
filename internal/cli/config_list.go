@@ -19,7 +19,7 @@ var (
 var configListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all shim configurations",
-	Long: `Display all configured shims from ribbin.toml.
+	Long: `Display all configured shims from ribbin.jsonc.
 
 Shows command name, action type, and configuration details.
 
@@ -36,20 +36,20 @@ func init() {
 }
 
 func runConfigList(cmd *cobra.Command, args []string) error {
-	// Find ribbin.toml
+	// Find ribbin.jsonc
 	configPath, err := config.FindProjectConfig()
 	if err != nil {
 		return fmt.Errorf("failed to find config: %w", err)
 	}
 
 	if configPath == "" {
-		return fmt.Errorf("No ribbin.toml found. Run 'ribbin init' to create one.")
+		return fmt.Errorf("No ribbin.jsonc found. Run 'ribbin init' to create one.")
 	}
 
 	// Load the config
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse ribbin.toml: %w", err)
+		return fmt.Errorf("failed to parse ribbin.jsonc: %w", err)
 	}
 
 	// Check if config is empty

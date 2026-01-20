@@ -78,17 +78,21 @@ exit 1
 		t.Fatalf("failed to create ribbin binary: %v", err)
 	}
 
-	// Step 2: Create ribbin.toml
-	configContent := `[wrappers.test-cmd]
-action = "block"
-message = "Use 'proper-cmd' instead"
-paths = ["` + testBinaryPath + `"]
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	// Step 2: Create ribbin.jsonc
+	configContent := `{
+  "wrappers": {
+    "test-cmd": {
+      "action": "block",
+      "message": "Use 'proper-cmd' instead",
+      "paths": ["` + testBinaryPath + `"]
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
-	t.Log("Step 2: Created ribbin.toml")
+	t.Log("Step 2: Created ribbin.jsonc")
 
 	// Step 3: Install shim
 	registry := &config.Registry{
@@ -182,7 +186,7 @@ paths = ["` + testBinaryPath + `"]
 	t.Log("Full shim cycle completed successfully!")
 }
 
-// TestConfigDiscovery tests finding ribbin.toml in parent directories
+// TestConfigDiscovery tests finding ribbin.jsonc in parent directories
 func TestConfigDiscovery(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "ribbin-config-test-*")
 	if err != nil {
@@ -191,7 +195,7 @@ func TestConfigDiscovery(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create nested directory structure
-	// tmpDir/project/ribbin.toml
+	// tmpDir/project/ribbin.jsonc
 	// tmpDir/project/src/lib/deep/
 	projectDir := filepath.Join(tmpDir, "project")
 	deepDir := filepath.Join(projectDir, "src", "lib", "deep")
@@ -200,11 +204,15 @@ func TestConfigDiscovery(t *testing.T) {
 	}
 
 	// Create config in project root
-	configPath := filepath.Join(projectDir, "ribbin.toml")
-	configContent := `[wrappers.npm]
-action = "block"
-message = "Use pnpm"
-`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	configContent := `{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm"
+    }
+  }
+}`
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
@@ -276,13 +284,17 @@ exit 0
 		t.Fatalf("failed to create test command: %v", err)
 	}
 
-	// Create ribbin.toml in projectDir (command should passthrough since we're not in projectDir)
-	configContent := `[wrappers.test-cmd]
-action = "block"
-message = "blocked"
-paths = ["` + testCmdPath + `"]
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	// Create ribbin.jsonc in projectDir (command should passthrough since we're not in projectDir)
+	configContent := `{
+  "wrappers": {
+    "test-cmd": {
+      "action": "block",
+      "message": "blocked",
+      "paths": ["` + testCmdPath + `"]
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -340,7 +352,7 @@ paths = ["` + testCmdPath + `"]
 	// The command should succeed (passthrough to original) since:
 	// 1. No activations in registry
 	// 2. GlobalOn is false
-	// 3. We're not in a directory with ribbin.toml
+	// 3. We're not in a directory with ribbin.jsonc
 	if err != nil {
 		t.Errorf("shim should passthrough to original command, got error: %v\nOutput: %s", err, output)
 	}
@@ -518,14 +530,18 @@ exec "` + dummyPath + `" "$@"
 		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
 	}
 
-	// Create ribbin.toml
+	// Create ribbin.jsonc
 	cmdName := filepath.Base(nodeShimPath)
-	configContent := `[wrappers.` + cmdName + `]
-action = "block"
-message = "Use something else"
-paths = ["` + nodeShimPath + `"]
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	configContent := `{
+  "wrappers": {
+    "` + cmdName + `": {
+      "action": "block",
+      "message": "Use something else",
+      "paths": ["` + nodeShimPath + `"]
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -569,7 +585,7 @@ paths = ["` + nodeShimPath + `"]
 
 	t.Log("Shim structure verified")
 
-	// Test 1: From workDir (no ribbin.toml), command should passthrough
+	// Test 1: From workDir (no ribbin.jsonc), command should passthrough
 	os.Chdir(workDir)
 	cmd = exec.Command(cmdName)
 	cmd.Env = append(os.Environ(),
@@ -719,13 +735,17 @@ exec "` + realNodePath + `" "$@"
 		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
 	}
 
-	// Create ribbin.toml that blocks node
-	configContent := `[wrappers.node]
-action = "block"
-message = "Use 'bun' instead of node"
-paths = ["` + nodeShimPath + `"]
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	// Create ribbin.jsonc that blocks node
+	configContent := `{
+  "wrappers": {
+    "node": {
+      "action": "block",
+      "message": "Use 'bun' instead of node",
+      "paths": ["` + nodeShimPath + `"]
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -777,7 +797,7 @@ paths = ["` + nodeShimPath + `"]
 
 	t.Log("Shim structure verified: node -> ribbin, node.ribbin-original = asdf script")
 
-	// Test 1: From workDir (no ribbin.toml), command should passthrough via asdf script to real node
+	// Test 1: From workDir (no ribbin.jsonc), command should passthrough via asdf script to real node
 	os.Chdir(workDir)
 	cmd = exec.Command("node", "--version")
 	cmd.Env = append(os.Environ(),
@@ -842,7 +862,7 @@ paths = ["` + nodeShimPath + `"]
 	t.Log("asdf compatibility test completed successfully!")
 }
 
-// TestParentDirectoryConfigDiscovery tests that ribbin finds ribbin.toml in parent directories
+// TestParentDirectoryConfigDiscovery tests that ribbin finds ribbin.jsonc in parent directories
 // when the shim is invoked from a subdirectory. This is an end-to-end test using the actual
 // ribbin binary to verify the full flow works.
 func TestParentDirectoryConfigDiscovery(t *testing.T) {
@@ -854,7 +874,7 @@ func TestParentDirectoryConfigDiscovery(t *testing.T) {
 
 	// Create directory structure:
 	// tmpDir/home/                  - fake home directory
-	// tmpDir/project/ribbin.toml    - config in project root
+	// tmpDir/project/ribbin.jsonc    - config in project root
 	// tmpDir/project/src/lib/deep/  - deep subdirectory where we'll run from
 	// tmpDir/bin/                   - where shims live
 	homeDir := filepath.Join(tmpDir, "home")
@@ -893,12 +913,16 @@ exit 0
 		t.Fatalf("failed to create shim symlink: %v", err)
 	}
 
-	// Create ribbin.toml in project root (NOT in the deep subdirectory)
-	configContent := `[wrappers.test-cmd]
-action = "block"
-message = "This command is blocked - config found in parent!"
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	// Create ribbin.jsonc in project root (NOT in the deep subdirectory)
+	configContent := `{
+  "wrappers": {
+    "test-cmd": {
+      "action": "block",
+      "message": "This command is blocked - config found in parent!"
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -948,7 +972,7 @@ message = "This command is blocked - config found in parent!"
 	)
 	output, err := cmd.CombinedOutput()
 
-	// Command should be BLOCKED because ribbin.toml is in a parent directory
+	// Command should be BLOCKED because ribbin.jsonc is in a parent directory
 	if err == nil {
 		t.Errorf("command should be blocked when config is in parent dir, but succeeded with: %s", output)
 	}
@@ -976,7 +1000,7 @@ message = "This command is blocked - config found in parent!"
 	}
 	t.Logf("Test 2 PASSED - Bypass works from subdir. Output: %s", output)
 
-	// Test 3: Run from a directory WITHOUT ribbin.toml in any parent - should passthrough
+	// Test 3: Run from a directory WITHOUT ribbin.jsonc in any parent - should passthrough
 	noConfigDir := filepath.Join(tmpDir, "other", "location")
 	if err := os.MkdirAll(noConfigDir, 0755); err != nil {
 		t.Fatalf("failed to create noconfig dir: %v", err)
@@ -990,7 +1014,7 @@ message = "This command is blocked - config found in parent!"
 	)
 	output, err = cmd.CombinedOutput()
 
-	// Should passthrough since there's no ribbin.toml in any parent
+	// Should passthrough since there's no ribbin.jsonc in any parent
 	if err != nil {
 		t.Errorf("should passthrough when no config in parents: %v\nOutput: %s", err, output)
 	}
@@ -1052,12 +1076,16 @@ exec "` + realNodePath + `" "$@"
 		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
 	}
 
-	// Create ribbin.toml
-	configContent := `[wrappers.node]
-action = "block"
-message = "Use 'bun' instead"
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	// Create ribbin.jsonc
+	configContent := `{
+  "wrappers": {
+    "node": {
+      "action": "block",
+      "message": "Use 'bun' instead"
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to create config: %v", err)
 	}
@@ -1099,7 +1127,7 @@ message = "Use 'bun' instead"
 		t.Fatalf("failed to save registry: %v", err)
 	}
 
-	// Test: From projectDir (has ribbin.toml), with GlobalOn=true, node should be BLOCKED
+	// Test: From projectDir (has ribbin.jsonc), with GlobalOn=true, node should be BLOCKED
 	os.Chdir(projectDir)
 	cmd := exec.Command("node", "--version")
 	cmd.Env = append(os.Environ(),
@@ -1171,13 +1199,13 @@ func TestRedirectAction(t *testing.T) {
 	// Copy test fixtures from testdata/projects/redirect/ to project dir
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "redirect")
 
-	// Copy ribbin.toml
-	fixtureConfigPath := filepath.Join(fixtureDir, "ribbin.toml")
+	// Copy ribbin.jsonc
+	fixtureConfigPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 	fixtureConfig, err := os.ReadFile(fixtureConfigPath)
 	if err != nil {
 		t.Fatalf("failed to read fixture config: %v", err)
 	}
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, fixtureConfig, 0644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
@@ -1230,7 +1258,7 @@ exit 0
 		t.Fatalf("failed to save registry: %v", err)
 	}
 
-	// Change to project directory (where ribbin.toml is)
+	// Change to project directory (where ribbin.jsonc is)
 	os.Chdir(projectDir)
 
 	// Execute the shimmed echo command with arguments
@@ -1307,8 +1335,8 @@ func TestRegistryPersistence(t *testing.T) {
 	// Create and save registry
 	registry := &config.Registry{
 		Wrappers: map[string]config.WrapperEntry{
-			"cat":  {Original: "/usr/bin/cat", Config: "/project/ribbin.toml"},
-			"node": {Original: "/usr/local/bin/node", Config: "/other/ribbin.toml"},
+			"cat":  {Original: "/usr/bin/cat", Config: "/project/ribbin.jsonc"},
+			"node": {Original: "/usr/local/bin/node", Config: "/other/ribbin.jsonc"},
 		},
 		ShellActivations:  make(map[int]config.ShellActivationEntry),
 		ConfigActivations: make(map[string]config.ConfigActivationEntry),
@@ -1340,7 +1368,7 @@ func TestRegistryPersistence(t *testing.T) {
 func TestScopedConfigIsolation(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
@@ -1375,7 +1403,7 @@ func TestScopedConfigIsolation(t *testing.T) {
 func TestScopedConfigExtendsRoot(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
@@ -1415,7 +1443,7 @@ func TestScopedConfigExtendsRoot(t *testing.T) {
 func TestScopedConfigMultipleExtends(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
@@ -1452,7 +1480,7 @@ func TestScopedConfigMultipleExtends(t *testing.T) {
 func TestScopedConfigPassthrough(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
@@ -1477,14 +1505,14 @@ func TestScopedConfigPassthrough(t *testing.T) {
 func TestScopedConfigExternalExtends(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	// external-test extends ./external/ribbin.toml
+	// external-test extends ./external/ribbin.jsonc
 	externalScope := cfg.Scopes["external-test"]
 	resolver := config.NewResolver()
 	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &externalScope)
@@ -1511,7 +1539,7 @@ func TestScopedConfigExternalExtends(t *testing.T) {
 func TestScopeMatching(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
@@ -1553,7 +1581,7 @@ func TestScopeMatching(t *testing.T) {
 func TestProvenanceTracking(t *testing.T) {
 	moduleRoot := findModuleRoot(t)
 	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
-	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 
 	cfg, err := config.LoadProjectConfig(configPath)
 	if err != nil {
@@ -1613,12 +1641,12 @@ func TestConfigShowCommand(t *testing.T) {
 	}
 
 	// Copy config files
-	mainConfig, _ := os.ReadFile(filepath.Join(fixtureDir, "ribbin.toml"))
-	if err := os.WriteFile(filepath.Join(projectDir, "ribbin.toml"), mainConfig, 0644); err != nil {
+	mainConfig, _ := os.ReadFile(filepath.Join(fixtureDir, "ribbin.jsonc"))
+	if err := os.WriteFile(filepath.Join(projectDir, "ribbin.jsonc"), mainConfig, 0644); err != nil {
 		t.Fatalf("failed to write main config: %v", err)
 	}
-	extConfig, _ := os.ReadFile(filepath.Join(fixtureDir, "external", "ribbin.toml"))
-	if err := os.WriteFile(filepath.Join(externalDir, "ribbin.toml"), extConfig, 0644); err != nil {
+	extConfig, _ := os.ReadFile(filepath.Join(fixtureDir, "external", "ribbin.jsonc"))
+	if err := os.WriteFile(filepath.Join(externalDir, "ribbin.jsonc"), extConfig, 0644); err != nil {
 		t.Fatalf("failed to write external config: %v", err)
 	}
 
@@ -1651,7 +1679,7 @@ func TestConfigShowCommand(t *testing.T) {
 	t.Logf("Config show output:\n%s", outputStr)
 
 	// Verify output contains expected elements
-	if !contains(outputStr, "ribbin.toml") {
+	if !contains(outputStr, "ribbin.jsonc") {
 		t.Error("output should contain config file name")
 	}
 	if !contains(outputStr, "frontend") {
@@ -1700,19 +1728,26 @@ exit 0
 	}
 
 	// Create scoped config
-	configContent := `
-[wrappers.npm]
-action = "block"
-message = "Use pnpm instead"
-
-[scopes.backend]
-path = "apps/backend"
-extends = ["root"]
-
-[scopes.backend.wrappers.npm]
-action = "passthrough"
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	configContent := `{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm instead"
+    }
+  },
+  "scopes": {
+    "backend": {
+      "path": "apps/backend",
+      "extends": ["root"],
+      "wrappers": {
+        "npm": {
+          "action": "passthrough"
+        }
+      }
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}

@@ -1,0 +1,11 @@
+{
+  // Test configuration for redirect action
+  // This config is used in integration tests to verify redirect functionality
+  "wrappers": {
+    "echo": {
+      "action": "redirect",
+      "redirect": "./scripts/test-redirect.sh",
+      "message": "Using test redirect script"
+    }
+  }
+}

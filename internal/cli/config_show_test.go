@@ -26,8 +26,8 @@ func TestConfigShowCommand_NoConfig(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when no config exists")
 	}
-	if !strings.Contains(err.Error(), "No ribbin.toml found") {
-		t.Errorf("error = %q, want to contain 'No ribbin.toml found'", err.Error())
+	if !strings.Contains(err.Error(), "No ribbin.jsonc found") {
+		t.Errorf("error = %q, want to contain 'No ribbin.jsonc found'", err.Error())
 	}
 }
 
@@ -36,15 +36,18 @@ func TestConfigShowCommand_RootShimsOnly(t *testing.T) {
 	defer cleanup()
 
 	// Create a simple config with root shims only
-	configContent := `
-[wrappers.npm]
-action = "block"
-message = "Use pnpm instead"
-
-[wrappers.cat]
-action = "warn"
-message = "Consider using bat"
-`
+	configContent := `{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm instead"
+    },
+    "cat": {
+      "action": "warn",
+      "message": "Consider using bat"
+    }
+  }
+}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Reset flags
@@ -73,7 +76,7 @@ message = "Consider using bat"
 	if !strings.Contains(output, "Config:") {
 		t.Error("output should contain 'Config:'")
 	}
-	if !strings.Contains(output, "ribbin.toml") {
+	if !strings.Contains(output, "ribbin.jsonc") {
 		t.Error("output should contain config path")
 	}
 	if !strings.Contains(output, "Scope:  (root)") {
@@ -95,23 +98,30 @@ func TestConfigShowCommand_ScopeMatching(t *testing.T) {
 	defer cleanup()
 
 	// Create a config with scopes
-	configContent := `
-[wrappers.cat]
-action = "warn"
-message = "root cat"
-
-[scopes.frontend]
-path = "apps/frontend"
-extends = ["root"]
-
-[scopes.frontend.wrappers.npm]
-action = "block"
-message = "Use pnpm"
-
-[scopes.frontend.wrappers.cat]
-action = "block"
-message = "frontend cat override"
-`
+	configContent := `{
+  "wrappers": {
+    "cat": {
+      "action": "warn",
+      "message": "root cat"
+    }
+  },
+  "scopes": {
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root"],
+      "wrappers": {
+        "npm": {
+          "action": "block",
+          "message": "Use pnpm"
+        },
+        "cat": {
+          "action": "block",
+          "message": "frontend cat override"
+        }
+      }
+    }
+  }
+}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Create the frontend directory and cd into it
@@ -170,11 +180,14 @@ func TestConfigShowCommand_JSONOutput(t *testing.T) {
 	_, tempDir, cleanup := setupTestEnv(t)
 	defer cleanup()
 
-	configContent := `
-[wrappers.npm]
-action = "block"
-message = "Use pnpm"
-`
+	configContent := `{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm"
+    }
+  }
+}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Set JSON flag
@@ -233,15 +246,18 @@ func TestConfigShowCommand_CommandFilter(t *testing.T) {
 	_, tempDir, cleanup := setupTestEnv(t)
 	defer cleanup()
 
-	configContent := `
-[wrappers.npm]
-action = "block"
-message = "Use pnpm"
-
-[wrappers.cat]
-action = "warn"
-message = "Use bat"
-`
+	configContent := `{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm"
+    },
+    "cat": {
+      "action": "warn",
+      "message": "Use bat"
+    }
+  }
+}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Set command filter
@@ -282,11 +298,14 @@ func TestConfigShowCommand_CommandNotFound(t *testing.T) {
 	_, tempDir, cleanup := setupTestEnv(t)
 	defer cleanup()
 
-	configContent := `
-[wrappers.npm]
-action = "block"
-message = "Use pnpm"
-`
+	configContent := `{
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm"
+    }
+  }
+}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Set command filter to non-existent command
@@ -308,8 +327,7 @@ func TestConfigShowCommand_NoShims(t *testing.T) {
 	defer cleanup()
 
 	// Create a config with no shims
-	configContent := `# Empty config
-`
+	configContent := `{}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Reset flags
@@ -344,25 +362,35 @@ func TestConfigShowCommand_ProvenanceChain(t *testing.T) {
 	defer cleanup()
 
 	// Create a config with multiple layers of extends
-	configContent := `
-[wrappers.cat]
-action = "warn"
-message = "root cat"
-
-[scopes.hardened]
-[scopes.hardened.wrappers.cat]
-action = "block"
-message = "hardened cat"
-
-[scopes.frontend]
-path = "apps/frontend"
-extends = ["root", "root.hardened"]
-
-[scopes.frontend.wrappers.cat]
-action = "redirect"
-message = "frontend cat"
-redirect = "bat"
-`
+	configContent := `{
+  "wrappers": {
+    "cat": {
+      "action": "warn",
+      "message": "root cat"
+    }
+  },
+  "scopes": {
+    "hardened": {
+      "wrappers": {
+        "cat": {
+          "action": "block",
+          "message": "hardened cat"
+        }
+      }
+    },
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root", "root.hardened"],
+      "wrappers": {
+        "cat": {
+          "action": "redirect",
+          "message": "frontend cat",
+          "redirect": "bat"
+        }
+      }
+    }
+  }
+}`
 	createTestConfig(t, tempDir, configContent)
 
 	// Create the frontend directory and cd into it

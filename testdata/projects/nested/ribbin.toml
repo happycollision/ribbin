@@ -1,8 +1,0 @@
-# Nested project config
-[wrappers.npm]
-action = "block"
-message = "Use 'pnpm' instead of npm"
-
-[wrappers.yarn]
-action = "block"
-message = "Use 'pnpm' instead of yarn"

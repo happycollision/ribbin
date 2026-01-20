@@ -44,11 +44,11 @@ func Run(argv0 string, args []string) error {
 		return execOriginal(originalPath, args)
 	}
 
-	// 5. Find nearest ribbin.toml (needed for activation check)
+	// 5. Find nearest ribbin.jsonc (needed for activation check)
 	configPath, err := config.FindProjectConfig()
 	if err != nil || configPath == "" {
 		// No config found -> passthrough
-		verboseLogDecision(cmdName, "PASS", "no ribbin.toml found")
+		verboseLogDecision(cmdName, "PASS", "no ribbin.jsonc found")
 		return execOriginal(originalPath, args)
 	}
 

@@ -13,7 +13,7 @@ import (
 type WrapperEntry struct {
 	// Original is the path to the original command being wrapped
 	Original string `json:"original"`
-	// Config is the path to the ribbin.toml that defines this wrapper
+	// Config is the path to the ribbin.jsonc that defines this wrapper
 	Config string `json:"config"`
 }
 

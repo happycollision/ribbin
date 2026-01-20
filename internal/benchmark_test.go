@@ -82,13 +82,17 @@ exec ` + realCatPath + ` "$@"
 		b.Fatalf("failed to build ribbin: %v\n%s", err, output)
 	}
 
-	// Create ribbin.toml (cat is NOT blocked - it's passthrough)
+	// Create ribbin.jsonc (cat is NOT blocked - it's passthrough)
 	// This tests the overhead of the shim decision logic
-	configContent := `[wrappers.cat]
-action = "passthrough"
-message = ""
-`
-	configPath := filepath.Join(projectDir, "ribbin.toml")
+	configContent := `{
+  "wrappers": {
+    "cat": {
+      "action": "passthrough",
+      "message": ""
+    }
+  }
+}`
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		b.Fatalf("failed to create config: %v", err)
 	}
