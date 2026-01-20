@@ -3,6 +3,7 @@ package shim
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -60,26 +61,30 @@ func Run(argv0 string, args []string) error {
 	// Extract command name from argv0
 	cmdName := extractCommandName(argv0)
 
-	// Check if command is in config
-	shimConfig, exists := projectConfig.Shims[cmdName]
+	// 8. Determine effective shims based on scope matching
+	shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, cmdName)
 	if !exists {
 		// Command not in config -> passthrough
 		return execOriginal(originalPath, args)
 	}
 
-	// 8. Check passthrough conditions
+	// 9. Check passthrough conditions
 	if shimConfig.Passthrough != nil {
 		if shouldPassthrough(shimConfig.Passthrough) {
 			return execOriginal(originalPath, args)
 		}
 	}
 
-	// 9. Handle action based on config
+	// 10. Handle action based on config
 	switch shimConfig.Action {
 	case "block":
 		printBlockMessage(cmdName, shimConfig.Message)
 		os.Exit(1)
 		return nil // unreachable, but satisfies compiler
+
+	case "passthrough":
+		// Explicit passthrough action - execute original binary
+		return execOriginal(originalPath, args)
 
 	case "redirect":
 		// Validate redirect field is not empty
@@ -252,4 +257,120 @@ func shouldPassthrough(pt *config.PassthroughConfig) bool {
 	}
 
 	return false
+}
+
+// getEffectiveShimConfig determines the effective shim configuration for a command
+// by finding the best matching scope and using the Resolver to merge shim maps.
+func getEffectiveShimConfig(projectConfig *config.ProjectConfig, configPath string, cmdName string) (config.ShimConfig, bool) {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		// Fall back to root shims if we can't get CWD
+		shimConfig, exists := projectConfig.Shims[cmdName]
+		return shimConfig, exists
+	}
+
+	// Find the best matching scope
+	matchingScope := findBestMatchingScope(projectConfig, configPath, cwd)
+
+	// Use Resolver to get effective shims
+	resolver := config.NewResolver()
+	effectiveShims, err := resolver.ResolveEffectiveShims(projectConfig, configPath, matchingScope)
+	if err != nil {
+		// If resolution fails, fall back to root shims
+		shimConfig, exists := projectConfig.Shims[cmdName]
+		return shimConfig, exists
+	}
+
+	shimConfig, exists := effectiveShims[cmdName]
+	return shimConfig, exists
+}
+
+// findBestMatchingScope finds the scope with the deepest path that contains the CWD.
+// Returns nil if no scope matches (meaning root shims should be used).
+func findBestMatchingScope(projectConfig *config.ProjectConfig, configPath string, cwd string) *config.ScopeConfig {
+	configDir := filepath.Dir(configPath)
+
+	// Resolve symlinks in CWD to handle macOS /var -> /private/var symlink
+	resolvedCwd, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		resolvedCwd = cwd
+	}
+	resolvedCwd = filepath.Clean(resolvedCwd)
+
+	var bestMatch *config.ScopeConfig
+	bestMatchDepth := -1
+
+	for _, scope := range projectConfig.Scopes {
+		scopePath := scope.Path
+		if scopePath == "" {
+			scopePath = "."
+		}
+
+		// Resolve scope path to absolute
+		var absScopePath string
+		if filepath.IsAbs(scopePath) {
+			absScopePath = scopePath
+		} else {
+			absScopePath = filepath.Join(configDir, scopePath)
+		}
+
+		// Resolve symlinks in scope path for consistent comparison
+		resolvedScopePath, err := filepath.EvalSymlinks(absScopePath)
+		if err != nil {
+			resolvedScopePath = absScopePath
+		}
+		resolvedScopePath = filepath.Clean(resolvedScopePath)
+
+		// Check if CWD is within the scope path
+		if isPathWithin(resolvedCwd, resolvedScopePath) {
+			// Calculate depth (number of path components)
+			depth := countPathComponents(resolvedScopePath)
+			if depth > bestMatchDepth {
+				bestMatchDepth = depth
+				scopeCopy := scope
+				bestMatch = &scopeCopy
+			}
+		}
+	}
+
+	return bestMatch
+}
+
+// isPathWithin checks if targetPath is within or equal to basePath.
+func isPathWithin(targetPath, basePath string) bool {
+	// Handle exact match
+	if targetPath == basePath {
+		return true
+	}
+
+	// Check if target is a subdirectory of base
+	// Use filepath.Rel to determine relationship
+	rel, err := filepath.Rel(basePath, targetPath)
+	if err != nil {
+		return false
+	}
+
+	// If the relative path starts with "..", target is not within base
+	if strings.HasPrefix(rel, "..") {
+		return false
+	}
+
+	return true
+}
+
+// countPathComponents counts the number of components in a path.
+func countPathComponents(path string) int {
+	// Clean the path first
+	path = filepath.Clean(path)
+
+	// Split by separator and count non-empty components
+	parts := strings.Split(path, string(filepath.Separator))
+	count := 0
+	for _, part := range parts {
+		if part != "" {
+			count++
+		}
+	}
+	return count
 }

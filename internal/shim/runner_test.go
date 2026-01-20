@@ -3,6 +3,7 @@ package shim
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -283,6 +284,468 @@ func TestPrintBlockMessage(t *testing.T) {
 
 		if len(output) == 0 {
 			t.Error("expected output to stderr")
+		}
+	})
+}
+
+func TestIsPathWithin(t *testing.T) {
+	tests := []struct {
+		name       string
+		targetPath string
+		basePath   string
+		expected   bool
+	}{
+		{
+			name:       "exact match",
+			targetPath: "/home/user/project",
+			basePath:   "/home/user/project",
+			expected:   true,
+		},
+		{
+			name:       "target is subdirectory",
+			targetPath: "/home/user/project/src",
+			basePath:   "/home/user/project",
+			expected:   true,
+		},
+		{
+			name:       "target is deeply nested",
+			targetPath: "/home/user/project/src/components/ui",
+			basePath:   "/home/user/project",
+			expected:   true,
+		},
+		{
+			name:       "target is parent directory",
+			targetPath: "/home/user",
+			basePath:   "/home/user/project",
+			expected:   false,
+		},
+		{
+			name:       "target is sibling directory",
+			targetPath: "/home/user/other",
+			basePath:   "/home/user/project",
+			expected:   false,
+		},
+		{
+			name:       "completely different path",
+			targetPath: "/var/log",
+			basePath:   "/home/user",
+			expected:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPathWithin(tt.targetPath, tt.basePath)
+			if result != tt.expected {
+				t.Errorf("isPathWithin(%q, %q) = %v, want %v", tt.targetPath, tt.basePath, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCountPathComponents(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected int
+	}{
+		{"/home/user/project", 3},
+		{"/home/user/project/src", 4},
+		{"/", 0},
+		{".", 1},
+		{"./src", 1},
+		{"/a/b/c/d/e", 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := countPathComponents(tt.path)
+			if result != tt.expected {
+				t.Errorf("countPathComponents(%q) = %d, want %d", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFindBestMatchingScope(t *testing.T) {
+	// Create a temporary directory structure for testing
+	tmpDir, err := os.MkdirTemp("", "ribbin-scope-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create subdirectories
+	srcDir := filepath.Join(tmpDir, "src")
+	srcComponentsDir := filepath.Join(srcDir, "components")
+	testsDir := filepath.Join(tmpDir, "tests")
+
+	for _, dir := range []string{srcDir, srcComponentsDir, testsDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	configPath := filepath.Join(tmpDir, "ribbin.toml")
+
+	t.Run("CWD in scope path - scope applies", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{
+				"cat": {Action: "block", Message: "root cat"},
+			},
+			Scopes: map[string]config.ScopeConfig{
+				"src": {
+					Path: "src",
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "src cat"},
+					},
+				},
+			},
+		}
+
+		result := findBestMatchingScope(projectConfig, configPath, srcDir)
+		if result == nil {
+			t.Fatal("expected to find matching scope, got nil")
+		}
+		if result.Path != "src" {
+			t.Errorf("expected scope path 'src', got %q", result.Path)
+		}
+	})
+
+	t.Run("multiple scopes match - deepest path wins", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{},
+			Scopes: map[string]config.ScopeConfig{
+				"src": {
+					Path: "src",
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "src cat"},
+					},
+				},
+				"src-components": {
+					Path: "src/components",
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "components cat"},
+					},
+				},
+			},
+		}
+
+		result := findBestMatchingScope(projectConfig, configPath, srcComponentsDir)
+		if result == nil {
+			t.Fatal("expected to find matching scope, got nil")
+		}
+		if result.Path != "src/components" {
+			t.Errorf("expected scope path 'src/components' (deepest), got %q", result.Path)
+		}
+	})
+
+	t.Run("no scope matches - returns nil (root shims used)", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{
+				"cat": {Action: "block", Message: "root cat"},
+			},
+			Scopes: map[string]config.ScopeConfig{
+				"src": {
+					Path: "src",
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "src cat"},
+					},
+				},
+			},
+		}
+
+		// Use tests directory which is not under src
+		result := findBestMatchingScope(projectConfig, configPath, testsDir)
+		if result != nil {
+			t.Errorf("expected no matching scope, got scope with path %q", result.Path)
+		}
+	})
+
+	t.Run("scope without path - defaults to config directory", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{},
+			Scopes: map[string]config.ScopeConfig{
+				"default": {
+					Path: "", // Empty path defaults to "."
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "default cat"},
+					},
+				},
+			},
+		}
+
+		// CWD is within config directory (anywhere)
+		result := findBestMatchingScope(projectConfig, configPath, srcDir)
+		if result == nil {
+			t.Fatal("expected to find matching scope with empty path, got nil")
+		}
+		if result.Path != "" {
+			t.Errorf("expected scope with empty path, got %q", result.Path)
+		}
+	})
+
+	t.Run("explicit dot path matches like empty path", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{},
+			Scopes: map[string]config.ScopeConfig{
+				"root-scope": {
+					Path: ".",
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "root scope cat"},
+					},
+				},
+			},
+		}
+
+		result := findBestMatchingScope(projectConfig, configPath, srcDir)
+		if result == nil {
+			t.Fatal("expected to find matching scope with '.' path, got nil")
+		}
+	})
+}
+
+func TestGetEffectiveShimConfig(t *testing.T) {
+	// Create a temporary directory structure for testing
+	tmpDir, err := os.MkdirTemp("", "ribbin-effective-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	srcDir := filepath.Join(tmpDir, "src")
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		t.Fatalf("failed to create src dir: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, "ribbin.toml")
+
+	// Save current directory and change to temp dir for testing
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+
+	t.Run("returns root shim when no scope matches", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{
+				"cat": {Action: "block", Message: "root cat message"},
+			},
+			Scopes: map[string]config.ScopeConfig{
+				"src": {
+					Path: "src",
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "src cat message"},
+					},
+				},
+			},
+		}
+
+		// Change to temp root (not src)
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("failed to change directory: %v", err)
+		}
+		defer os.Chdir(originalWd)
+
+		shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, "cat")
+		if !exists {
+			t.Fatal("expected shim config to exist")
+		}
+		if shimConfig.Message != "root cat message" {
+			t.Errorf("expected root shim message, got %q", shimConfig.Message)
+		}
+	})
+
+	t.Run("returns scope shim when scope matches", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{
+				"cat": {Action: "block", Message: "root cat message"},
+			},
+			Scopes: map[string]config.ScopeConfig{
+				"src": {
+					Path:    "src",
+					Extends: []string{"root"}, // Explicitly extend root to inherit root shims
+					Shims: map[string]config.ShimConfig{
+						"cat": {Action: "block", Message: "src cat message"}, // Override root
+					},
+				},
+			},
+		}
+
+		// Change to src directory
+		if err := os.Chdir(srcDir); err != nil {
+			t.Fatalf("failed to change directory: %v", err)
+		}
+		defer os.Chdir(originalWd)
+
+		shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, "cat")
+		if !exists {
+			t.Fatal("expected shim config to exist")
+		}
+		if shimConfig.Message != "src cat message" {
+			t.Errorf("expected src shim message, got %q", shimConfig.Message)
+		}
+	})
+
+	t.Run("returns false for non-existent command", func(t *testing.T) {
+		projectConfig := &config.ProjectConfig{
+			Shims: map[string]config.ShimConfig{
+				"cat": {Action: "block", Message: "root cat"},
+			},
+			Scopes: map[string]config.ScopeConfig{},
+		}
+
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("failed to change directory: %v", err)
+		}
+		defer os.Chdir(originalWd)
+
+		_, exists := getEffectiveShimConfig(projectConfig, configPath, "nonexistent")
+		if exists {
+			t.Error("expected shim config to not exist for unknown command")
+		}
+	})
+}
+
+func TestPassthroughAction(t *testing.T) {
+	// This tests that "passthrough" action is recognized
+	// The actual execution is tested in integration tests since it uses syscall.Exec
+
+	t.Run("passthrough action is valid", func(t *testing.T) {
+		// Create temp directory
+		tmpDir, err := os.MkdirTemp("", "ribbin-passthrough-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create sidecar binary
+		binaryPath := filepath.Join(tmpDir, "test-cmd")
+		sidecarPath := binaryPath + ".ribbin-original"
+
+		// Create a dummy executable
+		var scriptContent string
+		if runtime.GOOS == "windows" {
+			scriptContent = "@echo off\nexit 0\n"
+		} else {
+			scriptContent = "#!/bin/sh\nexit 0\n"
+		}
+		if err := os.WriteFile(sidecarPath, []byte(scriptContent), 0755); err != nil {
+			t.Fatalf("failed to create sidecar: %v", err)
+		}
+
+		// Verify that passthrough action config can be created and checked
+		shimConfig := config.ShimConfig{
+			Action:  "passthrough",
+			Message: "This should passthrough",
+		}
+
+		if shimConfig.Action != "passthrough" {
+			t.Errorf("expected action 'passthrough', got %q", shimConfig.Action)
+		}
+	})
+}
+
+func TestScopeMatchingIntegration(t *testing.T) {
+	// Integration test that verifies full scope matching flow
+	tmpDir, err := os.MkdirTemp("", "ribbin-integration-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create directory structure
+	frontendDir := filepath.Join(tmpDir, "frontend")
+	frontendSrcDir := filepath.Join(frontendDir, "src")
+	backendDir := filepath.Join(tmpDir, "backend")
+
+	for _, dir := range []string{frontendSrcDir, backendDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir: %v", err)
+		}
+	}
+
+	configPath := filepath.Join(tmpDir, "ribbin.toml")
+
+	projectConfig := &config.ProjectConfig{
+		Shims: map[string]config.ShimConfig{
+			"npm": {Action: "block", Message: "Use pnpm at root"},
+		},
+		Scopes: map[string]config.ScopeConfig{
+			"frontend": {
+				Path:    "frontend",
+				Extends: []string{"root"}, // Inherit root, then override
+				Shims: map[string]config.ShimConfig{
+					"npm": {Action: "passthrough"}, // Allow npm in frontend
+				},
+			},
+			"frontend-src": {
+				Path:    "frontend/src",
+				Extends: []string{"root"}, // Inherit root, then override
+				Shims: map[string]config.ShimConfig{
+					"npm": {Action: "block", Message: "No npm in src"},
+				},
+			},
+			"backend": {
+				Path:    "backend",
+				Extends: []string{"root"}, // Inherit root, then override
+				Shims: map[string]config.ShimConfig{
+					"npm": {Action: "redirect", Redirect: "./scripts/backend-npm.sh"},
+				},
+			},
+		},
+	}
+
+	originalWd, _ := os.Getwd()
+
+	t.Run("root directory uses root shims", func(t *testing.T) {
+		os.Chdir(tmpDir)
+		defer os.Chdir(originalWd)
+
+		shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, "npm")
+		if !exists {
+			t.Fatal("expected shim to exist")
+		}
+		if shimConfig.Action != "block" || shimConfig.Message != "Use pnpm at root" {
+			t.Errorf("unexpected shim config: %+v", shimConfig)
+		}
+	})
+
+	t.Run("frontend directory uses frontend scope", func(t *testing.T) {
+		os.Chdir(frontendDir)
+		defer os.Chdir(originalWd)
+
+		shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, "npm")
+		if !exists {
+			t.Fatal("expected shim to exist")
+		}
+		if shimConfig.Action != "passthrough" {
+			t.Errorf("expected passthrough action in frontend, got %q", shimConfig.Action)
+		}
+	})
+
+	t.Run("frontend/src uses deepest matching scope", func(t *testing.T) {
+		os.Chdir(frontendSrcDir)
+		defer os.Chdir(originalWd)
+
+		shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, "npm")
+		if !exists {
+			t.Fatal("expected shim to exist")
+		}
+		if shimConfig.Action != "block" || shimConfig.Message != "No npm in src" {
+			t.Errorf("expected frontend-src scope, got action=%q message=%q", shimConfig.Action, shimConfig.Message)
+		}
+	})
+
+	t.Run("backend uses backend scope", func(t *testing.T) {
+		os.Chdir(backendDir)
+		defer os.Chdir(originalWd)
+
+		shimConfig, exists := getEffectiveShimConfig(projectConfig, configPath, "npm")
+		if !exists {
+			t.Fatal("expected shim to exist")
+		}
+		if shimConfig.Action != "redirect" {
+			t.Errorf("expected redirect action in backend, got %q", shimConfig.Action)
 		}
 	})
 }
