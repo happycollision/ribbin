@@ -107,10 +107,13 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 			if entry, ok := registry.Shims[commandName]; ok {
 				pathsToUnshim = append(pathsToUnshim, entry.Original)
 			} else {
-				// Try to find the command in PATH
+				// Try to find the command in PATH and check if it has a sidecar
 				path, err := exec.LookPath(commandName)
 				if err == nil {
-					pathsToUnshim = append(pathsToUnshim, path)
+					// Only add if it looks like it was shimmed (has sidecar)
+					if shim.HasSidecar(path) {
+						pathsToUnshim = append(pathsToUnshim, path)
+					}
 				}
 			}
 		}

@@ -20,6 +20,13 @@ func SidecarPath(binaryPath string) (string, error) {
 	return binaryPath + ".ribbin-original", nil
 }
 
+// HasSidecar checks if a binary has a sidecar file (was shimmed)
+func HasSidecar(binaryPath string) bool {
+	sidecarPath := binaryPath + ".ribbin-original"
+	_, err := os.Stat(sidecarPath)
+	return err == nil
+}
+
 // Install creates a shim for a binary:
 // 1. Acquire lock to prevent TOCTOU races
 // 2. Validate paths and check file state (including symlink validation)

@@ -40,7 +40,21 @@ Examples:
   ribbin shim                            # Install shims for commands in ribbin.toml
   ribbin shim --confirm-system-dir       # Allow shimming in /usr/local/bin`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Step 1: Find nearest ribbin.toml
+		// Step 1: Check for Local Development Mode
+		// When ribbin is installed as a dev dependency (inside a git repo),
+		// it can only shim binaries within that same repository.
+		localDevCtx, err := security.DetectLocalDevMode()
+		if err != nil {
+			// Log warning but continue - don't block on detection errors
+			fmt.Fprintf(os.Stderr, "Warning: could not detect local dev mode: %v\n", err)
+		}
+		if localDevCtx != nil && localDevCtx.IsLocalDev {
+			fmt.Printf("Local Development Mode active\n")
+			fmt.Printf("  ribbin location: %s\n", localDevCtx.RibbinPath)
+			fmt.Printf("  repository root: %s\n\n", localDevCtx.RepoRoot)
+		}
+
+		// Step 2: Find nearest ribbin.toml
 		configPath, err := config.FindProjectConfig()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error finding config: %v\n", err)
@@ -58,14 +72,14 @@ Examples:
 			os.Exit(1)
 		}
 
-		// Step 2: Load registry
+		// Step 3: Load registry
 		registry, err := config.LoadRegistry()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error loading registry: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Step 3: Get ribbin binary path
+		// Step 4: Get ribbin binary path
 		execPath, err := os.Executable()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error getting executable path: %v\n", err)
@@ -77,8 +91,9 @@ Examples:
 			os.Exit(1)
 		}
 
-		// Step 4: Process each command in config.Shims
+		// Step 5: Process each command in config.Shims
 		var shimmed, skipped, failed int
+		var refusedOutsideRepo []string
 
 		for name, shimCfg := range projectConfig.Shims {
 			var paths []string
@@ -125,6 +140,15 @@ Examples:
 					}
 				}
 
+				// Check Local Development Mode restrictions
+				if localDevCtx != nil && localDevCtx.IsLocalDev {
+					if err := localDevCtx.ValidateBinaryPath(path); err != nil {
+						refusedOutsideRepo = append(refusedOutsideRepo, path)
+						skipped++
+						continue
+					}
+				}
+
 				// Validate binary for shimming (security check)
 				if err := security.ValidateBinaryForShim(path, confirmSystemDir); err != nil {
 					fmt.Printf("Failed to shim '%s': %v\n", path, err)
@@ -163,13 +187,21 @@ Examples:
 			}
 		}
 
-		// Step 5: Save registry
+		// Step 6: Save registry
 		if err := config.SaveRegistry(registry); err != nil {
 			fmt.Fprintf(os.Stderr, "Error saving registry: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Step 6: Print summary
+		// Step 7: Report refused paths in Local Development Mode
+		if len(refusedOutsideRepo) > 0 {
+			fmt.Printf("\nRefusing to shim tools outside the repository:\n")
+			for _, path := range refusedOutsideRepo {
+				fmt.Printf("  - %s\n", path)
+			}
+		}
+
+		// Step 8: Print summary
 		fmt.Printf("\nSummary: %d shimmed, %d skipped, %d failed\n", shimmed, skipped, failed)
 	},
 }
