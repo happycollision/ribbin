@@ -11,6 +11,7 @@ This project uses Go (managed via mise).
 - `make test` - Run unit tests (in Docker container for safety)
 - `make test-coverage` - Run tests with coverage report
 - `make test-integration` - Run integration tests
+- `make scenario` - Interactive scenario testing (see below)
 - `make clean` - Remove build artifacts
 - `go build ./cmd/ribbin` - Direct build
 
@@ -59,6 +60,29 @@ This works across ecosystems:
 - npm/pnpm/yarn: `./node_modules/.bin/ribbin`
 - Python venv: `./.venv/bin/ribbin`
 - Ruby bundler: `./vendor/bundle/bin/ribbin`
+
+## Interactive Scenario Testing
+
+Test ribbin in isolated Docker environments without affecting your host system:
+
+```bash
+make scenario                           # Show menu to pick a scenario
+make scenario SCENARIO=basic            # Run specific scenario directly
+```
+
+**Available scenarios:**
+
+| Scenario | Description |
+|----------|-------------|
+| `basic` | Block and redirect actions with local wrapper commands |
+| `local-dev-mode` | Simulates ribbin in node_modules/.bin - tests repo-only shimming |
+| `mixed-permissions` | Demonstrates allowed vs forbidden directory security |
+| `scopes` | Directory-based configs (monorepo style) |
+| `extends` | Config inheritance from mixins and external files |
+
+Inside the scenario shell, ribbin is pre-installed and you can test shim/unshim/activate commands. Type `exit` to leave.
+
+Scenario files are in `scripts/scenarios/`.
 
 ## Project Status
 
