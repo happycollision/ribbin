@@ -4,8 +4,8 @@
 
 | Platform | Overhead | Impact |
 |----------|----------|--------|
-| **Linux** | ~1.6ms | Imperceptible |
-| **macOS** | ~4.2ms | Imperceptible |
+| **Linux** | ~1.0ms | Imperceptible |
+| **macOS** | ~5.4ms | Imperceptible |
 
 For interactive use, you won't notice it. For tight loops, use `RIBBIN_BYPASS=1`.
 
@@ -13,9 +13,9 @@ For interactive use, you won't notice it. For tight loops, use `RIBBIN_BYPASS=1`
 
 | Invocations | Linux | macOS |
 |-------------|-------|-------|
-| 100 | 0.16s | 0.42s |
-| 1,000 | 1.6s | 4.2s |
-| 10,000 | 16s | 42s |
+| 100 | 0.10s | 0.54s |
+| 1,000 | 1.0s | 5.4s |
+| 10,000 | 10s | 54s |
 
 ## Bypass for Performance-Critical Scripts
 
@@ -51,12 +51,12 @@ make benchmark-all      # Both
 
 ### Linux (Docker, golang:1.23-alpine on ARM64)
 
-**Fast command (cat):** 3.04ms with shim vs 1.41ms without (+115%)
-**Slow command (grep):** 12.57ms with shim vs 10.85ms without (+16%)
+**Fast command (cat):** 1.96ms with shim vs 0.97ms without (+103%)
+**Slow command (grep):** 9.94ms with shim vs 8.84ms without (+12%)
 
 ### macOS (Apple M1 Pro)
 
-**Fast command (cat):** 10.17ms with shim vs 5.96ms without (+71%)
-**Slow command (grep):** 14.34ms with shim vs 10.13ms without (+42%)
+**Fast command (cat):** 11.55ms with shim vs 6.12ms without (+89%)
+**Slow command (grep):** 15.47ms with shim vs 10.58ms without (+46%)
 
 The absolute overhead is constant per platform. Relative overhead decreases as commands take longer.
