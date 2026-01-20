@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -61,6 +62,12 @@ func LogEvent(event *AuditEvent) error {
 	}
 	if event.User == "" {
 		event.User = os.Getenv("USER")
+		// Fallback to os/user if USER env is not set (e.g., in containers)
+		if event.User == "" {
+			if u, err := user.Current(); err == nil {
+				event.User = u.Username
+			}
+		}
 	}
 	event.UID = os.Getuid()
 	event.Elevated = os.Getuid() == 0
