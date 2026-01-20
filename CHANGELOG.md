@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6] - 2026-01-20
+
 ### Breaking Changes
 - **Config format migrated to JSONC**: Config files are now `ribbin.jsonc` instead of `ribbin.toml`. JSONC supports comments and is more familiar to web developers. A JSON Schema is provided for editor autocompletion.
 - **Command rename**: `shim`/`unshim` → `wrap`/`unwrap`
