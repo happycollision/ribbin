@@ -449,3 +449,339 @@ message = "external"
 		t.Errorf("expected 1 cached config after second resolve, got %d", len(resolver.cache))
 	}
 }
+
+// Tests for provenance tracking
+
+func TestResolveEffectiveShimsWithProvenance_RootOnly(t *testing.T) {
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat":  {Action: "block", Message: "root cat"},
+			"grep": {Action: "warn", Message: "root grep"},
+		},
+	}
+
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.toml", nil, "")
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
+	}
+
+	// Check shim count
+	if len(result) != 2 {
+		t.Errorf("expected 2 shims, got %d", len(result))
+	}
+
+	// Check cat shim provenance
+	catShim, ok := result["cat"]
+	if !ok {
+		t.Fatal("expected cat shim")
+	}
+	if catShim.Config.Action != "block" {
+		t.Errorf("cat action = %q, want %q", catShim.Config.Action, "block")
+	}
+	if catShim.Source.FilePath != "/project/ribbin.toml" {
+		t.Errorf("cat source file = %q, want %q", catShim.Source.FilePath, "/project/ribbin.toml")
+	}
+	if catShim.Source.Fragment != "root" {
+		t.Errorf("cat source fragment = %q, want %q", catShim.Source.Fragment, "root")
+	}
+	if catShim.Source.Overrode != nil {
+		t.Error("cat should not have overrode set")
+	}
+}
+
+func TestResolveEffectiveShimsWithProvenance_ScopeExtendsRoot(t *testing.T) {
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat":  {Action: "block", Message: "root cat"},
+			"grep": {Action: "warn", Message: "root grep"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path:    "apps/frontend",
+				Extends: []string{"root"},
+				Shims: map[string]ShimConfig{
+					"cat":  {Action: "redirect", Message: "frontend cat"}, // overrides root
+					"yarn": {Action: "block", Message: "use npm"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.toml", &scope, "frontend")
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
+	}
+
+	// Check cat shim (overridden by scope)
+	catShim, ok := result["cat"]
+	if !ok {
+		t.Fatal("expected cat shim")
+	}
+	if catShim.Config.Action != "redirect" {
+		t.Errorf("cat action = %q, want %q", catShim.Config.Action, "redirect")
+	}
+	if catShim.Source.Fragment != "root.frontend" {
+		t.Errorf("cat source fragment = %q, want %q", catShim.Source.Fragment, "root.frontend")
+	}
+	// Should track that it overrode root
+	if catShim.Source.Overrode == nil {
+		t.Fatal("cat should have overrode set")
+	}
+	if catShim.Source.Overrode.Fragment != "root" {
+		t.Errorf("cat overrode fragment = %q, want %q", catShim.Source.Overrode.Fragment, "root")
+	}
+
+	// Check grep shim (inherited from root)
+	grepShim, ok := result["grep"]
+	if !ok {
+		t.Fatal("expected grep shim")
+	}
+	if grepShim.Source.Fragment != "root" {
+		t.Errorf("grep source fragment = %q, want %q", grepShim.Source.Fragment, "root")
+	}
+	if grepShim.Source.Overrode != nil {
+		t.Error("grep should not have overrode set")
+	}
+
+	// Check yarn shim (scope's own, no inheritance)
+	yarnShim, ok := result["yarn"]
+	if !ok {
+		t.Fatal("expected yarn shim")
+	}
+	if yarnShim.Source.Fragment != "root.frontend" {
+		t.Errorf("yarn source fragment = %q, want %q", yarnShim.Source.Fragment, "root.frontend")
+	}
+	if yarnShim.Source.Overrode != nil {
+		t.Error("yarn should not have overrode set")
+	}
+}
+
+func TestResolveEffectiveShimsWithProvenance_MultipleExtends(t *testing.T) {
+	// extends = ["root", "root.strict"] - later override earlier
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat": {Action: "warn", Message: "root cat"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"strict": {
+				Shims: map[string]ShimConfig{
+					"cat": {Action: "block", Message: "strict cat"},
+				},
+			},
+			"backend": {
+				Path:    "apps/backend",
+				Extends: []string{"root", "root.strict"},
+				Shims:   map[string]ShimConfig{},
+			},
+		},
+	}
+
+	scope := config.Scopes["backend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, "/project/ribbin.toml", &scope, "backend")
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
+	}
+
+	// cat should come from strict, which overrode root
+	catShim, ok := result["cat"]
+	if !ok {
+		t.Fatal("expected cat shim")
+	}
+	if catShim.Config.Action != "block" {
+		t.Errorf("cat action = %q, want %q", catShim.Config.Action, "block")
+	}
+	if catShim.Source.Fragment != "root.strict" {
+		t.Errorf("cat source fragment = %q, want %q", catShim.Source.Fragment, "root.strict")
+	}
+	// Should track the override chain
+	if catShim.Source.Overrode == nil {
+		t.Fatal("cat should have overrode set")
+	}
+	if catShim.Source.Overrode.Fragment != "root" {
+		t.Errorf("cat overrode fragment = %q, want %q", catShim.Source.Overrode.Fragment, "root")
+	}
+}
+
+func TestResolveEffectiveShimsWithProvenance_ExternalFile(t *testing.T) {
+	// Create a temporary external config file
+	tmpDir := t.TempDir()
+
+	externalDir := filepath.Join(tmpDir, "external")
+	if err := os.MkdirAll(externalDir, 0755); err != nil {
+		t.Fatalf("failed to create external dir: %v", err)
+	}
+	externalPath := filepath.Join(externalDir, "ribbin.toml")
+	externalContent := `
+[shims.external-cmd]
+action = "block"
+message = "from external"
+`
+	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
+		t.Fatalf("failed to write external config: %v", err)
+	}
+
+	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path:    "apps/frontend",
+				Extends: []string{"./external/ribbin.toml"},
+				Shims: map[string]ShimConfig{
+					"npm": {Action: "block", Message: "use pnpm"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(config, mainPath, &scope, "frontend")
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShimsWithProvenance error = %v", err)
+	}
+
+	// Check external-cmd provenance
+	extShim, ok := result["external-cmd"]
+	if !ok {
+		t.Fatal("expected external-cmd shim")
+	}
+	if extShim.Source.FilePath != externalPath {
+		t.Errorf("external-cmd source file = %q, want %q", extShim.Source.FilePath, externalPath)
+	}
+	if extShim.Source.Fragment != "root" {
+		t.Errorf("external-cmd source fragment = %q, want %q", extShim.Source.Fragment, "root")
+	}
+
+	// Check npm provenance
+	npmShim, ok := result["npm"]
+	if !ok {
+		t.Fatal("expected npm shim")
+	}
+	if npmShim.Source.FilePath != mainPath {
+		t.Errorf("npm source file = %q, want %q", npmShim.Source.FilePath, mainPath)
+	}
+	if npmShim.Source.Fragment != "root.frontend" {
+		t.Errorf("npm source fragment = %q, want %q", npmShim.Source.Fragment, "root.frontend")
+	}
+}
+
+// Tests for FindMatchingScope
+
+func TestFindMatchingScope_NoScopes(t *testing.T) {
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat": {Action: "block"},
+		},
+	}
+
+	match := FindMatchingScope(config, "/project", "/project/src")
+	if match != nil {
+		t.Errorf("expected nil match, got scope %q", match.Name)
+	}
+}
+
+func TestFindMatchingScope_ExactMatch(t *testing.T) {
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path: "apps/frontend",
+			},
+		},
+	}
+
+	match := FindMatchingScope(config, "/project", "/project/apps/frontend")
+	if match == nil {
+		t.Fatal("expected a match")
+	}
+	if match.Name != "frontend" {
+		t.Errorf("match name = %q, want %q", match.Name, "frontend")
+	}
+}
+
+func TestFindMatchingScope_SubdirectoryMatch(t *testing.T) {
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path: "apps/frontend",
+			},
+		},
+	}
+
+	match := FindMatchingScope(config, "/project", "/project/apps/frontend/src/components")
+	if match == nil {
+		t.Fatal("expected a match")
+	}
+	if match.Name != "frontend" {
+		t.Errorf("match name = %q, want %q", match.Name, "frontend")
+	}
+}
+
+func TestFindMatchingScope_MostSpecificWins(t *testing.T) {
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"apps": {
+				Path: "apps",
+			},
+			"frontend": {
+				Path: "apps/frontend",
+			},
+		},
+	}
+
+	// Should match the more specific scope
+	match := FindMatchingScope(config, "/project", "/project/apps/frontend/src")
+	if match == nil {
+		t.Fatal("expected a match")
+	}
+	if match.Name != "frontend" {
+		t.Errorf("match name = %q, want %q", match.Name, "frontend")
+	}
+
+	// Should match apps for backend
+	match = FindMatchingScope(config, "/project", "/project/apps/backend")
+	if match == nil {
+		t.Fatal("expected a match")
+	}
+	if match.Name != "apps" {
+		t.Errorf("match name = %q, want %q", match.Name, "apps")
+	}
+}
+
+func TestFindMatchingScope_NoMatch(t *testing.T) {
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path: "apps/frontend",
+			},
+		},
+	}
+
+	// Outside the scope path
+	match := FindMatchingScope(config, "/project", "/project/lib/utils")
+	if match != nil {
+		t.Errorf("expected no match, got scope %q", match.Name)
+	}
+}
+
+func TestFindMatchingScope_EmptyPath(t *testing.T) {
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"global": {
+				Path: "", // defaults to "."
+			},
+		},
+	}
+
+	// Empty path means the scope applies to the config directory
+	match := FindMatchingScope(config, "/project", "/project/anything/here")
+	if match == nil {
+		t.Fatal("expected a match")
+	}
+	if match.Name != "global" {
+		t.Errorf("match name = %q, want %q", match.Name, "global")
+	}
+}
