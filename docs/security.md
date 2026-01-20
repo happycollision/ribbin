@@ -69,10 +69,10 @@ All file operations use advisory locks to prevent Time-of-Check to Time-of-Use (
 ```
 Attacker (Thread 1)          Ribbin (Thread 2)
 -----------------------      ------------------
-                             Check: /bin/cat exists
-Replace /bin/cat with
+                             Check: /bin/curl exists
+Replace /bin/curl with
 malicious binary
-                             Shim /bin/cat
+                             Shim /bin/curl
 ```
 
 With file locking, Thread 2 acquires a lock before checking and holds it throughout, preventing Thread 1 from modifying the file.
@@ -158,12 +158,12 @@ File operations are atomic to prevent partial failures that leave the system in 
 
 **Example Failure Scenario:**
 ```
-1. Rename /bin/cat → /bin/cat.ribbin-original ✓
-2. Create symlink /bin/cat → ribbin ✗ (permission denied)
-3. ROLLBACK: /bin/cat.ribbin-original → /bin/cat ✓
+1. Rename /bin/curl → /bin/curl.ribbin-original ✓
+2. Create symlink /bin/curl → ribbin ✗ (permission denied)
+3. ROLLBACK: /bin/curl.ribbin-original → /bin/curl ✓
 ```
 
-Without atomicity, step 2 failure would leave `/bin/cat` missing.
+Without atomicity, step 2 failure would leave `/bin/curl` missing.
 
 ### 7. Environment Variable Validation
 
@@ -184,10 +184,10 @@ Operations that require elevated privileges are logged and warned about.
 **Example:**
 ```bash
 # Attempting to shim system directory without flag
-ribbin shim /usr/bin/cat
+ribbin shim /usr/bin/curl
 
 # Output:
-# shimming /usr/bin/cat requires explicit confirmation
+# shimming /usr/bin/curl requires explicit confirmation
 #
 # Use --confirm-system-dir flag if you understand the security implications
 

@@ -110,10 +110,10 @@ func TestLoadProjectConfig(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[shims.curl]
 action = "block"
-message = "Use bat instead"
-paths = ["/bin/cat", "/usr/bin/cat"]
+message = "Use the project API client"
+paths = ["/bin/curl", "/usr/bin/curl"]
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to write config: %v", err)
@@ -128,18 +128,18 @@ paths = ["/bin/cat", "/usr/bin/cat"]
 			t.Fatal("Shims map is nil")
 		}
 
-		catShim, exists := cfg.Shims["cat"]
+		curlShim, exists := cfg.Shims["curl"]
 		if !exists {
-			t.Fatal("cat shim not found")
+			t.Fatal("curl shim not found")
 		}
-		if catShim.Action != "block" {
-			t.Errorf("expected action 'block', got '%s'", catShim.Action)
+		if curlShim.Action != "block" {
+			t.Errorf("expected action 'block', got '%s'", curlShim.Action)
 		}
-		if catShim.Message != "Use bat instead" {
-			t.Errorf("unexpected message: %s", catShim.Message)
+		if curlShim.Message != "Use the project API client" {
+			t.Errorf("unexpected message: %s", curlShim.Message)
 		}
-		if len(catShim.Paths) != 2 {
-			t.Errorf("expected 2 paths, got %d", len(catShim.Paths))
+		if len(curlShim.Paths) != 2 {
+			t.Errorf("expected 2 paths, got %d", len(curlShim.Paths))
 		}
 	})
 
@@ -250,9 +250,9 @@ passthrough = { invocation = ["pnpm run"], invocationRegexp = ["pnpm (typecheck|
 		defer os.RemoveAll(tmpDir)
 
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
-		content := `[shims.cat]
+		content := `[shims.curl]
 action = "block"
-message = "Use bat"
+message = "Use the API client"
 
 [scopes.frontend]
 path = "apps/frontend"
@@ -279,8 +279,8 @@ message = "Use npm in backend"
 		}
 
 		// Check root shim
-		if _, exists := cfg.Shims["cat"]; !exists {
-			t.Error("root cat shim not found")
+		if _, exists := cfg.Shims["curl"]; !exists {
+			t.Error("root curl shim not found")
 		}
 
 		// Check scopes

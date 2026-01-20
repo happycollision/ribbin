@@ -15,11 +15,15 @@ export PATH="$LOCAL_BIN:$PATH"
 
 # Create local wrapper scripts that call the real binaries
 # These are what ribbin will shim (it can't shim system binaries for security)
-cat > "$LOCAL_BIN/mycat" << 'EOF'
+
+# Create a fake npm for testing (simulates npm being blocked in favor of pnpm)
+cat > "$LOCAL_BIN/mynpm" << 'EOF'
 #!/bin/bash
-exec /bin/cat "$@"
+echo "npm (fake for testing)"
+echo "Version 10.0.0"
+echo "Running: npm $*"
 EOF
-chmod +x "$LOCAL_BIN/mycat"
+chmod +x "$LOCAL_BIN/mynpm"
 
 cat > "$LOCAL_BIN/mycurl" << 'EOF'
 #!/bin/bash
@@ -56,16 +60,16 @@ cat > ribbin.toml << EOF
 # Example ribbin configuration for testing
 # Try running blocked commands to see ribbin in action!
 
-# Block direct mycat usage - suggest bat instead
-[shims.mycat]
+# Block direct npm usage - this project uses pnpm
+[shims.mynpm]
 action = "block"
-message = "Use 'bat' for syntax highlighting: bat <file>"
-paths = ["$LOCAL_BIN/mycat"]
+message = "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead."
+paths = ["$LOCAL_BIN/mynpm"]
 
 # Block direct tsc usage - enforce project script
 [shims.tsc]
 action = "block"
-message = "Use 'npm run typecheck' instead of direct tsc"
+message = "Use 'pnpm run typecheck' instead of direct tsc"
 paths = ["$LOCAL_BIN/tsc"]
 
 # Redirect myecho to a custom script (for demonstration)
@@ -75,10 +79,10 @@ redirect = "./scripts/fancy-echo.sh"
 message = "Using fancy echo wrapper"
 paths = ["$LOCAL_BIN/myecho"]
 
-# Block mycurl in favor of httpie
+# Block mycurl - use the project's API client
 [shims.mycurl]
 action = "block"
-message = "Use 'http' (httpie) for better output formatting"
+message = "Use the project's API client at ./scripts/api.sh instead"
 paths = ["$LOCAL_BIN/mycurl"]
 EOF
 
@@ -108,7 +112,7 @@ This is a sample project for testing ribbin shims.
 ## Local Wrapper Commands
 
 These are local wrappers in ~/.local/bin that ribbin can safely shim:
-- `mycat` - wrapper for cat (will be blocked)
+- `mynpm` - fake npm (will be blocked, suggests pnpm)
 - `tsc` - fake TypeScript compiler (will be blocked)
 - `myecho` - wrapper for echo (will be redirected)
 - `mycurl` - wrapper for curl (will be blocked)
@@ -117,7 +121,7 @@ These are local wrappers in ~/.local/bin that ribbin can safely shim:
 
 1. First, test the commands work without shims:
    ```
-   mycat README.md
+   mynpm install
    tsc --version
    myecho "hello world"
    ```
@@ -139,7 +143,7 @@ These are local wrappers in ~/.local/bin that ribbin can safely shim:
 
 5. Now try the commands again - they should be blocked/redirected:
    ```
-   mycat README.md      # Should be blocked
+   mynpm install        # Should be blocked
    tsc --version        # Should be blocked
    myecho "hello"       # Should redirect to fancy-echo.sh
    ```
@@ -162,17 +166,17 @@ echo "Working directory: $SCENARIO_DIR"
 echo "Shim directory:    $LOCAL_BIN"
 echo ""
 echo "Local wrapper commands (in ~/.local/bin):"
-echo "  mycat   - wrapper for cat   (will be blocked)"
+echo "  mynpm   - fake npm          (will be blocked, suggests pnpm)"
 echo "  tsc     - fake tsc          (will be blocked)"
 echo "  myecho  - wrapper for echo  (will be redirected)"
 echo "  mycurl  - wrapper for curl  (will be blocked)"
 echo ""
 echo "Quick start:"
-echo "  1. mycat README.md       # Works normally"
-echo "  2. ribbin shim           # Install shims"
-echo "  3. ribbin on             # Enable shims globally"
-echo "  4. mycat README.md       # Now blocked!"
-echo "  5. ribbin unshim         # Restore originals"
+echo "  1. mynpm install           # Works normally"
+echo "  2. ribbin shim             # Install shims"
+echo "  3. ribbin on               # Enable shims globally"
+echo "  4. mynpm install           # Now blocked!"
+echo "  5. ribbin unshim           # Restore originals"
 echo ""
 echo "More commands: ribbin config show, ribbin --help"
 echo ""

@@ -88,16 +88,11 @@ Create a `ribbin.toml` file in your project root:
 action = "block"
 message = "Use 'pnpm run typecheck' - direct tsc misses project config"
 
-# Block cat, suggest bat
-[shims.cat]
-action = "block"
-message = "Use 'bat' for syntax highlighting"
-paths = ["/usr/bin/cat", "/bin/cat"]  # Optional: restrict to specific paths
-
-# Block npm in pnpm projects
+# Block npm - this project uses pnpm
 [shims.npm]
 action = "block"
-message = "This project uses pnpm"
+message = "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead."
+paths = ["/usr/local/bin/npm", "/usr/bin/npm"]  # Optional: restrict to specific paths
 ```
 
 ### Configuration Options
@@ -303,9 +298,9 @@ message = "This project uses pnpm"
 action = "block"
 message = "Use 'trash' for safe deletion"
 
-[shims.cat]
+[shims.curl]
 action = "block"
-message = "Use 'bat' or the Read tool for file contents"
+message = "Use the project's API client at ./scripts/api.sh or the built-in fetch tools"
 ```
 
 ## Contributing

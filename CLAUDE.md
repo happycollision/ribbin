@@ -37,11 +37,11 @@ Project config uses TOML (`ribbin.toml`):
 action = "block"
 message = "Use 'pnpm run typecheck' instead"
 
-# Block cat, suggest bat
-[shims.cat]
+# Block npm - this project uses pnpm
+[shims.npm]
 action = "block"
-message = "Use 'bat' for syntax highlighting"
-paths = ["/usr/bin/cat", "/bin/cat"]
+message = "This project uses pnpm. Run 'pnpm install' instead."
+paths = ["/usr/local/bin/npm", "/usr/bin/npm"]
 ```
 
 ## Local Development Mode

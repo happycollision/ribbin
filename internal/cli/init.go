@@ -62,11 +62,11 @@ const defaultConfig = `# ribbin - Command shimming tool
 # action = "block"
 # message = "This project uses pnpm. Run 'pnpm install' instead."
 
-# Example: Block cat, suggest bat for syntax highlighting
-# [shims.cat]
+# Example: Block curl, suggest project API client
+# [shims.curl]
 # action = "block"
-# message = "Use 'bat' for syntax highlighting"
-# paths = ["/bin/cat", "/usr/bin/cat"]  # Optional: only block specific paths
+# message = "Use the project's API client at ./scripts/api.sh instead"
+# paths = ["/bin/curl", "/usr/bin/curl"]  # Optional: only block specific paths
 
 # Example: Redirect npm to pnpm (absolute path)
 # [shims.npm]

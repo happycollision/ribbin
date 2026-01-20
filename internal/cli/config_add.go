@@ -29,7 +29,7 @@ For redirect actions, specify --action redirect and --redirect (script path).
 Examples:
   ribbin config add tsc --action block --message "Use pnpm typecheck"
   ribbin config add npm --action redirect --redirect ./scripts/npm.sh
-  ribbin config add cat --action block --message "Use bat" --paths /bin/cat,/usr/bin/cat`,
+  ribbin config add curl --action block --message "Use the project API client" --paths /bin/curl,/usr/bin/curl`,
 	Args: cobra.ExactArgs(1),
 	RunE: runConfigAdd,
 }

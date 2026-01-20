@@ -24,7 +24,7 @@ func TestAddShim(t *testing.T) {
 
 		shimConfig := ShimConfig{
 			Action:  "block",
-			Message: "Use bat instead",
+			Message: "Test block message",
 			Paths:   []string{"/bin/cat", "/usr/bin/cat"},
 		}
 
@@ -46,8 +46,8 @@ func TestAddShim(t *testing.T) {
 		if catShim.Action != "block" {
 			t.Errorf("expected action 'block', got '%s'", catShim.Action)
 		}
-		if catShim.Message != "Use bat instead" {
-			t.Errorf("expected message 'Use bat instead', got '%s'", catShim.Message)
+		if catShim.Message != "Test block message" {
+			t.Errorf("expected message 'Test block message', got '%s'", catShim.Message)
 		}
 		if len(catShim.Paths) != 2 {
 			t.Errorf("expected 2 paths, got %d", len(catShim.Paths))
@@ -79,7 +79,7 @@ message = "Use pnpm run typecheck"
 
 		shimConfig := ShimConfig{
 			Action:  "warn",
-			Message: "Consider using bat",
+			Message: "Test warn message",
 		}
 
 		err = AddShim(configPath, "cat", shimConfig)
@@ -188,7 +188,7 @@ func TestRemoveShim(t *testing.T) {
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		content := `[shims.cat]
 action = "block"
-message = "Use bat instead"
+message = "Test block message"
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -226,7 +226,7 @@ message = "Use bat instead"
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		content := `[shims.cat]
 action = "block"
-message = "Use bat instead"
+message = "Test block message"
 
 [shims.tsc]
 action = "block"
@@ -322,7 +322,7 @@ func TestUpdateShim(t *testing.T) {
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		content := `[shims.cat]
 action = "block"
-message = "Use bat instead"
+message = "Test block message"
 `
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 			t.Fatalf("failed to create config: %v", err)
@@ -330,7 +330,7 @@ message = "Use bat instead"
 
 		updatedConfig := ShimConfig{
 			Action:  "warn",
-			Message: "Consider using bat",
+			Message: "Test warn message",
 			Paths:   []string{"/bin/cat"},
 		}
 
@@ -352,7 +352,7 @@ message = "Use bat instead"
 		if catShim.Action != "warn" {
 			t.Errorf("expected action 'warn', got '%s'", catShim.Action)
 		}
-		if catShim.Message != "Consider using bat" {
+		if catShim.Message != "Test warn message" {
 			t.Errorf("expected updated message, got '%s'", catShim.Message)
 		}
 		if len(catShim.Paths) != 1 {
@@ -376,7 +376,7 @@ message = "Use bat instead"
 		configPath := filepath.Join(tmpDir, "ribbin.toml")
 		content := `[shims.cat]
 action = "block"
-message = "Use bat instead"
+message = "Test block message"
 
 [shims.tsc]
 action = "block"

@@ -113,10 +113,10 @@ func TestVerboseLogDecision(t *testing.T) {
 		},
 		{
 			name:     "redirect decision",
-			cmd:      "cat",
+			cmd:      "npm",
 			action:   "REDIRECT",
-			reason:   "bat",
-			contains: "[ribbin] cat -> REDIRECT: bat",
+			reason:   "pnpm",
+			contains: "[ribbin] npm -> REDIRECT: pnpm",
 		},
 	}
 

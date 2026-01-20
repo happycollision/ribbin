@@ -47,10 +47,10 @@ redirect = "./scripts/typecheck-wrapper.sh"
 
 **Path Restrictions:**
 ```toml
-[shims.cat]
+[shims.curl]
 action = "block"
-message = "Use 'bat' instead"
-paths = ["/usr/bin/cat", "/bin/cat"]
+message = "Use the project's API client instead"
+paths = ["/usr/bin/curl", "/bin/curl"]
 ```
 
 See [Configuration Options](../README.md#configuration) for full details.
@@ -137,8 +137,8 @@ See [Use Cases](../README.md#use-cases) for more examples.
 
 Ribbin uses a "sidecar" approach:
 
-1. Original binary renamed: `cat` → `cat.ribbin-original`
-2. Symlink created: `cat` → `ribbin`
+1. Original binary renamed: `npm` → `npm.ribbin-original`
+2. Symlink created: `npm` → `ribbin`
 3. When invoked, ribbin checks configuration
 4. If blocked: show error message
 5. Otherwise: exec original binary
@@ -220,7 +220,7 @@ docs/                    # Documentation
 
 Use sudo for system directories:
 ```bash
-sudo ribbin shim cat --confirm-system-dir
+sudo ribbin shim curl --confirm-system-dir
 ```
 
 Or use user-local directories:

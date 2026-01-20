@@ -1,8 +1,8 @@
 # Valid ribbin configuration for testing
-[shims.cat]
+[shims.curl]
 action = "block"
-message = "Use 'bat' for syntax highlighting"
-paths = ["/usr/bin/cat", "/bin/cat"]
+message = "Use the project's API client instead"
+paths = ["/usr/bin/curl", "/bin/curl"]
 
 [shims.npm]
 action = "block"
