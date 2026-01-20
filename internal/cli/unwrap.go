@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -149,23 +151,12 @@ func runUnwrap(cmd *cobra.Command, args []string) error {
 	}
 
 	// Track results
-	var restored, skipped, failed int
+	var results []wrap.UnwrapResult
 
 	// Unwrap each path
 	for _, path := range pathsToUnwrap {
-		err := wrap.Uninstall(path, registry)
-		if err != nil {
-			if strings.Contains(err.Error(), "sidecar not found") {
-				fmt.Printf("Skipped %s: not wrapped\n", path)
-				skipped++
-			} else {
-				fmt.Printf("Failed %s: %v\n", path, err)
-				failed++
-			}
-		} else {
-			fmt.Printf("Restored %s\n", path)
-			restored++
-		}
+		result := unwrapSinglePath(path, registry)
+		results = append(results, result)
 	}
 
 	// Save registry
@@ -174,7 +165,170 @@ func runUnwrap(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print summary
-	fmt.Printf("\nSummary: %d restored, %d skipped, %d failed\n", restored, skipped, failed)
+	printUnwrapSummary(results)
 
 	return nil
+}
+
+// unwrapSinglePath handles unwrapping a single binary with conflict detection
+func unwrapSinglePath(path string, registry *config.Registry) wrap.UnwrapResult {
+	result := wrap.UnwrapResult{BinaryPath: path}
+
+	// Check for hash conflict before unwrapping
+	hasConflict, currentHash, originalHash := wrap.CheckHashConflict(path)
+	if hasConflict {
+		result.Conflict = true
+		resolution := handleConflict(path, currentHash, originalHash, registry)
+		result.Resolution = resolution
+
+		switch resolution {
+		case wrap.ResolutionSkipped:
+			result.Success = true // Skipping is a valid successful outcome
+			return result
+		case wrap.ResolutionCleanup:
+			// Remove sidecar files, keep current binary
+			err := wrap.CleanupSidecarFiles(path, registry)
+			if err != nil {
+				result.Error = err
+				result.Success = false
+			} else {
+				result.Success = true
+			}
+			return result
+		case wrap.ResolutionRestored:
+			// Fall through to normal restore
+		}
+	}
+
+	// Normal unwrap
+	err := wrap.Uninstall(path, registry)
+	if err != nil {
+		result.Error = err
+		result.Success = false
+	} else {
+		result.Success = true
+		if hasConflict {
+			result.Resolution = wrap.ResolutionRestored
+		}
+	}
+
+	return result
+}
+
+// handleConflict presents the conflict to the user and gets their resolution choice
+func handleConflict(path, currentHash, originalHash string, registry *config.Registry) wrap.ConflictResolution {
+	fmt.Printf("\n⚠️  Conflict detected for %s\n", path)
+	fmt.Println("The tool appears to have been reinstalled since ribbin wrapped it.")
+	fmt.Println()
+	fmt.Println("For details on how ribbin wrapping works, see:")
+	fmt.Println("  https://github.com/happycollision/ribbin#how-wrapping-works")
+	fmt.Println()
+	fmt.Println("Options:")
+	fmt.Println("  1. Do nothing - leave current binary and ribbin sidecar files")
+	fmt.Println("  2. Clean up   - remove sidecar files, keep current binary")
+	fmt.Println("  3. Restore    - replace current binary with original from sidecar")
+	fmt.Println()
+	fmt.Print("Choose [1/2/3]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("\nError reading input, skipping this file")
+		return wrap.ResolutionSkipped
+	}
+
+	input = strings.TrimSpace(input)
+	switch input {
+	case "1":
+		fmt.Println("→ Skipping (no changes made)")
+		return wrap.ResolutionSkipped
+	case "2":
+		fmt.Println("→ Cleaning up sidecar files")
+		return wrap.ResolutionCleanup
+	case "3":
+		fmt.Println("→ Restoring original from sidecar")
+		return wrap.ResolutionRestored
+	default:
+		fmt.Println("→ Invalid choice, skipping (no changes made)")
+		return wrap.ResolutionSkipped
+	}
+}
+
+// printUnwrapSummary prints a formatted summary of all unwrap operations
+func printUnwrapSummary(results []wrap.UnwrapResult) {
+	var restored, skipped, cleanedUp, failed []string
+	var conflictResolutions []string
+
+	for _, r := range results {
+		if r.Success {
+			if r.Conflict {
+				switch r.Resolution {
+				case wrap.ResolutionSkipped:
+					skipped = append(skipped, r.BinaryPath)
+					conflictResolutions = append(conflictResolutions,
+						fmt.Sprintf("  %s → skipped (no changes made)", r.BinaryPath))
+				case wrap.ResolutionCleanup:
+					cleanedUp = append(cleanedUp, r.BinaryPath)
+					conflictResolutions = append(conflictResolutions,
+						fmt.Sprintf("  %s → cleaned up (kept current binary)", r.BinaryPath))
+				case wrap.ResolutionRestored:
+					restored = append(restored, r.BinaryPath)
+					conflictResolutions = append(conflictResolutions,
+						fmt.Sprintf("  %s → restored original", r.BinaryPath))
+				}
+			} else {
+				restored = append(restored, r.BinaryPath)
+			}
+		} else {
+			if r.Error != nil && strings.Contains(r.Error.Error(), "sidecar not found") {
+				skipped = append(skipped, r.BinaryPath)
+				fmt.Printf("Skipped %s: not wrapped\n", r.BinaryPath)
+			} else {
+				failed = append(failed, r.BinaryPath)
+				fmt.Printf("Failed %s: %v\n", r.BinaryPath, r.Error)
+			}
+		}
+	}
+
+	// Print success messages for non-conflict restores
+	for _, r := range results {
+		if r.Success && !r.Conflict && r.Resolution == wrap.ResolutionNone {
+			fmt.Printf("Restored %s\n", r.BinaryPath)
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("Unwrap Summary")
+	fmt.Println("==============")
+
+	if len(restored) > 0 {
+		fmt.Println()
+		fmt.Println("✓ Restored:")
+		for _, p := range restored {
+			fmt.Printf("  %s\n", p)
+		}
+	}
+
+	if len(conflictResolutions) > 0 {
+		fmt.Println()
+		fmt.Println("⚠️  Conflicts resolved:")
+		for _, line := range conflictResolutions {
+			fmt.Println(line)
+		}
+		fmt.Println()
+		fmt.Println("For details on how ribbin wrapping works, see:")
+		fmt.Println("  https://github.com/happycollision/ribbin#how-wrapping-works")
+	}
+
+	if len(failed) > 0 {
+		fmt.Println()
+		fmt.Println("✗ Failed:")
+		for _, p := range failed {
+			fmt.Printf("  %s\n", p)
+		}
+	}
+
+	// Final counts
+	fmt.Printf("\nTotal: %d restored, %d skipped, %d cleaned up, %d failed\n",
+		len(restored), len(skipped), len(cleanedUp), len(failed))
 }

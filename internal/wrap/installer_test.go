@@ -361,3 +361,333 @@ func TestFindSidecars(t *testing.T) {
 		}
 	})
 }
+
+func TestMetadataPath(t *testing.T) {
+	path := MetadataPath("/usr/local/bin/cat")
+	expected := "/usr/local/bin/cat.ribbin-meta"
+	if path != expected {
+		t.Errorf("MetadataPath() = %q, want %q", path, expected)
+	}
+}
+
+func TestHasMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("returns false when no metadata exists", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "no-meta")
+		if HasMetadata(binPath) {
+			t.Error("HasMetadata should return false when metadata doesn't exist")
+		}
+	})
+
+	t.Run("returns true when metadata exists", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "with-meta")
+		metaPath := MetadataPath(binPath)
+
+		// Create the metadata file
+		if err := os.WriteFile(metaPath, []byte("{}"), 0644); err != nil {
+			t.Fatalf("failed to create metadata: %v", err)
+		}
+
+		if !HasMetadata(binPath) {
+			t.Error("HasMetadata should return true when metadata exists")
+		}
+	})
+}
+
+func TestHashFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("calculates SHA256 hash", func(t *testing.T) {
+		content := []byte("hello world")
+		filePath := filepath.Join(tmpDir, "test-file")
+		if err := os.WriteFile(filePath, content, 0644); err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+
+		hash, err := hashFile(filePath)
+		if err != nil {
+			t.Fatalf("hashFile error: %v", err)
+		}
+
+		// SHA256 of "hello world" is well-known
+		expectedHash := "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+		if hash != expectedHash {
+			t.Errorf("hashFile() = %q, want %q", hash, expectedHash)
+		}
+	})
+
+	t.Run("returns error for non-existent file", func(t *testing.T) {
+		_, err := hashFile(filepath.Join(tmpDir, "nonexistent"))
+		if err == nil {
+			t.Error("expected error for non-existent file")
+		}
+	})
+}
+
+func TestMetadataLoadSave(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("saves and loads metadata correctly", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "test-binary")
+
+		meta := &WrapperMetadata{
+			OriginalHash:  "sha256:abc123",
+			OriginalSize:  12345,
+			RibbinPath:    "/usr/local/bin/ribbin",
+			RibbinVersion: "1.0.0",
+		}
+
+		// Save
+		if err := saveMetadata(binPath, meta); err != nil {
+			t.Fatalf("saveMetadata error: %v", err)
+		}
+
+		// Load
+		loaded, err := LoadMetadata(binPath)
+		if err != nil {
+			t.Fatalf("LoadMetadata error: %v", err)
+		}
+
+		if loaded.OriginalHash != meta.OriginalHash {
+			t.Errorf("OriginalHash = %q, want %q", loaded.OriginalHash, meta.OriginalHash)
+		}
+		if loaded.OriginalSize != meta.OriginalSize {
+			t.Errorf("OriginalSize = %d, want %d", loaded.OriginalSize, meta.OriginalSize)
+		}
+		if loaded.RibbinPath != meta.RibbinPath {
+			t.Errorf("RibbinPath = %q, want %q", loaded.RibbinPath, meta.RibbinPath)
+		}
+		if loaded.RibbinVersion != meta.RibbinVersion {
+			t.Errorf("RibbinVersion = %q, want %q", loaded.RibbinVersion, meta.RibbinVersion)
+		}
+	})
+
+	t.Run("returns error for non-existent metadata", func(t *testing.T) {
+		_, err := LoadMetadata(filepath.Join(tmpDir, "nonexistent"))
+		if err == nil {
+			t.Error("expected error for non-existent metadata")
+		}
+	})
+}
+
+func TestCheckHashConflict(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("returns no conflict when no metadata exists", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "no-meta")
+		hasConflict, _, _ := CheckHashConflict(binPath)
+		if hasConflict {
+			t.Error("expected no conflict when metadata doesn't exist")
+		}
+	})
+
+	t.Run("returns no conflict when hashes match", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "matching")
+		sidecarPath := binPath + ".ribbin-original"
+		content := []byte("original content")
+
+		// Create sidecar
+		if err := os.WriteFile(sidecarPath, content, 0755); err != nil {
+			t.Fatalf("failed to create sidecar: %v", err)
+		}
+
+		// Calculate hash
+		hash, err := hashFile(sidecarPath)
+		if err != nil {
+			t.Fatalf("hashFile error: %v", err)
+		}
+
+		// Create metadata with matching hash
+		meta := &WrapperMetadata{
+			OriginalHash: hash,
+			OriginalSize: int64(len(content)),
+		}
+		if err := saveMetadata(binPath, meta); err != nil {
+			t.Fatalf("saveMetadata error: %v", err)
+		}
+
+		hasConflict, currentHash, originalHash := CheckHashConflict(binPath)
+		if hasConflict {
+			t.Error("expected no conflict when hashes match")
+		}
+		if currentHash != originalHash {
+			t.Errorf("hashes should match: current=%q, original=%q", currentHash, originalHash)
+		}
+	})
+
+	t.Run("returns conflict when hashes differ", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "mismatched")
+		sidecarPath := binPath + ".ribbin-original"
+
+		// Create sidecar with different content than what metadata says
+		if err := os.WriteFile(sidecarPath, []byte("new content"), 0755); err != nil {
+			t.Fatalf("failed to create sidecar: %v", err)
+		}
+
+		// Create metadata with different hash
+		meta := &WrapperMetadata{
+			OriginalHash: "sha256:different",
+			OriginalSize: 100,
+		}
+		if err := saveMetadata(binPath, meta); err != nil {
+			t.Fatalf("saveMetadata error: %v", err)
+		}
+
+		hasConflict, currentHash, originalHash := CheckHashConflict(binPath)
+		if !hasConflict {
+			t.Error("expected conflict when hashes differ")
+		}
+		if currentHash == originalHash {
+			t.Error("hashes should be different")
+		}
+	})
+}
+
+func TestInstallCreatesMetadata(t *testing.T) {
+	// Create temp directory
+	tmpDir, err := os.MkdirTemp("", "ribbin-meta-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create original binary
+	binaryPath := filepath.Join(tmpDir, "test-binary")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho original"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	// Create fake ribbin
+	ribbinPath := filepath.Join(tmpDir, "ribbin")
+	if err := os.WriteFile(ribbinPath, []byte("#!/bin/sh\necho ribbin"), 0755); err != nil {
+		t.Fatalf("failed to create ribbin: %v", err)
+	}
+
+	registry := &config.Registry{
+		Wrappers:          make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+	}
+
+	err = Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
+	if err != nil {
+		t.Fatalf("Install error: %v", err)
+	}
+
+	// Check metadata file was created
+	if !HasMetadata(binaryPath) {
+		t.Error("metadata file should exist after install")
+	}
+
+	// Verify metadata content
+	meta, err := LoadMetadata(binaryPath)
+	if err != nil {
+		t.Fatalf("LoadMetadata error: %v", err)
+	}
+
+	if meta.OriginalHash == "" {
+		t.Error("metadata should have OriginalHash")
+	}
+	if meta.OriginalSize <= 0 {
+		t.Error("metadata should have OriginalSize")
+	}
+	if meta.RibbinPath != ribbinPath {
+		t.Errorf("RibbinPath = %q, want %q", meta.RibbinPath, ribbinPath)
+	}
+}
+
+func TestUninstallRemovesMetadata(t *testing.T) {
+	// Create temp directory
+	tmpDir, err := os.MkdirTemp("", "ribbin-meta-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	binaryPath := filepath.Join(tmpDir, "uninstall-test")
+	ribbinPath := filepath.Join(tmpDir, "ribbin")
+	sidecarPath := binaryPath + ".ribbin-original"
+	metaPath := MetadataPath(binaryPath)
+
+	// Create sidecar (original)
+	if err := os.WriteFile(sidecarPath, []byte("#!/bin/sh\necho original"), 0755); err != nil {
+		t.Fatalf("failed to create sidecar: %v", err)
+	}
+
+	// Create metadata
+	meta := &WrapperMetadata{OriginalHash: "sha256:test"}
+	if err := saveMetadata(binaryPath, meta); err != nil {
+		t.Fatalf("saveMetadata error: %v", err)
+	}
+
+	// Create symlink (shim)
+	if err := os.WriteFile(ribbinPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("failed to create ribbin: %v", err)
+	}
+	if err := os.Symlink(ribbinPath, binaryPath); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	registry := &config.Registry{
+		Wrappers: map[string]config.WrapperEntry{
+			"uninstall-test": {Original: binaryPath, Config: "/project/ribbin.toml"},
+		},
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+	}
+
+	uninstallErr := Uninstall(binaryPath, registry)
+	if uninstallErr != nil {
+		t.Fatalf("Uninstall error: %v", uninstallErr)
+	}
+
+	// Check metadata file was removed
+	if _, err := os.Stat(metaPath); !os.IsNotExist(err) {
+		t.Error("metadata file should be removed after uninstall")
+	}
+}
+
+func TestCleanupSidecarFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	binaryPath := filepath.Join(tmpDir, "cleanup-test")
+	sidecarPath := binaryPath + ".ribbin-original"
+	metaPath := MetadataPath(binaryPath)
+
+	// Create sidecar and metadata
+	if err := os.WriteFile(sidecarPath, []byte("sidecar content"), 0755); err != nil {
+		t.Fatalf("failed to create sidecar: %v", err)
+	}
+	if err := os.WriteFile(metaPath, []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to create metadata: %v", err)
+	}
+
+	registry := &config.Registry{
+		Wrappers: map[string]config.WrapperEntry{
+			"cleanup-test": {Original: binaryPath},
+		},
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+	}
+
+	err := CleanupSidecarFiles(binaryPath, registry)
+	if err != nil {
+		t.Fatalf("CleanupSidecarFiles error: %v", err)
+	}
+
+	// Verify sidecar removed
+	if _, err := os.Stat(sidecarPath); !os.IsNotExist(err) {
+		t.Error("sidecar should be removed")
+	}
+
+	// Verify metadata removed
+	if _, err := os.Stat(metaPath); !os.IsNotExist(err) {
+		t.Error("metadata should be removed")
+	}
+
+	// Verify registry updated
+	if _, exists := registry.Wrappers["cleanup-test"]; exists {
+		t.Error("registry entry should be removed")
+	}
+}

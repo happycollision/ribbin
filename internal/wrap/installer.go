@@ -1,8 +1,12 @@
 package wrap
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +14,127 @@ import (
 	"github.com/happycollision/ribbin/internal/config"
 	"github.com/happycollision/ribbin/internal/security"
 )
+
+// Version can be set by the CLI package at startup to include in metadata
+var Version = "dev"
+
+// WrapperMetadata tracks information about a wrapped binary for stale detection
+type WrapperMetadata struct {
+	WrappedAt     time.Time `json:"wrapped_at"`
+	OriginalHash  string    `json:"original_hash"` // sha256:abc123...
+	OriginalSize  int64     `json:"original_size"`
+	RibbinPath    string    `json:"ribbin_path"`
+	RibbinVersion string    `json:"ribbin_version"`
+}
+
+// MetadataPath returns the metadata file path for a binary
+func MetadataPath(binaryPath string) string {
+	return binaryPath + ".ribbin-meta"
+}
+
+// HasMetadata checks if a binary has a metadata file
+func HasMetadata(binaryPath string) bool {
+	_, err := os.Stat(MetadataPath(binaryPath))
+	return err == nil
+}
+
+// hashFile calculates the SHA256 hash of a file
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// LoadMetadata reads metadata from a .ribbin-meta file
+func LoadMetadata(binaryPath string) (*WrapperMetadata, error) {
+	metaPath := MetadataPath(binaryPath)
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var meta WrapperMetadata
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return nil, err
+	}
+
+	return &meta, nil
+}
+
+// saveMetadata writes metadata to a .ribbin-meta file
+func saveMetadata(binaryPath string, meta *WrapperMetadata) error {
+	metaPath := MetadataPath(binaryPath)
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(metaPath, data, 0644)
+}
+
+// removeMetadata removes the metadata file for a binary
+func removeMetadata(binaryPath string) error {
+	metaPath := MetadataPath(binaryPath)
+	err := os.Remove(metaPath)
+	if os.IsNotExist(err) {
+		return nil // No metadata file to remove is fine
+	}
+	return err
+}
+
+// ConflictResolution represents how a hash mismatch was resolved
+type ConflictResolution int
+
+const (
+	ResolutionNone     ConflictResolution = iota // No conflict
+	ResolutionSkipped                            // User chose to skip (do nothing)
+	ResolutionCleanup                            // User chose to remove sidecar files, keep current binary
+	ResolutionRestored                           // User chose to restore original from sidecar
+)
+
+// UnwrapResult tracks the result of unwrapping a single binary
+type UnwrapResult struct {
+	BinaryPath string
+	Success    bool
+	Error      error
+	Conflict   bool
+	Resolution ConflictResolution
+}
+
+// CheckHashConflict checks if the sidecar hash differs from what was recorded at wrap time.
+// Returns true if there's a conflict, false if no conflict or no metadata.
+func CheckHashConflict(binaryPath string) (hasConflict bool, currentHash string, originalHash string) {
+	sidecarPath := binaryPath + ".ribbin-original"
+
+	// Load metadata
+	meta, err := LoadMetadata(binaryPath)
+	if err != nil {
+		// No metadata or can't read it - assume no conflict
+		return false, "", ""
+	}
+
+	// Calculate current hash of sidecar
+	currentHash, err = hashFile(sidecarPath)
+	if err != nil {
+		// Can't hash sidecar - assume no conflict
+		return false, "", meta.OriginalHash
+	}
+
+	// Compare hashes
+	if currentHash != meta.OriginalHash {
+		return true, currentHash, meta.OriginalHash
+	}
+
+	return false, currentHash, meta.OriginalHash
+}
 
 // SidecarPath returns the sidecar path for a binary
 func SidecarPath(binaryPath string) (string, error) {
@@ -171,6 +296,23 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 		return installErr
 	}
 
+	// 7a. CREATE METADATA FILE (best effort - don't fail if this fails)
+	hash, hashErr := hashFile(sidecarPath)
+	if hashErr == nil {
+		sidecarInfo, statErr := os.Stat(sidecarPath)
+		if statErr == nil {
+			meta := &WrapperMetadata{
+				WrappedAt:     time.Now(),
+				OriginalHash:  hash,
+				OriginalSize:  sidecarInfo.Size(),
+				RibbinPath:    ribbinPath,
+				RibbinVersion: Version,
+			}
+			// Best effort - don't fail installation if metadata write fails
+			_ = saveMetadata(binaryPath, meta)
+		}
+	}
+
 	// 8. UPDATE REGISTRY (within lock)
 	commandName := filepath.Base(binaryPath)
 	registry.Wrappers[commandName] = config.WrapperEntry{
@@ -269,6 +411,29 @@ func Uninstall(binaryPath string, registry *config.Registry) error {
 		uninstallErr = fmt.Errorf("cannot restore original binary: %w", err)
 		return uninstallErr
 	}
+
+	// Clean up metadata file (best effort)
+	_ = removeMetadata(binaryPath)
+
+	// Update registry
+	commandName := filepath.Base(binaryPath)
+	delete(registry.Wrappers, commandName)
+
+	return nil
+}
+
+// CleanupSidecarFiles removes sidecar and metadata files without restoring the original.
+// Used when the user chooses to keep the current binary during conflict resolution.
+func CleanupSidecarFiles(binaryPath string, registry *config.Registry) error {
+	sidecarPath := binaryPath + ".ribbin-original"
+
+	// Remove sidecar file
+	if err := os.Remove(sidecarPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("cannot remove sidecar: %w", err)
+	}
+
+	// Remove metadata file
+	_ = removeMetadata(binaryPath)
 
 	// Update registry
 	commandName := filepath.Base(binaryPath)

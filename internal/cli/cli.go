@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/wrap"
 	"github.com/spf13/cobra"
 )
 
@@ -55,6 +56,9 @@ func init() {
 	rootCmd.AddCommand(deactivateCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(recoverCmd)
+
+	// Set version for metadata in wrap package
+	wrap.Version = Version
 }
 
 // Execute runs the root command
