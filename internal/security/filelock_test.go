@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 // TestAcquireLock_Exclusive verifies that exclusive locks prevent concurrent access

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestConfigShowCommand_NoConfig(t *testing.T) {

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/happycollision/ribbin/internal/testsafety"
+
 	"github.com/happycollision/ribbin/internal/config"
 )
 

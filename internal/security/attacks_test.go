@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 // =============================================================================

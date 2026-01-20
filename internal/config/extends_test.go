@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestParseExtendsRef_LocalReferences(t *testing.T) {
@@ -246,12 +248,12 @@ func TestIsLocalRef(t *testing.T) {
 		{"root", true},
 		{"root.backend", true},
 		{"root.hardened", true},
-		{"root.", false},           // incomplete
-		{"rootish", false},         // not "root" or "root."
-		{"./root", false},          // file path
-		{"../root", false},         // file path
-		{"/root", false},           // absolute path
-		{"other.toml", false},      // file without prefix
+		{"root.", false},            // incomplete
+		{"rootish", false},          // not "root" or "root."
+		{"./root", false},           // file path
+		{"../root", false},          // file path
+		{"/root", false},            // absolute path
+		{"other.toml", false},       // file without prefix
 		{"./file.toml#root", false}, // file with fragment
 	}
 
@@ -291,4 +293,3 @@ func TestSplitFileAndFragment(t *testing.T) {
 		})
 	}
 }
-

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/happycollision/ribbin/internal/testsafety"
+
 	"github.com/happycollision/ribbin/internal/config"
 )
 
@@ -25,6 +27,43 @@ func TestSidecarPath(t *testing.T) {
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)
 	}
+}
+
+func TestHasSidecar(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("returns false when no sidecar exists", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "no-sidecar")
+		if err := os.WriteFile(binPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+			t.Fatalf("failed to create binary: %v", err)
+		}
+
+		if HasSidecar(binPath) {
+			t.Error("HasSidecar should return false when sidecar doesn't exist")
+		}
+	})
+
+	t.Run("returns true when sidecar exists", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "with-sidecar")
+		sidecarPath := binPath + ".ribbin-original"
+
+		// Create the sidecar file
+		if err := os.WriteFile(sidecarPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+			t.Fatalf("failed to create sidecar: %v", err)
+		}
+
+		if !HasSidecar(binPath) {
+			t.Error("HasSidecar should return true when sidecar exists")
+		}
+	})
+
+	t.Run("returns false for nonexistent path", func(t *testing.T) {
+		binPath := filepath.Join(tmpDir, "nonexistent")
+
+		if HasSidecar(binPath) {
+			t.Error("HasSidecar should return false for nonexistent path")
+		}
+	})
 }
 
 func TestInstall(t *testing.T) {

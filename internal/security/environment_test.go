@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestValidateHomeDir(t *testing.T) {

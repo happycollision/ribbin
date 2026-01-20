@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestIsCriticalSystemBinary(t *testing.T) {
@@ -182,9 +184,9 @@ func TestIsAllowedDirectory(t *testing.T) {
 
 func TestRequiresConfirmation(t *testing.T) {
 	tests := []struct {
-		name        string
-		path        string
-		requires    bool
+		name     string
+		path     string
+		requires bool
 	}{
 		{
 			name:     "usr local bin requires confirmation",

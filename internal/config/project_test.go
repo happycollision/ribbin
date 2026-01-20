@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestFindProjectConfig(t *testing.T) {

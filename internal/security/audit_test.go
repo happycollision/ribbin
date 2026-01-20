@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestGetAuditLogPath(t *testing.T) {

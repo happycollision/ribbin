@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/happycollision/ribbin/internal/testsafety"
+
 	"github.com/happycollision/ribbin/internal/config"
 )
 

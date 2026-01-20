@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestVerboseLog(t *testing.T) {

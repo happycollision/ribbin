@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestRegistryPath(t *testing.T) {
@@ -215,7 +217,7 @@ func TestPruneDeadActivations(t *testing.T) {
 	registry := &Registry{
 		Shims: make(map[string]ShimEntry),
 		Activations: map[int]ActivationEntry{
-			1:        {PID: 1, ActivatedAt: time.Now()},       // PID 1 always exists
+			1:        {PID: 1, ActivatedAt: time.Now()},        // PID 1 always exists
 			99999999: {PID: 99999999, ActivatedAt: time.Now()}, // Very unlikely to exist
 		},
 		GlobalOn: false,

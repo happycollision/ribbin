@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestValidateBinaryPath_PathTraversal(t *testing.T) {
@@ -348,7 +350,7 @@ func TestIsWithinDirectory_SymlinkEscape(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		len(s) > len(substr)+1 && containsInner(s[1:len(s)-1], substr)))
+			len(s) > len(substr)+1 && containsInner(s[1:len(s)-1], substr)))
 }
 
 func containsInner(s, substr string) bool {

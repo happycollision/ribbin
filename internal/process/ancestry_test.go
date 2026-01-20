@@ -5,6 +5,8 @@ package process
 import (
 	"os"
 	"testing"
+
+	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
 func TestIsDescendantOf(t *testing.T) {
