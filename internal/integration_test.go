@@ -12,7 +12,7 @@ import (
 	_ "github.com/happycollision/ribbin/internal/testsafety"
 
 	"github.com/happycollision/ribbin/internal/config"
-	"github.com/happycollision/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/wrap"
 )
 
 // TestFullShimCycle tests the complete shim install/activate/block/uninstall workflow
@@ -98,7 +98,7 @@ paths = ["` + testBinaryPath + `"]
 		GlobalActive:    false,
 	}
 
-	if err := shim.Install(testBinaryPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(testBinaryPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)
 	}
 	t.Log("Step 3: Installed shim")
@@ -146,7 +146,7 @@ paths = ["` + testBinaryPath + `"]
 	t.Log("Step 5: Tested shimmed command execution")
 
 	// Step 6: Uninstall shim
-	if err := shim.Uninstall(testBinaryPath, registry); err != nil {
+	if err := wrap.Uninstall(testBinaryPath, registry); err != nil {
 		t.Fatalf("failed to uninstall shim: %v", err)
 	}
 	t.Log("Step 6: Uninstalled shim")
@@ -310,7 +310,7 @@ paths = ["` + testCmdPath + `"]
 		GlobalActive:    false,
 	}
 
-	if err := shim.Install(testCmdPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(testCmdPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)
 	}
 
@@ -538,7 +538,7 @@ paths = ["` + nodeShimPath + `"]
 		GlobalActive:    false,
 	}
 
-	if err := shim.Install(nodeShimPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(nodeShimPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)
 	}
 
@@ -596,7 +596,7 @@ paths = ["` + nodeShimPath + `"]
 	t.Logf("Test 2 PASSED - Bypass works: %s", output)
 
 	// Unshim and verify restoration
-	if err := shim.Uninstall(nodeShimPath, registry); err != nil {
+	if err := wrap.Uninstall(nodeShimPath, registry); err != nil {
 		t.Fatalf("failed to uninstall shim: %v", err)
 	}
 
@@ -739,7 +739,7 @@ paths = ["` + nodeShimPath + `"]
 		GlobalActive:    false,
 	}
 
-	if err := shim.Install(nodeShimPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(nodeShimPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim on asdf node: %v", err)
 	}
 
@@ -810,7 +810,7 @@ paths = ["` + nodeShimPath + `"]
 	t.Logf("Test 2 PASSED - Bypass works: %s", output)
 
 	// Unshim and verify asdf shim is restored
-	if err := shim.Uninstall(nodeShimPath, registry); err != nil {
+	if err := wrap.Uninstall(nodeShimPath, registry); err != nil {
 		t.Fatalf("failed to uninstall shim: %v", err)
 	}
 
@@ -1084,7 +1084,7 @@ message = "Use 'bun' instead"
 		GlobalActive:    true, // Enable globally for this test
 	}
 
-	if err := shim.Install(miseNodeShim, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(miseNodeShim, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)
 	}
 
@@ -1215,7 +1215,7 @@ exit 0
 		GlobalActive:    true, // Enable globally
 	}
 
-	if err := shim.Install(echoCmdPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(echoCmdPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)
 	}
 
@@ -1724,7 +1724,7 @@ action = "passthrough"
 		ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		GlobalActive:    true,
 	}
-	if err := shim.Install(npmPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(npmPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)
 	}
 

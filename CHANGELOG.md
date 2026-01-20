@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Helper methods added: `AddConfigActivation`, `RemoveConfigActivation`, `AddShellActivation`, `RemoveShellActivation`, `ClearConfigActivations`, `ClearShellActivations`
 - Config struct: `ShimConfig` → `WrapperConfig` (with alias for backwards compatibility)
 - TOML tags: `[shims.*]` → `[wrappers.*]` throughout codebase
+- Package rename: `internal/shim` → `internal/wrap`
 - `make release VERSION=x.y.z` command to automate releases
 - GitHub release notes now include installation instructions and changelog content
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/happycollision/ribbin/internal/config"
 	"github.com/happycollision/ribbin/internal/security"
-	"github.com/happycollision/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/wrap"
 	"github.com/spf13/cobra"
 )
 
@@ -73,7 +73,7 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get bin directories: %w", err)
 		}
-		sidecars, err := shim.FindSidecars(binDirs)
+		sidecars, err := wrap.FindSidecars(binDirs)
 		if err != nil {
 			return fmt.Errorf("failed to search for sidecars: %w", err)
 		}
@@ -111,7 +111,7 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 				path, err := exec.LookPath(commandName)
 				if err == nil {
 					// Only add if it looks like it was shimmed (has sidecar)
-					if shim.HasSidecar(path) {
+					if wrap.HasSidecar(path) {
 						pathsToUnshim = append(pathsToUnshim, path)
 					}
 				}
@@ -129,7 +129,7 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 
 	// Unshim each path
 	for _, path := range pathsToUnshim {
-		err := shim.Uninstall(path, registry)
+		err := wrap.Uninstall(path, registry)
 		if err != nil {
 			if strings.Contains(err.Error(), "sidecar not found") {
 				fmt.Printf("Skipped %s: not shimmed\n", path)

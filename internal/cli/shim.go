@@ -7,7 +7,7 @@ import (
 
 	"github.com/happycollision/ribbin/internal/config"
 	"github.com/happycollision/ribbin/internal/security"
-	"github.com/happycollision/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/wrap"
 	"github.com/spf13/cobra"
 )
 
@@ -97,9 +97,9 @@ Examples:
 		for name, shimCfg := range projectConfig.Wrappers {
 			var paths []string
 
-			// If Paths is empty, resolve via shim.ResolveCommand
+			// If Paths is empty, resolve via wrap.ResolveCommand
 			if len(shimCfg.Paths) == 0 {
-				resolvedPath, err := shim.ResolveCommand(name)
+				resolvedPath, err := wrap.ResolveCommand(name)
 				if err != nil {
 					fmt.Printf("Warning: command '%s' not found in PATH, skipping\n", name)
 					continue
@@ -163,7 +163,7 @@ Examples:
 				}
 
 				// Check if already shimmed
-				alreadyShimmed, err := shim.IsAlreadyShimmed(path)
+				alreadyShimmed, err := wrap.IsAlreadyShimmed(path)
 				if err != nil {
 					fmt.Printf("Warning: could not check if '%s' is shimmed: %v\n", path, err)
 					continue
@@ -175,7 +175,7 @@ Examples:
 				}
 
 				// Install shim
-				if err := shim.Install(path, ribbinPath, registry, configPath); err != nil {
+				if err := wrap.Install(path, ribbinPath, registry, configPath); err != nil {
 					fmt.Printf("Failed to shim '%s': %v\n", path, err)
 					failed++
 					continue

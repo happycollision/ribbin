@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/happycollision/ribbin/internal/cli"
-	"github.com/happycollision/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/wrap"
 )
 
 // resolveInPath looks up a command name in PATH and returns the full path
@@ -36,7 +36,7 @@ func main() {
 				shimPath = resolved
 			}
 		}
-		if err := shim.Run(shimPath, os.Args[1:]); err != nil {
+		if err := wrap.Run(shimPath, os.Args[1:]); err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", execName, err)
 			os.Exit(1)
 		}

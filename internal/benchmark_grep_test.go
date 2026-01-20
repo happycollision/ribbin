@@ -14,7 +14,7 @@ import (
 	_ "github.com/happycollision/ribbin/internal/testsafety"
 
 	"github.com/happycollision/ribbin/internal/config"
-	"github.com/happycollision/ribbin/internal/shim"
+	"github.com/happycollision/ribbin/internal/wrap"
 )
 
 // BenchmarkShimOverheadGrep measures the overhead of having a ribbin shim in place
@@ -113,7 +113,7 @@ message = ""
 	}
 
 	// Install shim
-	if err := shim.Install(grepPath, ribbinPath, registry, configPath); err != nil {
+	if err := wrap.Install(grepPath, ribbinPath, registry, configPath); err != nil {
 		b.Fatalf("failed to install shim: %v", err)
 	}
 
@@ -158,7 +158,7 @@ message = ""
 	})
 
 	// Uninstall shim for comparison
-	if err := shim.Uninstall(grepPath, registry); err != nil {
+	if err := wrap.Uninstall(grepPath, registry); err != nil {
 		b.Fatalf("failed to uninstall shim: %v", err)
 	}
 
