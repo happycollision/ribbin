@@ -20,9 +20,58 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Build release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME}"
+
+          # Extract changelog content
+          CHANGELOG=$(./scripts/extract-changelog.sh "$VERSION" || echo "No changelog entry found.")
+
+          # Build the complete release notes
+          cat > /tmp/release-notes.md << RELEASE_EOF
+          ## Installation
+
+          ### Quick Install (macOS/Linux)
+
+          \`\`\`bash
+          curl -fsSL https://raw.githubusercontent.com/happycollision/ribbin/main/install.sh | bash
+          \`\`\`
+
+          ### Manual Download
+
+          Download the appropriate archive for your platform from the assets below, extract it, and add \`ribbin\` to your PATH.
+
+          ### From Source
+
+          \`\`\`bash
+          go install github.com/happycollision/ribbin/cmd/ribbin@${TAG}
+          \`\`\`
+
+          ---
+
+          ## What's Changed
+
+          ${CHANGELOG}
+
+          ---
+
+          **Full Changelog**: https://github.com/happycollision/ribbin/blob/main/CHANGELOG.md
+          RELEASE_EOF
+
+          # Remove leading indentation from heredoc
+          sed -i 's/^          //' /tmp/release-notes.md
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
+
+      - name: Update release with notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref_name }}" --notes-file /tmp/release-notes.md

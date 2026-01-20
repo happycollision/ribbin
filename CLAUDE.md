@@ -84,6 +84,22 @@ Inside the scenario shell, ribbin is pre-installed and you can test shim/unshim/
 
 Scenario files are in `scripts/scenarios/`.
 
+## Releasing
+
+To create a new release:
+
+```bash
+make release VERSION=0.1.0-alpha.6
+```
+
+This will:
+1. Update CHANGELOG.md (move Unreleased content to new version section)
+2. Commit the changelog update
+3. Create and push the git tag
+4. Trigger GitHub Actions to build and publish the release
+
+The release script validates semver format and checks for uncommitted changes before proceeding.
+
 ## Project Status
 
 Implementation in progress. See Plan.md for design notes.

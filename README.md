@@ -308,6 +308,28 @@ action = "block"
 message = "Use 'bat' or the Read tool for file contents"
 ```
 
+## Contributing
+
+### Releasing
+
+To create a new release:
+
+```bash
+make release VERSION=0.1.0
+```
+
+This will:
+1. Validate the version format (semver)
+2. Update CHANGELOG.md (move Unreleased content to new version)
+3. Commit the changelog update
+4. Create and push the git tag
+5. Trigger GitHub Actions to build binaries and publish the release
+
+**Prerequisites:**
+- No uncommitted changes
+- Content in the `[Unreleased]` section of CHANGELOG.md
+- Valid semver version (e.g., `1.0.0`, `0.1.0-alpha.1`)
+
 ## License
 
 MIT

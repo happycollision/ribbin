@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+- `make release VERSION=x.y.z` command to automate releases
+- GitHub release notes now include installation instructions and changelog content
+
+## [0.1.0-alpha.5] - 2026-01-20
+
 ### Added
 - **Local Development Mode**: When ribbin is installed as a dev dependency (e.g., in `node_modules/.bin/`), it automatically restricts shimming to binaries within the same git repository. This protects against malicious packages attempting to shim system binaries.
 - **Interactive scenario testing**: `make scenario` launches isolated Docker environments for testing ribbin configurations without affecting the host system. Available scenarios: `basic`, `local-dev-mode`, `mixed-permissions`, `scopes`, `extends`.

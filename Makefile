@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage test-integration test-host benchmark benchmark-grep benchmark-all benchmark-full scenario clean
+.PHONY: build install test test-coverage test-integration test-host benchmark benchmark-grep benchmark-all benchmark-full scenario release clean
 
 BINARY_NAME=ribbin
 BUILD_DIR=bin
@@ -66,6 +66,14 @@ benchmark-full:
 scenario:
 	docker build -f Dockerfile.scenario -t ribbin-scenario .
 	-docker run --rm -it -e SCENARIO=$(SCENARIO) ribbin-scenario
+
+# Create a new release
+# Usage: make release VERSION=0.1.0-alpha.6
+release:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release VERSION=0.1.0-alpha.6)
+endif
+	./scripts/release.sh $(VERSION)
 
 clean:
 	rm -rf $(BUILD_DIR)
