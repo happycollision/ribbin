@@ -32,27 +32,27 @@ git config user.name "Tester"
 # Create a ribbin.toml with mixed permission levels
 cat > ribbin.toml << EOF
 # Mixed permissions scenario
-# This config has shims targeting different permission levels
+# This config has wrappers targeting different permission levels
 
 # ALLOWED: ~/.local/bin - no confirmation needed
-[shims.my-tool]
+[wrappers.my-tool]
 action = "block"
 message = "Use 'npm run tool' instead"
 paths = ["$LOCAL_BIN/my-tool"]
 
 # ALLOWED: /usr/local/bin - no confirmation needed
-[shims.jq]
+[wrappers.jq]
 action = "warn"
 message = "Consider using gojq for better performance"
 # Will resolve from PATH to /usr/local/bin/jq (allowed)
 
 # REQUIRES CONFIRMATION: /bin, /usr/bin - needs --confirm-system-dir
-[shims.cat]
+[wrappers.cat]
 action = "block"
 message = "Use bat instead"
 # Will resolve from PATH to /bin/cat (requires confirmation)
 
-[shims.ls]
+[wrappers.ls]
 action = "warn"
 message = "Use exa for better output"
 # Will resolve from PATH to /bin/ls (requires confirmation)
@@ -93,30 +93,30 @@ This scenario demonstrates ribbin's permission levels:
 
 1. Run without confirmation flag:
    ```
-   ribbin shim
+   ribbin wrap
    ```
    Only `my-tool` and `jq` should succeed. `cat` and `ls` will fail.
 
 2. Run with confirmation flag:
    ```
-   ribbin shim --confirm-system-dir
+   ribbin wrap --confirm-system-dir
    ```
-   Now `cat` and `ls` will also be shimmed (we're root in Docker).
+   Now `cat` and `ls` will also be wrapped (we're root in Docker).
 
-3. Check what got shimmed:
+3. Check what got wrapped:
    ```
    ls -la ~/.local/bin/
    ls -la /bin/cat /bin/ls
    ```
 
-4. Unshim everything:
+4. Unwrap everything:
    ```
-   ribbin unshim
+   ribbin unwrap
    ```
 
 ## Key insight:
 
-ribbin allows shimming system directories with explicit confirmation.
+ribbin allows wrapping system directories with explicit confirmation.
 Critical binaries (bash, sudo, ssh, etc.) are always blocked by name,
 regardless of the --confirm-system-dir flag.
 EOF
@@ -137,11 +137,11 @@ echo "  ALLOWED:              jq      -> /usr/local/bin/jq"
 echo "  REQUIRES CONFIRMATION: cat     -> /bin/cat"
 echo "  REQUIRES CONFIRMATION: ls      -> /bin/ls"
 echo ""
-echo "Try: ribbin shim"
+echo "Try: ribbin wrap"
 echo "  - my-tool and jq will succeed (allowed directories)"
 echo "  - cat and ls will fail (need --confirm-system-dir)"
 echo ""
-echo "Then try: ribbin shim --confirm-system-dir"
+echo "Then try: ribbin wrap --confirm-system-dir"
 echo "  - All four will succeed"
 echo ""
 echo "Type 'exit' to leave the scenario."

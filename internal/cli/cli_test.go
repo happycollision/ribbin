@@ -82,7 +82,7 @@ func createTestConfig(t *testing.T, dir string, content string) string {
 func TestRootCommand(t *testing.T) {
 	// Test that root command has expected subcommands
 	subcommands := rootCmd.Commands()
-	expectedCmds := []string{"shim", "unshim", "activate", "on", "off"}
+	expectedCmds := []string{"wrap", "unwrap", "activate", "deactivate", "status", "recover"}
 
 	cmdNames := make(map[string]bool)
 	for _, cmd := range subcommands {
@@ -96,16 +96,24 @@ func TestRootCommand(t *testing.T) {
 	}
 }
 
-func TestOnCommand(t *testing.T) {
+func TestActivateGlobalCommand(t *testing.T) {
 	tempHome, _, cleanup := setupTestEnv(t)
 	defer cleanup()
 
-	t.Run("enables shims when disabled", func(t *testing.T) {
+	// Reset flags before each test
+	resetActivateFlags := func() {
+		activateConfig = false
+		activateShell = false
+		activateGlobal = false
+	}
+
+	t.Run("enables global activation when disabled", func(t *testing.T) {
+		resetActivateFlags()
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    false,
+			GlobalActive:      false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -114,7 +122,8 @@ func TestOnCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		onCmd.Run(onCmd, []string{})
+		activateGlobal = true
+		activateCmd.Run(activateCmd, []string{})
 
 		w.Close()
 		os.Stdout = oldStdout
@@ -124,22 +133,23 @@ func TestOnCommand(t *testing.T) {
 		output := buf.String()
 
 		if output == "" {
-			t.Error("expected output from on command")
+			t.Error("expected output from activate --global command")
 		}
 
 		// Verify registry was updated
 		loaded, _ := config.LoadRegistry()
 		if !loaded.GlobalActive {
-			t.Error("GlobalActive should be true after 'on' command")
+			t.Error("GlobalActive should be true after 'activate --global' command")
 		}
 	})
 
-	t.Run("reports already enabled", func(t *testing.T) {
+	t.Run("reports already globally active", func(t *testing.T) {
+		resetActivateFlags()
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    true,
+			GlobalActive:      true,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -147,7 +157,8 @@ func TestOnCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		onCmd.Run(onCmd, []string{})
+		activateGlobal = true
+		activateCmd.Run(activateCmd, []string{})
 
 		w.Close()
 		os.Stdout = oldStdout
@@ -157,21 +168,31 @@ func TestOnCommand(t *testing.T) {
 		output := buf.String()
 
 		if output == "" {
-			t.Error("expected output about already enabled")
+			t.Error("expected output about already globally active")
 		}
 	})
 }
 
-func TestOffCommand(t *testing.T) {
+func TestDeactivateGlobalCommand(t *testing.T) {
 	tempHome, _, cleanup := setupTestEnv(t)
 	defer cleanup()
 
-	t.Run("disables shims when enabled", func(t *testing.T) {
+	// Reset flags before each test
+	resetDeactivateFlags := func() {
+		deactivateConfig = false
+		deactivateShell = false
+		deactivateGlobal = false
+		deactivateAll = false
+		deactivateEverything = false
+	}
+
+	t.Run("disables global when enabled", func(t *testing.T) {
+		resetDeactivateFlags()
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    true,
+			GlobalActive:      true,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -179,7 +200,8 @@ func TestOffCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		offCmd.Run(offCmd, []string{})
+		deactivateGlobal = true
+		deactivateCmd.Run(deactivateCmd, []string{})
 
 		w.Close()
 		os.Stdout = oldStdout
@@ -190,16 +212,17 @@ func TestOffCommand(t *testing.T) {
 		// Verify registry was updated
 		loaded, _ := config.LoadRegistry()
 		if loaded.GlobalActive {
-			t.Error("GlobalActive should be false after 'off' command")
+			t.Error("GlobalActive should be false after 'deactivate --global' command")
 		}
 	})
 
 	t.Run("reports already disabled", func(t *testing.T) {
+		resetDeactivateFlags()
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    false,
+			GlobalActive:      false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -207,7 +230,8 @@ func TestOffCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		offCmd.Run(offCmd, []string{})
+		deactivateGlobal = true
+		deactivateCmd.Run(deactivateCmd, []string{})
 
 		w.Close()
 		os.Stdout = oldStdout
@@ -222,16 +246,24 @@ func TestOffCommand(t *testing.T) {
 	})
 }
 
-func TestActivateCommand(t *testing.T) {
+func TestActivateShellCommand(t *testing.T) {
 	tempHome, _, cleanup := setupTestEnv(t)
 	defer cleanup()
 
+	// Reset flags before each test
+	resetActivateFlags := func() {
+		activateConfig = false
+		activateShell = false
+		activateGlobal = false
+	}
+
 	t.Run("activates for current shell", func(t *testing.T) {
+		resetActivateFlags()
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    false,
+			GlobalActive:      false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -239,6 +271,7 @@ func TestActivateCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
+		activateShell = true
 		activateCmd.Run(activateCmd, []string{})
 
 		w.Close()
@@ -255,7 +288,8 @@ func TestActivateCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("is idempotent", func(t *testing.T) {
+	t.Run("is idempotent for shell activation", func(t *testing.T) {
+		resetActivateFlags()
 		ppid := os.Getppid()
 		registry := &config.Registry{
 			Wrappers: make(map[string]config.WrapperEntry),
@@ -271,6 +305,7 @@ func TestActivateCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
+		activateShell = true
 		activateCmd.Run(activateCmd, []string{})
 
 		w.Close()
@@ -283,6 +318,100 @@ func TestActivateCommand(t *testing.T) {
 		// Should report already activated
 		if output == "" {
 			t.Error("expected output about already activated")
+		}
+	})
+}
+
+func TestDeactivateEverything(t *testing.T) {
+	tempHome, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	// Reset flags before each test
+	resetDeactivateFlags := func() {
+		deactivateConfig = false
+		deactivateShell = false
+		deactivateGlobal = false
+		deactivateAll = false
+		deactivateEverything = false
+	}
+
+	t.Run("clears all activation state", func(t *testing.T) {
+		resetDeactivateFlags()
+		registry := &config.Registry{
+			Wrappers: make(map[string]config.WrapperEntry),
+			ShellActivations: map[int]config.ShellActivationEntry{
+				12345: {PID: 12345},
+			},
+			ConfigActivations: map[string]config.ConfigActivationEntry{
+				"/some/config.toml": {},
+			},
+			GlobalActive: true,
+		}
+		createTestRegistry(t, tempHome, registry)
+
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		deactivateEverything = true
+		deactivateCmd.Run(deactivateCmd, []string{})
+
+		w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		buf.ReadFrom(r)
+
+		// Verify everything was cleared
+		loaded, _ := config.LoadRegistry()
+		if loaded.GlobalActive {
+			t.Error("GlobalActive should be false after --everything")
+		}
+		if len(loaded.ShellActivations) != 0 {
+			t.Error("ShellActivations should be empty after --everything")
+		}
+		if len(loaded.ConfigActivations) != 0 {
+			t.Error("ConfigActivations should be empty after --everything")
+		}
+	})
+}
+
+func TestStatusCommand(t *testing.T) {
+	tempHome, _, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	t.Run("displays status", func(t *testing.T) {
+		registry := &config.Registry{
+			Wrappers:          make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      false,
+		}
+		createTestRegistry(t, tempHome, registry)
+
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		statusCmd.Run(statusCmd, []string{})
+
+		w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		buf.ReadFrom(r)
+		output := buf.String()
+
+		if output == "" {
+			t.Error("expected output from status command")
+		}
+
+		// Check for expected sections
+		if !bytes.Contains([]byte(output), []byte("Ribbin Status")) {
+			t.Error("expected 'Ribbin Status' header in output")
+		}
+		if !bytes.Contains([]byte(output), []byte("Activation:")) {
+			t.Error("expected 'Activation:' section in output")
 		}
 	})
 }
@@ -308,4 +437,100 @@ func TestCommonBinDirs(t *testing.T) {
 	if !found["/usr/local/bin"] {
 		t.Error("should include /usr/local/bin")
 	}
+}
+
+func TestPrintGlobalWarningIfActive(t *testing.T) {
+	t.Run("prints warning when global is active", func(t *testing.T) {
+		tempHome, _, cleanup := setupTestEnv(t)
+		defer cleanup()
+
+		registry := &config.Registry{
+			Wrappers:          make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      true,
+		}
+		createTestRegistry(t, tempHome, registry)
+
+		// Capture stderr
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		printGlobalWarningIfActive()
+
+		w.Close()
+		os.Stderr = oldStderr
+
+		var buf bytes.Buffer
+		buf.ReadFrom(r)
+		output := buf.String()
+
+		if output == "" {
+			t.Error("expected warning output when global is active")
+		}
+		if !bytes.Contains([]byte(output), []byte("GLOBAL MODE ACTIVE")) {
+			t.Error("expected 'GLOBAL MODE ACTIVE' in warning output")
+		}
+		if !bytes.Contains([]byte(output), []byte("deactivate --global")) {
+			t.Error("expected deactivation hint in warning output")
+		}
+	})
+
+	t.Run("prints nothing when global is inactive", func(t *testing.T) {
+		tempHome, _, cleanup := setupTestEnv(t)
+		defer cleanup()
+
+		registry := &config.Registry{
+			Wrappers:          make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      false,
+		}
+		createTestRegistry(t, tempHome, registry)
+
+		// Capture stderr
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		printGlobalWarningIfActive()
+
+		w.Close()
+		os.Stderr = oldStderr
+
+		var buf bytes.Buffer
+		buf.ReadFrom(r)
+		output := buf.String()
+
+		if output != "" {
+			t.Errorf("expected no output when global is inactive, got: %q", output)
+		}
+	})
+
+	t.Run("handles missing registry gracefully", func(t *testing.T) {
+		_, _, cleanup := setupTestEnv(t)
+		defer cleanup()
+
+		// Don't create a registry - it won't exist
+
+		// Capture stderr
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		printGlobalWarningIfActive()
+
+		w.Close()
+		os.Stderr = oldStderr
+
+		var buf bytes.Buffer
+		buf.ReadFrom(r)
+		output := buf.String()
+
+		// Should not print anything when registry doesn't exist
+		if output != "" {
+			t.Errorf("expected no output when registry doesn't exist, got: %q", output)
+		}
+	})
 }

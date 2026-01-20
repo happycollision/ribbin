@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: Scopes - different shim configs for different directories
+# Description: Scopes - different wrapper configs for different directories
 
 set -e
 
@@ -13,7 +13,7 @@ echo ""
 mkdir -p "$LOCAL_BIN"
 export PATH="$LOCAL_BIN:$PATH"
 
-# Create local tools that we can shim
+# Create local tools that we can wrap
 for tool in my-npm my-yarn my-pnpm my-rm; do
     cat > "$LOCAL_BIN/$tool" << EOF
 #!/bin/bash
@@ -34,19 +34,19 @@ git config user.name "Tester"
 # Create a ribbin.toml with scoped configurations
 cat > ribbin.toml << EOF
 # Scopes demonstration
-# Different directories get different shim rules
+# Different directories get different wrapper rules
 
 # ============================================
-# ROOT LEVEL SHIMS
+# ROOT LEVEL WRAPPERS
 # These apply everywhere unless overridden
 # ============================================
 
-[shims.my-npm]
+[wrappers.my-npm]
 action = "block"
 message = "Use 'pnpm' instead of npm"
 paths = ["$LOCAL_BIN/my-npm"]
 
-[shims.my-rm]
+[wrappers.my-rm]
 action = "warn"
 message = "Be careful with rm!"
 paths = ["$LOCAL_BIN/my-rm"]
@@ -136,9 +136,9 @@ scenario/
 
 ## Try these commands:
 
-1. Install shims and activate:
+1. Install wrappers and activate:
    ```
-   ribbin shim && ribbin on
+   ribbin wrap && ribbin activate --global
    ```
 
 2. Test from project root:
@@ -214,7 +214,7 @@ echo "  ./apps/backend/       (backend scope - npm allowed)"
 echo "  ./packages/shared/    (shared scope - strictest)"
 echo ""
 echo "Quick start:"
-echo "  1. ribbin shim && ribbin on"
+echo "  1. ribbin wrap && ribbin activate --global"
 echo "  2. my-npm install        # blocked at root"
 echo "  3. cd apps/backend"
 echo "  4. my-npm install        # allowed! (backend overrides)"

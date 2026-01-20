@@ -13,7 +13,7 @@ echo ""
 mkdir -p "$LOCAL_BIN"
 export PATH="$LOCAL_BIN:$PATH"
 
-# Create local tools that we can shim
+# Create local tools that we can wrap
 for tool in my-rm my-curl my-wget my-ssh my-docker my-kubectl; do
     cat > "$LOCAL_BIN/$tool" << EOF
 #!/bin/bash
@@ -36,17 +36,17 @@ cat > team-configs/security-baseline.toml << EOF
 # Team security baseline - shared across projects
 # Other configs can extend this file
 
-[shims.my-rm]
+[wrappers.my-rm]
 action = "block"
 message = "Use trash-cli for safety"
 paths = ["$LOCAL_BIN/my-rm"]
 
-[shims.my-curl]
+[wrappers.my-curl]
 action = "warn"
 message = "Prefer httpie for better security headers"
 paths = ["$LOCAL_BIN/my-curl"]
 
-[shims.my-wget]
+[wrappers.my-wget]
 action = "warn"
 message = "Use curl or httpie instead"
 paths = ["$LOCAL_BIN/my-wget"]
@@ -57,17 +57,17 @@ cat > team-configs/production-hardened.toml << EOF
 # Production hardening rules
 # Use in addition to security baseline
 
-[shims.my-ssh]
+[wrappers.my-ssh]
 action = "warn"
 message = "Ensure you're using the correct SSH key for production"
 paths = ["$LOCAL_BIN/my-ssh"]
 
-[shims.my-docker]
+[wrappers.my-docker]
 action = "warn"
 message = "Double-check you're targeting the right registry"
 paths = ["$LOCAL_BIN/my-docker"]
 
-[shims.my-kubectl]
+[wrappers.my-kubectl]
 action = "warn"
 message = "Verify KUBECONFIG is set to the correct cluster"
 paths = ["$LOCAL_BIN/my-kubectl"]
@@ -156,7 +156,7 @@ This scenario demonstrates ribbin's `extends` feature for config inheritance.
    extends = ["root.development"]  # Reference internal mixin
    ```
 
-3. **Root keyword** - Inherit from root-level shims
+3. **Root keyword** - Inherit from root-level wrappers
    ```toml
    extends = ["root"]
    ```
@@ -187,9 +187,9 @@ scenario/
 
 ## Try these commands:
 
-1. Install shims and activate:
+1. Install wrappers and activate:
    ```
-   ribbin shim && ribbin on
+   ribbin wrap && ribbin activate --global
    ```
 
 2. Check effective config at root:
@@ -261,7 +261,7 @@ echo "  projects/web-app extends baseline + development"
 echo "  projects/data-pipeline extends baseline + production"
 echo ""
 echo "Quick start:"
-echo "  1. ribbin shim && ribbin on"
+echo "  1. ribbin wrap && ribbin activate --global"
 echo "  2. cd projects/web-app && ribbin config show"
 echo "  3. cd ../data-pipeline && ribbin config show"
 echo ""

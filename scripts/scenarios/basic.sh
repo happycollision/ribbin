@@ -54,33 +54,33 @@ git init -q
 git config user.email "tester@example.com"
 git config user.name "Tester"
 
-# Create a ribbin.toml with various shim examples
+# Create a ribbin.toml with various wrapper examples
 # Using explicit paths to our local wrappers
 cat > ribbin.toml << EOF
 # Example ribbin configuration for testing
 # Try running blocked commands to see ribbin in action!
 
 # Block direct npm usage - this project uses pnpm
-[shims.mynpm]
+[wrappers.mynpm]
 action = "block"
 message = "This project uses pnpm. Run 'pnpm install' or 'pnpm add <pkg>' instead."
 paths = ["$LOCAL_BIN/mynpm"]
 
 # Block direct tsc usage - enforce project script
-[shims.tsc]
+[wrappers.tsc]
 action = "block"
 message = "Use 'pnpm run typecheck' instead of direct tsc"
 paths = ["$LOCAL_BIN/tsc"]
 
 # Redirect myecho to a custom script (for demonstration)
-[shims.myecho]
+[wrappers.myecho]
 action = "redirect"
 redirect = "./scripts/fancy-echo.sh"
 message = "Using fancy echo wrapper"
 paths = ["$LOCAL_BIN/myecho"]
 
 # Block mycurl - use the project's API client
-[shims.mycurl]
+[wrappers.mycurl]
 action = "block"
 message = "Use the project's API client at ./scripts/api.sh instead"
 paths = ["$LOCAL_BIN/mycurl"]
@@ -107,11 +107,11 @@ EOF
 cat > README.md << 'EOF'
 # Test Project
 
-This is a sample project for testing ribbin shims.
+This is a sample project for testing ribbin wrappers.
 
 ## Local Wrapper Commands
 
-These are local wrappers in ~/.local/bin that ribbin can safely shim:
+These are local wrappers in ~/.local/bin that ribbin can safely wrap:
 - `mynpm` - fake npm (will be blocked, suggests pnpm)
 - `tsc` - fake TypeScript compiler (will be blocked)
 - `myecho` - wrapper for echo (will be redirected)
@@ -119,7 +119,7 @@ These are local wrappers in ~/.local/bin that ribbin can safely shim:
 
 ## Try these steps:
 
-1. First, test the commands work without shims:
+1. First, test the commands work without wrappers:
    ```
    mynpm install
    tsc --version
@@ -131,14 +131,14 @@ These are local wrappers in ~/.local/bin that ribbin can safely shim:
    ribbin config show
    ```
 
-3. Install the shims:
+3. Install the wrappers:
    ```
-   ribbin shim
+   ribbin wrap
    ```
 
-4. Enable shims globally:
+4. Activate wrappers globally:
    ```
-   ribbin on
+   ribbin activate --global
    ```
 
 5. Now try the commands again - they should be blocked/redirected:
@@ -148,9 +148,9 @@ These are local wrappers in ~/.local/bin that ribbin can safely shim:
    myecho "hello"       # Should redirect to fancy-echo.sh
    ```
 
-6. Remove shims when done:
+6. Remove wrappers when done:
    ```
-   ribbin unshim
+   ribbin unwrap
    ```
 EOF
 
@@ -163,7 +163,7 @@ echo "  Basic Scenario Ready!"
 echo "========================================"
 echo ""
 echo "Working directory: $SCENARIO_DIR"
-echo "Shim directory:    $LOCAL_BIN"
+echo "Wrapper directory: $LOCAL_BIN"
 echo ""
 echo "Local wrapper commands (in ~/.local/bin):"
 echo "  mynpm   - fake npm          (will be blocked, suggests pnpm)"
@@ -172,13 +172,13 @@ echo "  myecho  - wrapper for echo  (will be redirected)"
 echo "  mycurl  - wrapper for curl  (will be blocked)"
 echo ""
 echo "Quick start:"
-echo "  1. mynpm install           # Works normally"
-echo "  2. ribbin shim             # Install shims"
-echo "  3. ribbin on               # Enable shims globally"
-echo "  4. mynpm install           # Now blocked!"
-echo "  5. ribbin unshim           # Restore originals"
+echo "  1. mynpm install             # Works normally"
+echo "  2. ribbin wrap               # Install wrappers"
+echo "  3. ribbin activate --global  # Activate globally"
+echo "  4. mynpm install             # Now blocked!"
+echo "  5. ribbin unwrap             # Restore originals"
 echo ""
-echo "More commands: ribbin config show, ribbin --help"
+echo "More commands: ribbin config show, ribbin status, ribbin --help"
 echo ""
 echo "Type 'exit' to leave the scenario."
 echo "========================================"

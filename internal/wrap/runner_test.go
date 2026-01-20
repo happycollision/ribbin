@@ -35,33 +35,35 @@ func TestExtractCommandName(t *testing.T) {
 }
 
 func TestIsActive(t *testing.T) {
-	t.Run("returns true when GlobalActive is true", func(t *testing.T) {
+	testConfigPath := "/test/project/ribbin.toml"
+
+	t.Run("returns true when GlobalActive is true (priority 1)", func(t *testing.T) {
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    true,
+			GlobalActive:      true,
 		}
 
-		if !isActive(registry) {
+		if !isActive(registry, testConfigPath) {
 			t.Error("should be active when GlobalActive is true")
 		}
 	})
 
-	t.Run("returns false when GlobalActive is false and no activations", func(t *testing.T) {
+	t.Run("returns false when nothing is active", func(t *testing.T) {
 		registry := &config.Registry{
-			Wrappers:       make(map[string]config.WrapperEntry),
+			Wrappers:          make(map[string]config.WrapperEntry),
 			ShellActivations:  make(map[int]config.ShellActivationEntry),
 			ConfigActivations: make(map[string]config.ConfigActivationEntry),
-			GlobalActive:    false,
+			GlobalActive:      false,
 		}
 
-		if isActive(registry) {
+		if isActive(registry, testConfigPath) {
 			t.Error("should not be active when GlobalActive is false and no activations")
 		}
 	})
 
-	t.Run("returns true when ancestor PID is in activations", func(t *testing.T) {
+	t.Run("returns true when ancestor PID is in shell activations (priority 2)", func(t *testing.T) {
 		// PID 1 is always an ancestor (init/launchd)
 		registry := &config.Registry{
 			Wrappers: make(map[string]config.WrapperEntry),
@@ -72,12 +74,12 @@ func TestIsActive(t *testing.T) {
 			GlobalActive:      false,
 		}
 
-		if !isActive(registry) {
-			t.Error("should be active when PID 1 is in activations")
+		if !isActive(registry, testConfigPath) {
+			t.Error("should be active when PID 1 is in shell activations")
 		}
 	})
 
-	t.Run("returns false when non-ancestor PID is in activations", func(t *testing.T) {
+	t.Run("returns false when non-ancestor PID is in shell activations", func(t *testing.T) {
 		// Use a high PID that's unlikely to be an ancestor
 		registry := &config.Registry{
 			Wrappers: make(map[string]config.WrapperEntry),
@@ -88,8 +90,86 @@ func TestIsActive(t *testing.T) {
 			GlobalActive:      false,
 		}
 
-		if isActive(registry) {
-			t.Error("should not be active when only non-ancestor PIDs in activations")
+		if isActive(registry, testConfigPath) {
+			t.Error("should not be active when only non-ancestor PIDs in shell activations")
+		}
+	})
+
+	t.Run("returns true when config is in config activations (priority 3)", func(t *testing.T) {
+		registry := &config.Registry{
+			Wrappers:         make(map[string]config.WrapperEntry),
+			ShellActivations: make(map[int]config.ShellActivationEntry),
+			ConfigActivations: map[string]config.ConfigActivationEntry{
+				testConfigPath: {ActivatedAt: time.Now()},
+			},
+			GlobalActive: false,
+		}
+
+		if !isActive(registry, testConfigPath) {
+			t.Error("should be active when config is in config activations")
+		}
+	})
+
+	t.Run("returns false when different config is in config activations", func(t *testing.T) {
+		registry := &config.Registry{
+			Wrappers:         make(map[string]config.WrapperEntry),
+			ShellActivations: make(map[int]config.ShellActivationEntry),
+			ConfigActivations: map[string]config.ConfigActivationEntry{
+				"/other/project/ribbin.toml": {ActivatedAt: time.Now()},
+			},
+			GlobalActive: false,
+		}
+
+		if isActive(registry, testConfigPath) {
+			t.Error("should not be active when only different config is activated")
+		}
+	})
+
+	t.Run("returns false when config path is empty", func(t *testing.T) {
+		registry := &config.Registry{
+			Wrappers:         make(map[string]config.WrapperEntry),
+			ShellActivations: make(map[int]config.ShellActivationEntry),
+			ConfigActivations: map[string]config.ConfigActivationEntry{
+				testConfigPath: {ActivatedAt: time.Now()},
+			},
+			GlobalActive: false,
+		}
+
+		// Empty config path should not match anything in config activations
+		if isActive(registry, "") {
+			t.Error("should not be active when config path is empty and no other activations")
+		}
+	})
+
+	t.Run("global overrides shell activation (priority test)", func(t *testing.T) {
+		// Even with shell activation for non-ancestor, global should make it active
+		registry := &config.Registry{
+			Wrappers: make(map[string]config.WrapperEntry),
+			ShellActivations: map[int]config.ShellActivationEntry{
+				99999999: {PID: 99999999, ActivatedAt: time.Now()}, // Non-ancestor
+			},
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      true, // Global on
+		}
+
+		if !isActive(registry, testConfigPath) {
+			t.Error("global should override shell activation check")
+		}
+	})
+
+	t.Run("shell activation overrides config activation (priority test)", func(t *testing.T) {
+		// With ancestor PID in shell, should be active even without config activation
+		registry := &config.Registry{
+			Wrappers: make(map[string]config.WrapperEntry),
+			ShellActivations: map[int]config.ShellActivationEntry{
+				1: {PID: 1, ActivatedAt: time.Now()}, // Ancestor
+			},
+			ConfigActivations: make(map[string]config.ConfigActivationEntry), // No config activation
+			GlobalActive:      false,
+		}
+
+		if !isActive(registry, testConfigPath) {
+			t.Error("shell activation should work even without config activation")
 		}
 	})
 }

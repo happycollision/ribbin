@@ -36,7 +36,7 @@ func Run(argv0 string, args []string) error {
 		return execOriginal(originalPath, args)
 	}
 
-	// 4. Load registry, check if active
+	// 4. Load registry
 	registry, err := config.LoadRegistry()
 	if err != nil {
 		// If we can't load registry, passthrough
@@ -44,17 +44,17 @@ func Run(argv0 string, args []string) error {
 		return execOriginal(originalPath, args)
 	}
 
-	// 5. If not active -> passthrough
-	if !isActive(registry) {
-		verboseLogDecision(cmdName, "PASS", "ribbin not active")
-		return execOriginal(originalPath, args)
-	}
-
-	// 6. Find nearest ribbin.toml
+	// 5. Find nearest ribbin.toml (needed for activation check)
 	configPath, err := config.FindProjectConfig()
 	if err != nil || configPath == "" {
 		// No config found -> passthrough
 		verboseLogDecision(cmdName, "PASS", "no ribbin.toml found")
+		return execOriginal(originalPath, args)
+	}
+
+	// 6. Check if active using three-tier activation model
+	if !isActive(registry, configPath) {
+		verboseLogDecision(cmdName, "PASS", "ribbin not active")
 		return execOriginal(originalPath, args)
 	}
 
@@ -123,20 +123,28 @@ func Run(argv0 string, args []string) error {
 	}
 }
 
-// isActive checks if ribbin is active (global_active OR ancestor PID in shell_activations)
-func isActive(registry *config.Registry) bool {
-	// Check global_active flag
+// isActive checks if ribbin is active using three-tier activation priority:
+// Priority 1: GlobalActive - fires everything everywhere
+// Priority 2: ShellActivations - all configs fire for descendant processes
+// Priority 3: ConfigActivations - specific config fires for all shells
+func isActive(registry *config.Registry, configPath string) bool {
+	// Priority 1: Global overrides everything
 	if registry.GlobalActive {
 		return true
 	}
 
-	// Prune dead shell activations first
+	// Priority 2: Shell activation (any config fires for descendants)
 	registry.PruneDeadShellActivations()
-
-	// Check if any shell activation PID is an ancestor of this process
 	for pid := range registry.ShellActivations {
 		isDescendant, err := process.IsDescendantOf(pid)
 		if err == nil && isDescendant {
+			return true
+		}
+	}
+
+	// Priority 3: Config-specific activation
+	if configPath != "" {
+		if _, ok := registry.ConfigActivations[configPath]; ok {
 			return true
 		}
 	}

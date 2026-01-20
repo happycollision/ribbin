@@ -27,7 +27,7 @@ chmod +x "$LOCAL_BIN/ribbin"
 # Add local bin to PATH (at the front so our ribbin is found first)
 export PATH="$LOCAL_BIN:$PATH"
 
-# Create some local scripts that CAN be shimmed (inside the repo)
+# Create some local scripts that CAN be wrapped (inside the repo)
 cat > "$LOCAL_BIN/my-lint" << 'EOF'
 #!/bin/bash
 echo "Running linter..."
@@ -45,24 +45,24 @@ chmod +x "$LOCAL_BIN/my-build"
 # Create a ribbin.toml
 cat > ribbin.toml << EOF
 # Local Development Mode demo
-# ribbin is installed in node_modules/.bin, so it can only shim
+# ribbin is installed in node_modules/.bin, so it can only wrap
 # binaries within this repository.
 
 # This WILL work - my-lint is inside the repo
-[shims.my-lint]
+[wrappers.my-lint]
 action = "redirect"
 redirect = "./scripts/lint-wrapper.sh"
 message = "Using project lint wrapper"
 paths = ["$LOCAL_BIN/my-lint"]
 
 # This WILL work - my-build is inside the repo
-[shims.my-build]
+[wrappers.my-build]
 action = "block"
 message = "Use 'npm run build' instead"
 paths = ["$LOCAL_BIN/my-build"]
 
 # This will be REFUSED - cat is outside the repo (system binary)
-[shims.cat]
+[wrappers.cat]
 action = "block"
 message = "Use bat instead"
 # No paths specified - will try to resolve from PATH (system /bin/cat)
@@ -101,17 +101,17 @@ This scenario demonstrates ribbin's Local Development Mode.
 
 When ribbin is installed as a dev dependency (e.g., in `node_modules/.bin`),
 it automatically detects that it's inside a git repository and restricts
-itself to only shim binaries within that same repository.
+itself to only wrap binaries within that same repository.
 
-This protects developers from malicious packages that might try to shim
+This protects developers from malicious packages that might try to wrap
 system binaries like `cat`, `curl`, `ssh`, etc.
 
 ## In this scenario:
 
 - ribbin is installed at `./node_modules/.bin/ribbin`
-- It can shim `./node_modules/.bin/my-lint` (inside repo)
-- It can shim `./node_modules/.bin/my-build` (inside repo)
-- It CANNOT shim `/bin/cat` (outside repo - system binary)
+- It can wrap `./node_modules/.bin/my-lint` (inside repo)
+- It can wrap `./node_modules/.bin/my-build` (inside repo)
+- It CANNOT wrap `/bin/cat` (outside repo - system binary)
 
 ## Try these commands:
 
@@ -121,15 +121,15 @@ system binaries like `cat`, `curl`, `ssh`, etc.
    ribbin config show
    ```
 
-2. Try to shim everything:
+2. Try to wrap everything:
    ```
-   ribbin shim
+   ribbin wrap
    ```
    Notice that `cat` is refused because it's outside the repository.
 
-3. Enable shims and test:
+3. Activate and test:
    ```
-   ribbin on
+   ribbin activate --global
    my-lint          # Should redirect through wrapper
    my-build         # Should be blocked
    ```
@@ -137,7 +137,7 @@ system binaries like `cat`, `curl`, `ssh`, etc.
 ## Why this matters:
 
 If you `npm install malicious-package` and it includes a ribbin config
-that tries to shim `ssh` or `curl`, Local Development Mode prevents it.
+that tries to wrap `ssh` or `curl`, Local Development Mode prevents it.
 The malicious package's ribbin can only affect binaries within its own
 node_modules, not your system.
 EOF
@@ -154,20 +154,20 @@ echo "Working directory: $SCENARIO_DIR"
 echo "Ribbin location:   $LOCAL_BIN/ribbin (inside repo)"
 echo ""
 echo "This simulates ribbin installed via npm/pnpm/yarn."
-echo "Ribbin will only shim binaries INSIDE this repository."
+echo "Ribbin will only wrap binaries INSIDE this repository."
 echo ""
-echo "Local binaries (CAN be shimmed):"
+echo "Local binaries (CAN be wrapped):"
 echo "  my-lint   - will be redirected"
 echo "  my-build  - will be blocked"
 echo ""
-echo "System binaries (CANNOT be shimmed):"
+echo "System binaries (CANNOT be wrapped):"
 echo "  cat, curl, etc. - refused by Local Development Mode"
 echo ""
 echo "Quick start:"
-echo "  1. ribbin shim         # Watch 'cat' get refused"
-echo "  2. ribbin on           # Enable shims"
-echo "  3. my-build            # Blocked!"
-echo "  4. my-lint             # Redirected through wrapper"
+echo "  1. ribbin wrap               # Watch 'cat' get refused"
+echo "  2. ribbin activate --global  # Activate globally"
+echo "  3. my-build                  # Blocked!"
+echo "  4. my-lint                   # Redirected through wrapper"
 echo ""
 echo "Type 'exit' to leave the scenario."
 echo "========================================"
