@@ -43,6 +43,23 @@ message = "Use 'bat' for syntax highlighting"
 paths = ["/usr/bin/cat", "/bin/cat"]
 ```
 
+## Local Development Mode
+
+When ribbin is installed as a dev dependency (e.g., in `node_modules/.bin/`), it automatically enables **Local Development Mode**. In this mode, ribbin can only shim binaries within the same git repository.
+
+This protects developers from malicious packages that might try to shim system binaries.
+
+**Detection**: ribbin checks if its own executable is inside a git repository by walking up directories looking for `.git`.
+
+**Behavior**:
+- If ribbin is inside a git repo → can only shim binaries in that repo
+- If ribbin is NOT in a git repo (global install) → normal security rules apply
+
+This works across ecosystems:
+- npm/pnpm/yarn: `./node_modules/.bin/ribbin`
+- Python venv: `./.venv/bin/ribbin`
+- Ruby bundler: `./vendor/bundle/bin/ribbin`
+
 ## Project Status
 
 Implementation in progress. See Plan.md for design notes.

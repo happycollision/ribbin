@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage test-integration benchmark benchmark-grep benchmark-all benchmark-full clean
+.PHONY: build install test test-coverage test-integration test-host benchmark benchmark-grep benchmark-all benchmark-full clean
 
 BINARY_NAME=ribbin
 BUILD_DIR=bin
@@ -29,6 +29,11 @@ test-integration:
 test-shell:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
 	docker run --rm -it $(TEST_IMAGE) sh
+
+# Run tests on host (DANGEROUS - only for debugging, may modify system files)
+# Requires explicit opt-in via environment variable
+test-host:
+	RIBBIN_DANGEROUSLY_ALLOW_HOST_TESTS=1 go test ./...
 
 # Run benchmark to measure shim overhead on cat (10k iterations, fast command)
 benchmark:
