@@ -7,17 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+- **Config format migrated to JSONC**: Config files are now `ribbin.jsonc` instead of `ribbin.toml`. JSONC supports comments and is more familiar to web developers. A JSON Schema is provided for editor autocompletion.
+- **Command rename**: `shim`/`unshim` → `wrap`/`unwrap`
+- **Config sections renamed**: `[shims.*]` → `"wrappers": {...}`
+- **Activation commands overhauled**: `on`/`off` replaced with `activate`/`deactivate` with explicit scope flags
+
+### Added
+- **Three-tier activation model**: Control wrapper scope precisely
+  - `ribbin activate` (default) - activate specific config file
+  - `ribbin activate --shell` - activate for current shell session
+  - `ribbin activate --global` - activate system-wide
+- **Recovery command**: `ribbin recover` searches for and restores all wrapped binaries (alias for `unwrap --global --search`)
+- **Metadata sidecars**: `.ribbin-meta` files track original binary hash for stale detection and conflict resolution during unwrap
+- **Status command**: `ribbin status` shows current activation state
+- **Scaffold command**: `ribbin scaffold` generates example configs
+- New recovery scenario for interactive testing
+
 ### Changed
-- **Config format**: `[shims.*]` renamed to `[wrappers.*]` in ribbin.toml for consistency with internal naming
+- Improved conflict detection during unwrap when binaries have been reinstalled
+- Better error messages with links to documentation
+- Global mode warning banner when wrappers are firing everywhere
 
 ### Internal
-- Registry structure updated for three-tier activation model: `wrappers`, `shell_activations`, `config_activations`, `global_active`
-- Helper methods added: `AddConfigActivation`, `RemoveConfigActivation`, `AddShellActivation`, `RemoveShellActivation`, `ClearConfigActivations`, `ClearShellActivations`
-- Config struct: `ShimConfig` → `WrapperConfig` (with alias for backwards compatibility)
-- TOML tags: `[shims.*]` → `[wrappers.*]` throughout codebase
+- Registry structure updated for three-tier activation: `wrappers`, `shell_activations`, `config_activations`, `global_active`
 - Package rename: `internal/shim` → `internal/wrap`
+- Config parsing switched from BurntSushi/toml to tailscale/hujson for JSONC support
 - `make release VERSION=x.y.z` command to automate releases
-- GitHub release notes now include installation instructions and changelog content
 
 ## [0.1.0-alpha.5] - 2026-01-20
 
