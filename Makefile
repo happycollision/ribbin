@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage test-integration test-host benchmark benchmark-grep benchmark-all benchmark-full clean
+.PHONY: build install test test-coverage test-integration test-host benchmark benchmark-grep benchmark-all benchmark-full scenario clean
 
 BINARY_NAME=ribbin
 BUILD_DIR=bin
@@ -54,6 +54,18 @@ benchmark-all:
 benchmark-full:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
 	docker run --rm $(TEST_IMAGE) go test -tags=integration -bench=BenchmarkShimOverhead -benchtime=1000000x -run=^$$ ./internal
+
+# Interactive scenario for manual testing (runs in Docker)
+# Builds ribbin, sets up a test project with shims, drops you into a shell
+# Type 'exit' to leave - all artifacts are cleaned up automatically
+#
+# Usage:
+#   make scenario              # Show scenario menu
+#   make scenario SCENARIO=basic        # Run basic scenario directly
+#   make scenario SCENARIO=local-dev-mode  # Run local dev mode scenario
+scenario:
+	docker build -f Dockerfile.scenario -t ribbin-scenario .
+	-docker run --rm -it -e SCENARIO=$(SCENARIO) ribbin-scenario
 
 clean:
 	rm -rf $(BUILD_DIR)

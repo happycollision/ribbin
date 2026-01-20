@@ -1,0 +1,52 @@
+# Interactive scenario container for testing ribbin
+# Usage: make scenario [SCENARIO=name]
+FROM golang:1.23-alpine
+
+# Install shell and basic tools
+RUN apk add --no-cache \
+    bash \
+    coreutils \
+    curl \
+    git \
+    less \
+    vim \
+    tree \
+    sudo
+
+# Create a non-root user for more realistic testing
+RUN adduser -D -s /bin/bash tester && \
+    echo "tester ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+WORKDIR /home/tester
+
+# Copy and build ribbin
+COPY --chown=tester:tester . /app
+WORKDIR /app
+RUN go build -buildvcs=false -o /usr/local/bin/ribbin ./cmd/ribbin
+
+# Copy scenario scripts
+RUN mkdir -p /usr/local/share/ribbin-scenarios
+COPY --chown=root:root scripts/scenarios/*.sh /usr/local/share/ribbin-scenarios/
+RUN chmod +x /usr/local/share/ribbin-scenarios/*.sh
+
+# Copy scenario selector
+COPY --chown=root:root scripts/scenario-select.sh /usr/local/bin/scenario-select
+RUN chmod +x /usr/local/bin/scenario-select
+
+# Switch to tester user and their home directory
+USER tester
+WORKDIR /home/tester
+
+# Default scenario can be overridden with SCENARIO env var
+ENV SCENARIO=""
+
+# Set up the environment when container starts
+# If SCENARIO is set, run that scenario directly; otherwise show menu
+ENTRYPOINT ["/bin/bash", "-c", "\
+    if [ -n \"$SCENARIO\" ]; then \
+        source /usr/local/share/ribbin-scenarios/${SCENARIO}.sh; \
+    else \
+        scenario-select || exit 0; \
+    fi && \
+    cd \"${SCENARIO_DIR:-$HOME/scenario}\" && \
+    export PATH=\"${LOCAL_BIN:-$HOME/.local/bin}:$PATH\" && \
+    exec /bin/bash --norc --noprofile -i"]
