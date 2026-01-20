@@ -25,12 +25,12 @@ Example:
 			return
 		}
 
-		if !registry.GlobalOn {
+		if !registry.GlobalActive {
 			fmt.Println("Shims are already globally disabled")
 			return
 		}
 
-		registry.GlobalOn = false
+		registry.GlobalActive = false
 
 		if err := config.SaveRegistry(registry); err != nil {
 			fmt.Printf("Error saving registry: %v\n", err)

@@ -46,14 +46,17 @@ func TestLoadRegistry(t *testing.T) {
 			t.Fatalf("LoadRegistry error: %v", err)
 		}
 
-		if registry.Shims == nil {
-			t.Error("Shims map is nil")
+		if registry.Wrappers == nil {
+			t.Error("Wrappers map is nil")
 		}
-		if registry.Activations == nil {
-			t.Error("Activations map is nil")
+		if registry.ShellActivations == nil {
+			t.Error("ShellActivations map is nil")
 		}
-		if registry.GlobalOn != false {
-			t.Error("GlobalOn should be false by default")
+		if registry.ConfigActivations == nil {
+			t.Error("ConfigActivations map is nil")
+		}
+		if registry.GlobalActive != false {
+			t.Error("GlobalActive should be false by default")
 		}
 	})
 
@@ -66,13 +69,16 @@ func TestLoadRegistry(t *testing.T) {
 
 		// Write a registry file
 		registry := Registry{
-			Shims: map[string]ShimEntry{
+			Wrappers: map[string]WrapperEntry{
 				"cat": {Original: "/usr/bin/cat", Config: "/project/ribbin.toml"},
 			},
-			Activations: map[int]ActivationEntry{
+			ShellActivations: map[int]ShellActivationEntry{
 				1234: {PID: 1234, ActivatedAt: time.Now()},
 			},
-			GlobalOn: true,
+			ConfigActivations: map[string]ConfigActivationEntry{
+				"/project/ribbin.toml": {ActivatedAt: time.Now()},
+			},
+			GlobalActive: true,
 		}
 
 		data, err := json.Marshal(registry)
@@ -90,14 +96,17 @@ func TestLoadRegistry(t *testing.T) {
 			t.Fatalf("LoadRegistry error: %v", err)
 		}
 
-		if !loaded.GlobalOn {
-			t.Error("GlobalOn should be true")
+		if !loaded.GlobalActive {
+			t.Error("GlobalActive should be true")
 		}
-		if _, exists := loaded.Shims["cat"]; !exists {
-			t.Error("cat shim should exist")
+		if _, exists := loaded.Wrappers["cat"]; !exists {
+			t.Error("cat wrapper should exist")
 		}
-		if len(loaded.Activations) != 1 {
-			t.Errorf("expected 1 activation, got %d", len(loaded.Activations))
+		if len(loaded.ShellActivations) != 1 {
+			t.Errorf("expected 1 shell activation, got %d", len(loaded.ShellActivations))
+		}
+		if len(loaded.ConfigActivations) != 1 {
+			t.Errorf("expected 1 config activation, got %d", len(loaded.ConfigActivations))
 		}
 	})
 
@@ -129,7 +138,7 @@ func TestLoadRegistry(t *testing.T) {
 
 		// Write minimal registry (no maps initialized)
 		registryPath := filepath.Join(registryDir, "registry.json")
-		if err := os.WriteFile(registryPath, []byte(`{"global_on": false}`), 0644); err != nil {
+		if err := os.WriteFile(registryPath, []byte(`{"global_active": false}`), 0644); err != nil {
 			t.Fatalf("failed to write registry: %v", err)
 		}
 
@@ -138,11 +147,14 @@ func TestLoadRegistry(t *testing.T) {
 			t.Fatalf("LoadRegistry error: %v", err)
 		}
 
-		if loaded.Shims == nil {
-			t.Error("Shims should be initialized")
+		if loaded.Wrappers == nil {
+			t.Error("Wrappers should be initialized")
 		}
-		if loaded.Activations == nil {
-			t.Error("Activations should be initialized")
+		if loaded.ShellActivations == nil {
+			t.Error("ShellActivations should be initialized")
+		}
+		if loaded.ConfigActivations == nil {
+			t.Error("ConfigActivations should be initialized")
 		}
 	})
 }
@@ -162,9 +174,10 @@ func TestSaveRegistry(t *testing.T) {
 
 	t.Run("creates directory if missing", func(t *testing.T) {
 		registry := &Registry{
-			Shims:       make(map[string]ShimEntry),
-			Activations: make(map[int]ActivationEntry),
-			GlobalOn:    true,
+			Wrappers:          make(map[string]WrapperEntry),
+			ShellActivations:  make(map[int]ShellActivationEntry),
+			ConfigActivations: make(map[string]ConfigActivationEntry),
+			GlobalActive:      true,
 		}
 
 		if err := SaveRegistry(registry); err != nil {
@@ -181,9 +194,10 @@ func TestSaveRegistry(t *testing.T) {
 	t.Run("overwrites existing registry", func(t *testing.T) {
 		// First save
 		registry1 := &Registry{
-			Shims:       make(map[string]ShimEntry),
-			Activations: make(map[int]ActivationEntry),
-			GlobalOn:    false,
+			Wrappers:          make(map[string]WrapperEntry),
+			ShellActivations:  make(map[int]ShellActivationEntry),
+			ConfigActivations: make(map[string]ConfigActivationEntry),
+			GlobalActive:      false,
 		}
 		if err := SaveRegistry(registry1); err != nil {
 			t.Fatalf("SaveRegistry error: %v", err)
@@ -191,9 +205,10 @@ func TestSaveRegistry(t *testing.T) {
 
 		// Second save with different data
 		registry2 := &Registry{
-			Shims:       map[string]ShimEntry{"cat": {Original: "/bin/cat"}},
-			Activations: make(map[int]ActivationEntry),
-			GlobalOn:    true,
+			Wrappers:          map[string]WrapperEntry{"cat": {Original: "/bin/cat"}},
+			ShellActivations:  make(map[int]ShellActivationEntry),
+			ConfigActivations: make(map[string]ConfigActivationEntry),
+			GlobalActive:      true,
 		}
 		if err := SaveRegistry(registry2); err != nil {
 			t.Fatalf("SaveRegistry error: %v", err)
@@ -204,36 +219,111 @@ func TestSaveRegistry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadRegistry error: %v", err)
 		}
-		if !loaded.GlobalOn {
-			t.Error("GlobalOn should be true")
+		if !loaded.GlobalActive {
+			t.Error("GlobalActive should be true")
 		}
-		if _, exists := loaded.Shims["cat"]; !exists {
-			t.Error("cat shim should exist")
+		if _, exists := loaded.Wrappers["cat"]; !exists {
+			t.Error("cat wrapper should exist")
 		}
 	})
 }
 
-func TestPruneDeadActivations(t *testing.T) {
+func TestPruneDeadShellActivations(t *testing.T) {
 	registry := &Registry{
-		Shims: make(map[string]ShimEntry),
-		Activations: map[int]ActivationEntry{
+		Wrappers: make(map[string]WrapperEntry),
+		ShellActivations: map[int]ShellActivationEntry{
 			1:        {PID: 1, ActivatedAt: time.Now()},        // PID 1 always exists
 			99999999: {PID: 99999999, ActivatedAt: time.Now()}, // Very unlikely to exist
 		},
-		GlobalOn: false,
+		ConfigActivations: make(map[string]ConfigActivationEntry),
+		GlobalActive:      false,
 	}
 
-	registry.PruneDeadActivations()
+	registry.PruneDeadShellActivations()
 
 	// PID 1 (init/launchd) should still exist
-	if _, exists := registry.Activations[1]; !exists {
+	if _, exists := registry.ShellActivations[1]; !exists {
 		t.Error("PID 1 should still exist after pruning")
 	}
 
 	// Dead PID should be removed
-	if _, exists := registry.Activations[99999999]; exists {
+	if _, exists := registry.ShellActivations[99999999]; exists {
 		t.Error("dead PID should be removed after pruning")
 	}
+}
+
+func TestConfigActivationHelpers(t *testing.T) {
+	registry := &Registry{
+		Wrappers:          make(map[string]WrapperEntry),
+		ShellActivations:  make(map[int]ShellActivationEntry),
+		ConfigActivations: make(map[string]ConfigActivationEntry),
+		GlobalActive:      false,
+	}
+
+	t.Run("AddConfigActivation adds config", func(t *testing.T) {
+		registry.AddConfigActivation("/path/to/ribbin.toml")
+
+		if _, exists := registry.ConfigActivations["/path/to/ribbin.toml"]; !exists {
+			t.Error("config should be added")
+		}
+	})
+
+	t.Run("RemoveConfigActivation removes config", func(t *testing.T) {
+		registry.RemoveConfigActivation("/path/to/ribbin.toml")
+
+		if _, exists := registry.ConfigActivations["/path/to/ribbin.toml"]; exists {
+			t.Error("config should be removed")
+		}
+	})
+
+	t.Run("ClearConfigActivations clears all", func(t *testing.T) {
+		registry.AddConfigActivation("/path/a.toml")
+		registry.AddConfigActivation("/path/b.toml")
+		registry.ClearConfigActivations()
+
+		if len(registry.ConfigActivations) != 0 {
+			t.Errorf("expected 0 config activations, got %d", len(registry.ConfigActivations))
+		}
+	})
+}
+
+func TestShellActivationHelpers(t *testing.T) {
+	registry := &Registry{
+		Wrappers:          make(map[string]WrapperEntry),
+		ShellActivations:  make(map[int]ShellActivationEntry),
+		ConfigActivations: make(map[string]ConfigActivationEntry),
+		GlobalActive:      false,
+	}
+
+	t.Run("AddShellActivation adds shell", func(t *testing.T) {
+		registry.AddShellActivation(12345)
+
+		entry, exists := registry.ShellActivations[12345]
+		if !exists {
+			t.Error("shell activation should be added")
+		}
+		if entry.PID != 12345 {
+			t.Errorf("expected PID 12345, got %d", entry.PID)
+		}
+	})
+
+	t.Run("RemoveShellActivation removes shell", func(t *testing.T) {
+		registry.RemoveShellActivation(12345)
+
+		if _, exists := registry.ShellActivations[12345]; exists {
+			t.Error("shell activation should be removed")
+		}
+	})
+
+	t.Run("ClearShellActivations clears all", func(t *testing.T) {
+		registry.AddShellActivation(111)
+		registry.AddShellActivation(222)
+		registry.ClearShellActivations()
+
+		if len(registry.ShellActivations) != 0 {
+			t.Errorf("expected 0 shell activations, got %d", len(registry.ShellActivations))
+		}
+	})
 }
 
 func TestProcessExists(t *testing.T) {

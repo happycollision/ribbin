@@ -9,30 +9,38 @@ import (
 	"github.com/happycollision/ribbin/internal/security"
 )
 
-// ShimEntry tracks an installed shim in the registry
-type ShimEntry struct {
-	// Original is the path to the original command being shimmed
+// WrapperEntry tracks an installed wrapper in the registry
+type WrapperEntry struct {
+	// Original is the path to the original command being wrapped
 	Original string `json:"original"`
-	// Config is the path to the ribbin.json that defines this shim
+	// Config is the path to the ribbin.toml that defines this wrapper
 	Config string `json:"config"`
 }
 
-// ActivationEntry tracks an active ribbin session
-type ActivationEntry struct {
+// ShellActivationEntry tracks an active ribbin shell session
+type ShellActivationEntry struct {
 	// PID of the shell process that activated ribbin
 	PID int `json:"pid"`
 	// ActivatedAt is when the session was activated
 	ActivatedAt time.Time `json:"activated_at"`
 }
 
+// ConfigActivationEntry tracks activation of a specific config file
+type ConfigActivationEntry struct {
+	// ActivatedAt is when the config was activated
+	ActivatedAt time.Time `json:"activated_at"`
+}
+
 // Registry is the global ribbin state stored in ~/.config/ribbin/registry.json
 type Registry struct {
-	// Shims maps command names to their shim entries
-	Shims map[string]ShimEntry `json:"shims"`
-	// Activations tracks active shell sessions
-	Activations map[int]ActivationEntry `json:"activations"`
-	// GlobalOn indicates if ribbin is globally enabled
-	GlobalOn bool `json:"global_on"`
+	// Wrappers maps command names to their wrapper entries
+	Wrappers map[string]WrapperEntry `json:"wrappers"`
+	// ShellActivations tracks active shell sessions (all configs fire for this shell)
+	ShellActivations map[int]ShellActivationEntry `json:"shell_activations"`
+	// ConfigActivations tracks per-config activation (config fires for all shells)
+	ConfigActivations map[string]ConfigActivationEntry `json:"config_activations"`
+	// GlobalActive indicates if ribbin is globally enabled (everything fires everywhere)
+	GlobalActive bool `json:"global_active"`
 }
 
 // RegistryPath returns the path to the global registry file.
@@ -52,9 +60,10 @@ func LoadRegistry() (*Registry, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// Return empty registry if file doesn't exist
 		return &Registry{
-			Shims:       make(map[string]ShimEntry),
-			Activations: make(map[int]ActivationEntry),
-			GlobalOn:    false,
+			Wrappers:          make(map[string]WrapperEntry),
+			ShellActivations:  make(map[int]ShellActivationEntry),
+			ConfigActivations: make(map[string]ConfigActivationEntry),
+			GlobalActive:      false,
 		}, nil
 	}
 
@@ -77,23 +86,67 @@ func LoadRegistry() (*Registry, error) {
 	}
 
 	// Initialize maps if nil (for backwards compatibility)
-	if registry.Shims == nil {
-		registry.Shims = make(map[string]ShimEntry)
+	if registry.Wrappers == nil {
+		registry.Wrappers = make(map[string]WrapperEntry)
 	}
-	if registry.Activations == nil {
-		registry.Activations = make(map[int]ActivationEntry)
+	if registry.ShellActivations == nil {
+		registry.ShellActivations = make(map[int]ShellActivationEntry)
+	}
+	if registry.ConfigActivations == nil {
+		registry.ConfigActivations = make(map[string]ConfigActivationEntry)
 	}
 
 	return &registry, nil
 }
 
-// PruneDeadActivations removes activation entries for processes that no longer exist.
-func (r *Registry) PruneDeadActivations() {
-	for pid := range r.Activations {
+// PruneDeadShellActivations removes shell activation entries for processes that no longer exist.
+func (r *Registry) PruneDeadShellActivations() {
+	for pid := range r.ShellActivations {
 		if !processExists(pid) {
-			delete(r.Activations, pid)
+			delete(r.ShellActivations, pid)
 		}
 	}
+}
+
+// ClearShellActivations removes all shell activations.
+func (r *Registry) ClearShellActivations() {
+	r.ShellActivations = make(map[int]ShellActivationEntry)
+}
+
+// ClearConfigActivations removes all config activations.
+func (r *Registry) ClearConfigActivations() {
+	r.ConfigActivations = make(map[string]ConfigActivationEntry)
+}
+
+// AddConfigActivation adds a config to the activation set.
+func (r *Registry) AddConfigActivation(configPath string) {
+	if r.ConfigActivations == nil {
+		r.ConfigActivations = make(map[string]ConfigActivationEntry)
+	}
+	r.ConfigActivations[configPath] = ConfigActivationEntry{
+		ActivatedAt: time.Now(),
+	}
+}
+
+// RemoveConfigActivation removes a config from the activation set.
+func (r *Registry) RemoveConfigActivation(configPath string) {
+	delete(r.ConfigActivations, configPath)
+}
+
+// AddShellActivation adds a shell activation for the given PID.
+func (r *Registry) AddShellActivation(pid int) {
+	if r.ShellActivations == nil {
+		r.ShellActivations = make(map[int]ShellActivationEntry)
+	}
+	r.ShellActivations[pid] = ShellActivationEntry{
+		PID:         pid,
+		ActivatedAt: time.Now(),
+	}
+}
+
+// RemoveShellActivation removes a shell activation for the given PID.
+func (r *Registry) RemoveShellActivation(pid int) {
+	delete(r.ShellActivations, pid)
 }
 
 // processExists checks if a process with the given PID exists.

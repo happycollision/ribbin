@@ -173,7 +173,7 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 
 	// 8. UPDATE REGISTRY (within lock)
 	commandName := filepath.Base(binaryPath)
-	registry.Shims[commandName] = config.ShimEntry{
+	registry.Wrappers[commandName] = config.WrapperEntry{
 		Original: binaryPath,
 		Config:   configPath,
 	}
@@ -272,7 +272,7 @@ func Uninstall(binaryPath string, registry *config.Registry) error {
 
 	// Update registry
 	commandName := filepath.Base(binaryPath)
-	delete(registry.Shims, commandName)
+	delete(registry.Wrappers, commandName)
 
 	return nil
 }

@@ -88,8 +88,9 @@ func TestInstall(t *testing.T) {
 		}
 
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
 		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
@@ -116,7 +117,7 @@ func TestInstall(t *testing.T) {
 		}
 
 		// Check registry updated
-		entry, exists := registry.Shims["test-binary"]
+		entry, exists := registry.Wrappers["test-binary"]
 		if !exists {
 			t.Error("registry should have entry for test-binary")
 		}
@@ -146,8 +147,9 @@ func TestInstall(t *testing.T) {
 
 		ribbinPath := filepath.Join(tmpDir, "ribbin")
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
 		installErr := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
@@ -169,8 +171,9 @@ func TestInstall(t *testing.T) {
 		ribbinPath := "" // Empty path will cause symlink to fail
 
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
 		err := Install(binaryPath, ribbinPath, registry, "/project/ribbin.toml")
@@ -234,10 +237,11 @@ func TestUninstall(t *testing.T) {
 		}
 
 		registry := &config.Registry{
-			Shims: map[string]config.ShimEntry{
+			Wrappers: map[string]config.WrapperEntry{
 				"uninstall-test": {Original: binaryPath, Config: "/project/ribbin.toml"},
 			},
-			Activations: make(map[int]config.ActivationEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
 		uninstallErr := Uninstall(binaryPath, registry)
@@ -265,7 +269,7 @@ func TestUninstall(t *testing.T) {
 		}
 
 		// Registry should be updated
-		if _, exists := registry.Shims["uninstall-test"]; exists {
+		if _, exists := registry.Wrappers["uninstall-test"]; exists {
 			t.Error("registry entry should be removed after uninstall")
 		}
 	})
@@ -277,8 +281,9 @@ func TestUninstall(t *testing.T) {
 		}
 
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
 		}
 
 		err := Uninstall(binaryPath, registry)

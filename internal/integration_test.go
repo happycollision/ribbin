@@ -92,9 +92,10 @@ paths = ["` + testBinaryPath + `"]
 
 	// Step 3: Install shim
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    false,
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    false,
 	}
 
 	if err := shim.Install(testBinaryPath, ribbinPath, registry, configPath); err != nil {
@@ -118,7 +119,7 @@ paths = ["` + testBinaryPath + `"]
 	}
 
 	// Verify registry was updated
-	if _, exists := registry.Shims["test-cmd"]; !exists {
+	if _, exists := registry.Wrappers["test-cmd"]; !exists {
 		t.Error("registry should contain test-cmd entry")
 	}
 
@@ -165,7 +166,7 @@ paths = ["` + testBinaryPath + `"]
 	}
 
 	// Verify registry was updated
-	if _, exists := registry.Shims["test-cmd"]; exists {
+	if _, exists := registry.Wrappers["test-cmd"]; exists {
 		t.Error("registry should not contain test-cmd entry after uninstall")
 	}
 
@@ -303,9 +304,10 @@ paths = ["` + testCmdPath + `"]
 
 	// Install shim: rename test-cmd to test-cmd.ribbin-original, symlink test-cmd -> ribbin
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    false,
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    false,
 	}
 
 	if err := shim.Install(testCmdPath, ribbinPath, registry, configPath); err != nil {
@@ -530,9 +532,10 @@ paths = ["` + nodeShimPath + `"]
 
 	// Install ribbin shim
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    false,
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    false,
 	}
 
 	if err := shim.Install(nodeShimPath, ribbinPath, registry, configPath); err != nil {
@@ -730,9 +733,10 @@ paths = ["` + nodeShimPath + `"]
 	// Install ribbin shim on asdf's node shim (a shell script)
 	// This creates: node -> ribbin, node.ribbin-original = (the shell script)
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    false,
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    false,
 	}
 
 	if err := shim.Install(nodeShimPath, ribbinPath, registry, configPath); err != nil {
@@ -901,11 +905,12 @@ message = "This command is blocked - config found in parent!"
 
 	// Create registry with GlobalOn = true
 	registry := &config.Registry{
-		Shims: map[string]config.ShimEntry{
+		Wrappers: map[string]config.WrapperEntry{
 			"test-cmd": {Original: shimPath, Config: configPath},
 		},
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    true,
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    true,
 	}
 	registryDir := filepath.Join(homeDir, ".config", "ribbin")
 	if err := os.MkdirAll(registryDir, 0755); err != nil {
@@ -1073,9 +1078,10 @@ message = "Use 'bun' instead"
 
 	// Install shim
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    true, // Enable globally for this test
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    true, // Enable globally for this test
 	}
 
 	if err := shim.Install(miseNodeShim, ribbinPath, registry, configPath); err != nil {
@@ -1203,9 +1209,10 @@ exit 0
 
 	// Install shim
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    true, // Enable globally
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    true, // Enable globally
 	}
 
 	if err := shim.Install(echoCmdPath, ribbinPath, registry, configPath); err != nil {
@@ -1299,12 +1306,13 @@ func TestRegistryPersistence(t *testing.T) {
 
 	// Create and save registry
 	registry := &config.Registry{
-		Shims: map[string]config.ShimEntry{
+		Wrappers: map[string]config.WrapperEntry{
 			"cat":  {Original: "/usr/bin/cat", Config: "/project/ribbin.toml"},
 			"node": {Original: "/usr/local/bin/node", Config: "/other/ribbin.toml"},
 		},
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    true,
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    true,
 	}
 
 	if err := config.SaveRegistry(registry); err != nil {
@@ -1317,7 +1325,7 @@ func TestRegistryPersistence(t *testing.T) {
 		t.Fatalf("LoadRegistry error: %v", err)
 	}
 
-	if !loaded.GlobalOn {
+	if !loaded.GlobalActive {
 		t.Error("GlobalOn should be true")
 	}
 	if len(loaded.Shims) != 2 {
@@ -1342,7 +1350,7 @@ func TestScopedConfigIsolation(t *testing.T) {
 	// Create an isolated scope (no extends) for testing
 	isolatedScope := config.ScopeConfig{
 		Path:  "isolated",
-		Shims: map[string]config.ShimConfig{"local-cmd": {Action: "block", Message: "local only"}},
+		Wrappers: map[string]config.ShimConfig{"local-cmd": {Action: "block", Message: "local only"}},
 	}
 
 	resolver := config.NewResolver()
@@ -1711,9 +1719,10 @@ action = "passthrough"
 
 	// Install shim
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    true,
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    true,
 	}
 	if err := shim.Install(npmPath, ribbinPath, registry, configPath); err != nil {
 		t.Fatalf("failed to install shim: %v", err)

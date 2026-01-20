@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/happycollision/ribbin/internal/config"
 	"github.com/happycollision/ribbin/internal/process"
@@ -41,19 +40,16 @@ Example:
 		}
 
 		// Check if already activated for this shell (idempotent)
-		if _, exists := registry.Activations[shellPID]; exists {
+		if _, exists := registry.ShellActivations[shellPID]; exists {
 			fmt.Printf("ribbin already activated for shell (PID %d)\n", shellPID)
 			return
 		}
 
-		// Prune dead activations
-		registry.PruneDeadActivations()
+		// Prune dead shell activations
+		registry.PruneDeadShellActivations()
 
-		// Add new activation entry
-		registry.Activations[shellPID] = config.ActivationEntry{
-			PID:         shellPID,
-			ActivatedAt: time.Now(),
-		}
+		// Add new shell activation entry
+		registry.AddShellActivation(shellPID)
 
 		// Save registry
 		if err := config.SaveRegistry(registry); err != nil {

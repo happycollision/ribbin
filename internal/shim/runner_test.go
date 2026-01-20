@@ -35,38 +35,41 @@ func TestExtractCommandName(t *testing.T) {
 }
 
 func TestIsActive(t *testing.T) {
-	t.Run("returns true when GlobalOn is true", func(t *testing.T) {
+	t.Run("returns true when GlobalActive is true", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    true,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    true,
 		}
 
 		if !isActive(registry) {
-			t.Error("should be active when GlobalOn is true")
+			t.Error("should be active when GlobalActive is true")
 		}
 	})
 
-	t.Run("returns false when GlobalOn is false and no activations", func(t *testing.T) {
+	t.Run("returns false when GlobalActive is false and no activations", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    false,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    false,
 		}
 
 		if isActive(registry) {
-			t.Error("should not be active when GlobalOn is false and no activations")
+			t.Error("should not be active when GlobalActive is false and no activations")
 		}
 	})
 
 	t.Run("returns true when ancestor PID is in activations", func(t *testing.T) {
 		// PID 1 is always an ancestor (init/launchd)
 		registry := &config.Registry{
-			Shims: make(map[string]config.ShimEntry),
-			Activations: map[int]config.ActivationEntry{
+			Wrappers: make(map[string]config.WrapperEntry),
+			ShellActivations: map[int]config.ShellActivationEntry{
 				1: {PID: 1, ActivatedAt: time.Now()},
 			},
-			GlobalOn: false,
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      false,
 		}
 
 		if !isActive(registry) {
@@ -77,11 +80,12 @@ func TestIsActive(t *testing.T) {
 	t.Run("returns false when non-ancestor PID is in activations", func(t *testing.T) {
 		// Use a high PID that's unlikely to be an ancestor
 		registry := &config.Registry{
-			Shims: make(map[string]config.ShimEntry),
-			Activations: map[int]config.ActivationEntry{
+			Wrappers: make(map[string]config.WrapperEntry),
+			ShellActivations: map[int]config.ShellActivationEntry{
 				99999999: {PID: 99999999, ActivatedAt: time.Now()},
 			},
-			GlobalOn: false,
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      false,
 		}
 
 		if isActive(registry) {

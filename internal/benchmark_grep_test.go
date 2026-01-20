@@ -106,9 +106,10 @@ message = ""
 
 	// Create registry with GlobalOn = true
 	registry := &config.Registry{
-		Shims:       make(map[string]config.ShimEntry),
-		Activations: make(map[int]config.ActivationEntry),
-		GlobalOn:    true,
+		Wrappers:       make(map[string]config.WrapperEntry),
+		ShellActivations:  make(map[int]config.ShellActivationEntry),
+		ConfigActivations: make(map[string]config.ConfigActivationEntry),
+		GlobalActive:    true,
 	}
 
 	// Install shim

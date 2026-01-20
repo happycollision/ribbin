@@ -123,18 +123,18 @@ func Run(argv0 string, args []string) error {
 	}
 }
 
-// isActive checks if ribbin is active (global_on OR ancestor PID in activations)
+// isActive checks if ribbin is active (global_active OR ancestor PID in shell_activations)
 func isActive(registry *config.Registry) bool {
-	// Check global_on flag
-	if registry.GlobalOn {
+	// Check global_active flag
+	if registry.GlobalActive {
 		return true
 	}
 
-	// Prune dead activations first
-	registry.PruneDeadActivations()
+	// Prune dead shell activations first
+	registry.PruneDeadShellActivations()
 
-	// Check if any activation PID is an ancestor of this process
-	for pid := range registry.Activations {
+	// Check if any shell activation PID is an ancestor of this process
+	for pid := range registry.ShellActivations {
 		isDescendant, err := process.IsDescendantOf(pid)
 		if err == nil && isDescendant {
 			return true

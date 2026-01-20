@@ -84,7 +84,7 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 		}
 	} else if unshimAll {
 		// Use paths from registry
-		for _, entry := range registry.Shims {
+		for _, entry := range registry.Wrappers {
 			pathsToUnshim = append(pathsToUnshim, entry.Original)
 		}
 	} else {
@@ -104,7 +104,7 @@ func runUnshim(cmd *cobra.Command, args []string) error {
 
 		// For each command in project config, find its path in registry
 		for commandName := range projectConfig.Shims {
-			if entry, ok := registry.Shims[commandName]; ok {
+			if entry, ok := registry.Wrappers[commandName]; ok {
 				pathsToUnshim = append(pathsToUnshim, entry.Original)
 			} else {
 				// Try to find the command in PATH and check if it has a sidecar

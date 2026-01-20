@@ -102,9 +102,10 @@ func TestOnCommand(t *testing.T) {
 
 	t.Run("enables shims when disabled", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    false,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -128,16 +129,17 @@ func TestOnCommand(t *testing.T) {
 
 		// Verify registry was updated
 		loaded, _ := config.LoadRegistry()
-		if !loaded.GlobalOn {
-			t.Error("GlobalOn should be true after 'on' command")
+		if !loaded.GlobalActive {
+			t.Error("GlobalActive should be true after 'on' command")
 		}
 	})
 
 	t.Run("reports already enabled", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    true,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    true,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -166,9 +168,10 @@ func TestOffCommand(t *testing.T) {
 
 	t.Run("disables shims when enabled", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    true,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    true,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -186,16 +189,17 @@ func TestOffCommand(t *testing.T) {
 
 		// Verify registry was updated
 		loaded, _ := config.LoadRegistry()
-		if loaded.GlobalOn {
-			t.Error("GlobalOn should be false after 'off' command")
+		if loaded.GlobalActive {
+			t.Error("GlobalActive should be false after 'off' command")
 		}
 	})
 
 	t.Run("reports already disabled", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    false,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -224,9 +228,10 @@ func TestActivateCommand(t *testing.T) {
 
 	t.Run("activates for current shell", func(t *testing.T) {
 		registry := &config.Registry{
-			Shims:       make(map[string]config.ShimEntry),
-			Activations: make(map[int]config.ActivationEntry),
-			GlobalOn:    false,
+			Wrappers:       make(map[string]config.WrapperEntry),
+			ShellActivations:  make(map[int]config.ShellActivationEntry),
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:    false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
@@ -245,7 +250,7 @@ func TestActivateCommand(t *testing.T) {
 		// Verify activation was added
 		loaded, _ := config.LoadRegistry()
 		ppid := os.Getppid()
-		if _, exists := loaded.Activations[ppid]; !exists {
+		if _, exists := loaded.ShellActivations[ppid]; !exists {
 			t.Error("activation should be added for parent shell PID")
 		}
 	})
@@ -253,11 +258,12 @@ func TestActivateCommand(t *testing.T) {
 	t.Run("is idempotent", func(t *testing.T) {
 		ppid := os.Getppid()
 		registry := &config.Registry{
-			Shims: make(map[string]config.ShimEntry),
-			Activations: map[int]config.ActivationEntry{
+			Wrappers: make(map[string]config.WrapperEntry),
+			ShellActivations: map[int]config.ShellActivationEntry{
 				ppid: {PID: ppid},
 			},
-			GlobalOn: false,
+			ConfigActivations: make(map[string]config.ConfigActivationEntry),
+			GlobalActive:      false,
 		}
 		createTestRegistry(t, tempHome, registry)
 
