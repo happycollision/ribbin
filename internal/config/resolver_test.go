@@ -1,0 +1,451 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestResolveEffectiveShims_IsolatedScope(t *testing.T) {
+	// Scope with no extends should only have its own shims
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat": {Action: "block", Message: "root cat"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path: "apps/frontend",
+				// No extends - isolated
+				Shims: map[string]ShimConfig{
+					"npm": {Action: "block", Message: "use pnpm"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// Should only have npm, not cat (isolated scope)
+	if len(result) != 1 {
+		t.Errorf("expected 1 shim, got %d: %v", len(result), result)
+	}
+	if _, ok := result["npm"]; !ok {
+		t.Error("expected npm shim")
+	}
+	if _, ok := result["cat"]; ok {
+		t.Error("should not have cat shim (isolated scope)")
+	}
+}
+
+func TestResolveEffectiveShims_ExtendsRoot(t *testing.T) {
+	// Scope extends root - gets root shims + own shims, own wins on conflict
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat":  {Action: "block", Message: "root cat"},
+			"grep": {Action: "warn", Message: "root grep"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"backend": {
+				Path:    "apps/backend",
+				Extends: []string{"root"},
+				Shims: map[string]ShimConfig{
+					"cat":  {Action: "redirect", Message: "backend cat"}, // overrides root
+					"yarn": {Action: "block", Message: "use npm"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["backend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// Should have: cat (overridden), grep (from root), yarn (own)
+	if len(result) != 3 {
+		t.Errorf("expected 3 shims, got %d: %v", len(result), result)
+	}
+
+	// cat should be overridden by scope
+	if result["cat"].Message != "backend cat" {
+		t.Errorf("cat should be overridden, got %q", result["cat"].Message)
+	}
+
+	// grep should come from root
+	if result["grep"].Message != "root grep" {
+		t.Errorf("grep should come from root, got %q", result["grep"].Message)
+	}
+
+	// yarn is scope's own
+	if result["yarn"].Message != "use npm" {
+		t.Errorf("yarn should be from scope, got %q", result["yarn"].Message)
+	}
+}
+
+func TestResolveEffectiveShims_MultipleExtends(t *testing.T) {
+	// extends = ["root", "root.strict"] - order matters, later wins
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat": {Action: "warn", Message: "root cat"},
+			"rm":  {Action: "warn", Message: "root rm"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"strict": {
+				// No extends, just defines stricter rules
+				Shims: map[string]ShimConfig{
+					"cat": {Action: "block", Message: "strict cat"}, // stricter than root
+					"rm":  {Action: "block", Message: "strict rm"},
+				},
+			},
+			"backend": {
+				Path:    "apps/backend",
+				Extends: []string{"root", "root.strict"},
+				Shims: map[string]ShimConfig{
+					"yarn": {Action: "block", Message: "use npm"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["backend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// cat and rm should come from strict (later in extends list)
+	if result["cat"].Message != "strict cat" {
+		t.Errorf("cat should be from strict, got %q", result["cat"].Message)
+	}
+	if result["rm"].Message != "strict rm" {
+		t.Errorf("rm should be from strict, got %q", result["rm"].Message)
+	}
+	if result["yarn"].Message != "use npm" {
+		t.Errorf("yarn should be from scope, got %q", result["yarn"].Message)
+	}
+}
+
+func TestResolveEffectiveShims_RecursiveExtends(t *testing.T) {
+	// Scope A extends scope B which extends root
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat": {Action: "warn", Message: "root cat"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"base": {
+				Extends: []string{"root"},
+				Shims: map[string]ShimConfig{
+					"npm": {Action: "block", Message: "base npm"},
+				},
+			},
+			"frontend": {
+				Path:    "apps/frontend",
+				Extends: []string{"root.base"},
+				Shims: map[string]ShimConfig{
+					"yarn": {Action: "block", Message: "frontend yarn"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// Should have: cat (from root via base), npm (from base), yarn (own)
+	if len(result) != 3 {
+		t.Errorf("expected 3 shims, got %d: %v", len(result), result)
+	}
+	if result["cat"].Message != "root cat" {
+		t.Errorf("cat should come from root, got %q", result["cat"].Message)
+	}
+	if result["npm"].Message != "base npm" {
+		t.Errorf("npm should come from base, got %q", result["npm"].Message)
+	}
+	if result["yarn"].Message != "frontend yarn" {
+		t.Errorf("yarn should come from scope, got %q", result["yarn"].Message)
+	}
+}
+
+func TestResolveEffectiveShims_CycleDetection(t *testing.T) {
+	// A extends B, B extends A - should error
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"a": {
+				Extends: []string{"root.b"},
+				Shims:   map[string]ShimConfig{},
+			},
+			"b": {
+				Extends: []string{"root.a"},
+				Shims:   map[string]ShimConfig{},
+			},
+		},
+	}
+
+	scope := config.Scopes["a"]
+	resolver := NewResolver()
+	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err == nil {
+		t.Fatal("expected cycle detection error")
+	}
+	if !strings.Contains(err.Error(), "cyclic") {
+		t.Errorf("expected cyclic error, got: %v", err)
+	}
+}
+
+func TestResolveEffectiveShims_SelfCycle(t *testing.T) {
+	// Scope extends itself
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"self": {
+				Extends: []string{"root.self"},
+				Shims:   map[string]ShimConfig{},
+			},
+		},
+	}
+
+	scope := config.Scopes["self"]
+	resolver := NewResolver()
+	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err == nil {
+		t.Fatal("expected cycle detection error for self-reference")
+	}
+	if !strings.Contains(err.Error(), "cyclic") {
+		t.Errorf("expected cyclic error, got: %v", err)
+	}
+}
+
+func TestResolveEffectiveShims_NilScope(t *testing.T) {
+	// nil scope means resolve root shims only
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat":  {Action: "block", Message: "root cat"},
+			"grep": {Action: "warn", Message: "root grep"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Shims: map[string]ShimConfig{
+					"npm": {Action: "block", Message: "use pnpm"},
+				},
+			},
+		},
+	}
+
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", nil)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// Should only have root shims
+	if len(result) != 2 {
+		t.Errorf("expected 2 shims, got %d: %v", len(result), result)
+	}
+	if _, ok := result["cat"]; !ok {
+		t.Error("expected cat shim from root")
+	}
+	if _, ok := result["npm"]; ok {
+		t.Error("should not have npm shim (that's in a scope)")
+	}
+}
+
+func TestResolveEffectiveShims_ScopeNotFound(t *testing.T) {
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Extends: []string{"root.nonexistent"},
+				Shims:   map[string]ShimConfig{},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	_, err := resolver.ResolveEffectiveShims(config, "/project/ribbin.toml", &scope)
+	if err == nil {
+		t.Fatal("expected error for nonexistent scope")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestResolveEffectiveShims_ExternalFile(t *testing.T) {
+	// Create a temporary external config file
+	tmpDir := t.TempDir()
+
+	// Create external config in a subdirectory (must be named ribbin.toml per security rules)
+	externalDir := filepath.Join(tmpDir, "external")
+	if err := os.MkdirAll(externalDir, 0755); err != nil {
+		t.Fatalf("failed to create external dir: %v", err)
+	}
+	externalPath := filepath.Join(externalDir, "ribbin.toml")
+	externalContent := `
+[shims.external-cmd]
+action = "block"
+message = "from external"
+`
+	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
+		t.Fatalf("failed to write external config: %v", err)
+	}
+
+	// Create main config that extends external
+	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	config := &ProjectConfig{
+		Shims: map[string]ShimConfig{
+			"cat": {Action: "block", Message: "main cat"},
+		},
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path:    "apps/frontend",
+				Extends: []string{"./external/ribbin.toml"},
+				Shims: map[string]ShimConfig{
+					"npm": {Action: "block", Message: "use pnpm"},
+				},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, mainPath, &scope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// Should have: external-cmd (from external file), npm (own)
+	// Note: cat is NOT included because the scope doesn't extend root
+	if result["external-cmd"].Message != "from external" {
+		t.Errorf("external-cmd should come from external file, got %q", result["external-cmd"].Message)
+	}
+	if result["npm"].Message != "use pnpm" {
+		t.Errorf("npm should be from scope, got %q", result["npm"].Message)
+	}
+	if _, ok := result["cat"]; ok {
+		t.Error("should not have cat (scope doesn't extend root)")
+	}
+}
+
+func TestResolveEffectiveShims_ExternalFileWithFragment(t *testing.T) {
+	// Create a temporary external config file with scopes
+	tmpDir := t.TempDir()
+
+	// Create external config with a scope (in subdirectory, named ribbin.toml)
+	teamDir := filepath.Join(tmpDir, "team")
+	if err := os.MkdirAll(teamDir, 0755); err != nil {
+		t.Fatalf("failed to create team dir: %v", err)
+	}
+	externalPath := filepath.Join(teamDir, "ribbin.toml")
+	externalContent := `
+[shims.team-cmd]
+action = "warn"
+message = "team root"
+
+[scopes.strict]
+[scopes.strict.shims.team-cmd]
+action = "block"
+message = "team strict"
+`
+	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
+		t.Fatalf("failed to write external config: %v", err)
+	}
+
+	// Create main config that extends specific scope from external
+	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"frontend": {
+				Path:    "apps/frontend",
+				Extends: []string{"./team/ribbin.toml#root.strict"},
+				Shims:   map[string]ShimConfig{},
+			},
+		},
+	}
+
+	scope := config.Scopes["frontend"]
+	resolver := NewResolver()
+	result, err := resolver.ResolveEffectiveShims(config, mainPath, &scope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error = %v", err)
+	}
+
+	// Should have team-cmd from the strict scope (block, not warn)
+	if result["team-cmd"].Action != "block" {
+		t.Errorf("team-cmd should be block from strict scope, got %q", result["team-cmd"].Action)
+	}
+	if result["team-cmd"].Message != "team strict" {
+		t.Errorf("team-cmd message should be from strict, got %q", result["team-cmd"].Message)
+	}
+}
+
+func TestResolver_ConfigCaching(t *testing.T) {
+	// Verify that external configs are cached
+	tmpDir := t.TempDir()
+
+	// Create external config in subdirectory (must be named ribbin.toml)
+	externalDir := filepath.Join(tmpDir, "external")
+	if err := os.MkdirAll(externalDir, 0755); err != nil {
+		t.Fatalf("failed to create external dir: %v", err)
+	}
+	externalPath := filepath.Join(externalDir, "ribbin.toml")
+	externalContent := `
+[shims.ext]
+action = "block"
+message = "external"
+`
+	if err := os.WriteFile(externalPath, []byte(externalContent), 0644); err != nil {
+		t.Fatalf("failed to write external config: %v", err)
+	}
+
+	mainPath := filepath.Join(tmpDir, "ribbin.toml")
+	config := &ProjectConfig{
+		Scopes: map[string]ScopeConfig{
+			"a": {
+				Extends: []string{"./external/ribbin.toml"},
+				Shims:   map[string]ShimConfig{},
+			},
+			"b": {
+				Extends: []string{"./external/ribbin.toml"},
+				Shims:   map[string]ShimConfig{},
+			},
+		},
+	}
+
+	resolver := NewResolver()
+
+	// Resolve scope a
+	scopeA := config.Scopes["a"]
+	_, err := resolver.ResolveEffectiveShims(config, mainPath, &scopeA)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims for a error = %v", err)
+	}
+
+	// Check cache has the external file
+	if len(resolver.cache) != 1 {
+		t.Errorf("expected 1 cached config, got %d", len(resolver.cache))
+	}
+
+	// Resolve scope b - should reuse cache
+	scopeB := config.Scopes["b"]
+	_, err = resolver.ResolveEffectiveShims(config, mainPath, &scopeB)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims for b error = %v", err)
+	}
+
+	// Cache size should still be 1
+	if len(resolver.cache) != 1 {
+		t.Errorf("expected 1 cached config after second resolve, got %d", len(resolver.cache))
+	}
+}
