@@ -1325,3 +1325,447 @@ func TestRegistryPersistence(t *testing.T) {
 		t.Error("cat shim Original mismatch")
 	}
 }
+
+// TestScopedConfigIsolation tests that isolated scopes (no extends) only have their own shims
+func TestScopedConfigIsolation(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Create an isolated scope (no extends) for testing
+	isolatedScope := config.ScopeConfig{
+		Path:  "isolated",
+		Shims: map[string]config.ShimConfig{"local-cmd": {Action: "block", Message: "local only"}},
+	}
+
+	resolver := config.NewResolver()
+	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &isolatedScope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error: %v", err)
+	}
+
+	// Should only have local-cmd, not cat/npm/rm from root
+	if len(result) != 1 {
+		t.Errorf("isolated scope should have 1 shim, got %d: %v", len(result), result)
+	}
+	if _, ok := result["local-cmd"]; !ok {
+		t.Error("isolated scope should have local-cmd")
+	}
+	if _, ok := result["cat"]; ok {
+		t.Error("isolated scope should NOT have cat (no extends)")
+	}
+}
+
+// TestScopedConfigExtendsRoot tests that scopes extending root inherit root shims
+func TestScopedConfigExtendsRoot(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Frontend scope extends root
+	frontendScope := cfg.Scopes["frontend"]
+	resolver := config.NewResolver()
+	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &frontendScope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error: %v", err)
+	}
+
+	// Should have: cat, npm, rm (from root), yarn (own), rm override (own)
+	if _, ok := result["cat"]; !ok {
+		t.Error("frontend should inherit cat from root")
+	}
+	if _, ok := result["npm"]; !ok {
+		t.Error("frontend should inherit npm from root")
+	}
+	if _, ok := result["yarn"]; !ok {
+		t.Error("frontend should have its own yarn shim")
+	}
+
+	// Frontend overrides rm to block (root has warn)
+	rmShim := result["rm"]
+	if rmShim.Action != "block" {
+		t.Errorf("frontend rm should be block (override), got %s", rmShim.Action)
+	}
+	if rmShim.Message != "Use trash in frontend" {
+		t.Errorf("frontend rm message should be overridden, got %s", rmShim.Message)
+	}
+}
+
+// TestScopedConfigMultipleExtends tests extends = ["root", "root.scope"]
+func TestScopedConfigMultipleExtends(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Backend extends root and root.strict-mode
+	backendScope := cfg.Scopes["backend"]
+	resolver := config.NewResolver()
+	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &backendScope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error: %v", err)
+	}
+
+	// Should have: cat (root), curl (strict-mode), rm (strict-mode wins over root)
+	if _, ok := result["cat"]; !ok {
+		t.Error("backend should have cat from root")
+	}
+	if _, ok := result["curl"]; !ok {
+		t.Error("backend should have curl from strict-mode")
+	}
+
+	// rm should come from strict-mode (later in extends), not root
+	rmShim := result["rm"]
+	if rmShim.Action != "block" {
+		t.Errorf("backend rm should be block (from strict-mode), got %s", rmShim.Action)
+	}
+	if rmShim.Message != "Use trash (strict)" {
+		t.Errorf("backend rm message should be from strict-mode, got %s", rmShim.Message)
+	}
+}
+
+// TestScopedConfigPassthrough tests action = "passthrough" overriding a block
+func TestScopedConfigPassthrough(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Backend has npm = passthrough, overriding root's block
+	backendScope := cfg.Scopes["backend"]
+	resolver := config.NewResolver()
+	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &backendScope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error: %v", err)
+	}
+
+	npmShim := result["npm"]
+	if npmShim.Action != "passthrough" {
+		t.Errorf("backend npm should be passthrough (override), got %s", npmShim.Action)
+	}
+}
+
+// TestScopedConfigExternalExtends tests extends from external file
+func TestScopedConfigExternalExtends(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// external-test extends ./external/ribbin.toml
+	externalScope := cfg.Scopes["external-test"]
+	resolver := config.NewResolver()
+	result, err := resolver.ResolveEffectiveShims(cfg, configPath, &externalScope)
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShims error: %v", err)
+	}
+
+	// Should have shims from external file
+	if _, ok := result["external-cmd"]; !ok {
+		t.Error("external-test should have external-cmd from external file")
+	}
+	if _, ok := result["shared-tool"]; !ok {
+		t.Error("external-test should have shared-tool from external file")
+	}
+
+	// Verify it came from the external file
+	extShim := result["external-cmd"]
+	if extShim.Action != "block" {
+		t.Errorf("external-cmd action should be block, got %s", extShim.Action)
+	}
+}
+
+// TestScopeMatching tests that the correct scope is selected based on CWD
+func TestScopeMatching(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		cwd           string
+		expectedScope string // empty means root (no scope match), "strict-mode" matches root dir since it has no path
+	}{
+		{"root dir", fixtureDir, "strict-mode"}, // strict-mode has no path, defaults to ".", matches config dir
+		{"frontend dir", filepath.Join(fixtureDir, "apps", "frontend"), "frontend"},
+		{"frontend subdir", filepath.Join(fixtureDir, "apps", "frontend", "src"), "frontend"},
+		{"backend dir", filepath.Join(fixtureDir, "apps", "backend"), "backend"},
+		{"external dir", filepath.Join(fixtureDir, "external"), "external-test"},
+		{"unmatched dir", filepath.Join(fixtureDir, "some", "other"), "strict-mode"}, // strict-mode matches because path defaults to "."
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			match := config.FindMatchingScope(cfg, fixtureDir, tt.cwd)
+			if tt.expectedScope == "" {
+				if match != nil {
+					t.Errorf("expected no scope match, got %s", match.Name)
+				}
+			} else {
+				if match == nil {
+					t.Errorf("expected scope %s, got nil", tt.expectedScope)
+				} else if match.Name != tt.expectedScope {
+					t.Errorf("expected scope %s, got %s", tt.expectedScope, match.Name)
+				}
+			}
+		})
+	}
+}
+
+// TestProvenanceTracking tests that provenance is correctly tracked through extends
+func TestProvenanceTracking(t *testing.T) {
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+	configPath := filepath.Join(fixtureDir, "ribbin.toml")
+
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Frontend scope extends root and overrides rm
+	frontendScope := cfg.Scopes["frontend"]
+	resolver := config.NewResolver()
+	result, err := resolver.ResolveEffectiveShimsWithProvenance(cfg, configPath, &frontendScope, "frontend")
+	if err != nil {
+		t.Fatalf("ResolveEffectiveShimsWithProvenance error: %v", err)
+	}
+
+	// cat should come from root
+	catShim := result["cat"]
+	if catShim.Source.Fragment != "root" {
+		t.Errorf("cat source should be root, got %s", catShim.Source.Fragment)
+	}
+	if catShim.Source.Overrode != nil {
+		t.Error("cat should not have overrode (it's inherited, not overridden)")
+	}
+
+	// rm should come from frontend, overriding root
+	rmShim := result["rm"]
+	if rmShim.Source.Fragment != "root.frontend" {
+		t.Errorf("rm source should be root.frontend, got %s", rmShim.Source.Fragment)
+	}
+	if rmShim.Source.Overrode == nil {
+		t.Error("rm should have overrode set (it overrides root)")
+	} else if rmShim.Source.Overrode.Fragment != "root" {
+		t.Errorf("rm overrode should be root, got %s", rmShim.Source.Overrode.Fragment)
+	}
+}
+
+// TestConfigShowCommand tests the ribbin config show command output
+func TestConfigShowCommand(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-config-show-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Copy fixtures
+	moduleRoot := findModuleRoot(t)
+	fixtureDir := filepath.Join(moduleRoot, "testdata", "projects", "scoped")
+
+	// Create directory structure
+	projectDir := filepath.Join(tmpDir, "project")
+	frontendDir := filepath.Join(projectDir, "apps", "frontend")
+	externalDir := filepath.Join(projectDir, "external")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatalf("failed to create dirs: %v", err)
+	}
+	if err := os.MkdirAll(externalDir, 0755); err != nil {
+		t.Fatalf("failed to create external dir: %v", err)
+	}
+
+	// Copy config files
+	mainConfig, _ := os.ReadFile(filepath.Join(fixtureDir, "ribbin.toml"))
+	if err := os.WriteFile(filepath.Join(projectDir, "ribbin.toml"), mainConfig, 0644); err != nil {
+		t.Fatalf("failed to write main config: %v", err)
+	}
+	extConfig, _ := os.ReadFile(filepath.Join(fixtureDir, "external", "ribbin.toml"))
+	if err := os.WriteFile(filepath.Join(externalDir, "ribbin.toml"), extConfig, 0644); err != nil {
+		t.Fatalf("failed to write external config: %v", err)
+	}
+
+	// Build ribbin
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Save original dir
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+
+	// Test from frontend directory
+	os.Chdir(frontendDir)
+	cmd := exec.Command(ribbinPath, "config", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("config show output: %s", output)
+		// Command may exit non-zero if no config found - that's ok
+	}
+
+	outputStr := string(output)
+	t.Logf("Config show output:\n%s", outputStr)
+
+	// Verify output contains expected elements
+	if !contains(outputStr, "ribbin.toml") {
+		t.Error("output should contain config file name")
+	}
+	if !contains(outputStr, "frontend") {
+		t.Error("output should show frontend scope")
+	}
+}
+
+// TestEndToEndScopedBlocking tests full shim blocking with scoped configs
+func TestEndToEndScopedBlocking(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-scoped-e2e-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Set up directories
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	frontendDir := filepath.Join(projectDir, "apps", "frontend")
+	backendDir := filepath.Join(projectDir, "apps", "backend")
+	binDir := filepath.Join(tmpDir, "bin")
+
+	for _, dir := range []string{homeDir, frontendDir, backendDir, binDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Build ribbin
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Create test command
+	npmPath := filepath.Join(binDir, "npm")
+	npmContent := `#!/bin/sh
+echo "REAL_NPM: $@"
+exit 0
+`
+	if err := os.WriteFile(npmPath, []byte(npmContent), 0755); err != nil {
+		t.Fatalf("failed to create npm: %v", err)
+	}
+
+	// Create scoped config
+	configContent := `
+[shims.npm]
+action = "block"
+message = "Use pnpm instead"
+
+[scopes.backend]
+path = "apps/backend"
+extends = ["root"]
+
+[scopes.backend.shims.npm]
+action = "passthrough"
+`
+	configPath := filepath.Join(projectDir, "ribbin.toml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Install shim
+	registry := &config.Registry{
+		Shims:       make(map[string]config.ShimEntry),
+		Activations: make(map[int]config.ActivationEntry),
+		GlobalOn:    true,
+	}
+	if err := shim.Install(npmPath, ribbinPath, registry, configPath); err != nil {
+		t.Fatalf("failed to install shim: %v", err)
+	}
+
+	// Save registry
+	registryDir := filepath.Join(homeDir, ".config", "ribbin")
+	if err := os.MkdirAll(registryDir, 0755); err != nil {
+		t.Fatalf("failed to create registry dir: %v", err)
+	}
+	registryPath := filepath.Join(registryDir, "registry.json")
+	data, _ := json.MarshalIndent(registry, "", "  ")
+	if err := os.WriteFile(registryPath, data, 0644); err != nil {
+		t.Fatalf("failed to save registry: %v", err)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	// Test 1: From frontend (no passthrough) - should be blocked
+	os.Chdir(frontendDir)
+	cmd := exec.Command("npm", "install")
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Errorf("npm should be blocked in frontend, but succeeded: %s", output)
+	}
+	t.Logf("Frontend npm blocked as expected: %s", output)
+
+	// Test 2: From backend (has passthrough) - should work
+	os.Chdir(backendDir)
+	cmd = exec.Command("npm", "install")
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+
+	if err != nil {
+		t.Errorf("npm should passthrough in backend: %v\nOutput: %s", err, output)
+	}
+	if !contains(string(output), "REAL_NPM") {
+		t.Errorf("expected real npm output, got: %s", output)
+	}
+	t.Logf("Backend npm passthrough works: %s", output)
+
+	t.Log("End-to-end scoped blocking test completed!")
+}

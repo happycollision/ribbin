@@ -1,0 +1,53 @@
+# Test fixture for scoped configurations
+# Tests: root shims, scopes with path, extends, passthrough override
+
+# Root-level shims (available to scopes that extend root)
+[shims.cat]
+action = "block"
+message = "Use 'bat' instead"
+
+[shims.npm]
+action = "block"
+message = "Use 'pnpm' instead"
+
+[shims.rm]
+action = "warn"
+message = "Be careful with rm"
+
+# Frontend scope: extends root, adds yarn block
+[scopes.frontend]
+path = "apps/frontend"
+extends = ["root"]
+
+[scopes.frontend.shims.yarn]
+action = "block"
+message = "Use pnpm in frontend"
+
+# Frontend also overrides rm to block (stricter)
+[scopes.frontend.shims.rm]
+action = "block"
+message = "Use trash in frontend"
+
+# Backend scope: extends root and strict-mode mixin
+[scopes.backend]
+path = "apps/backend"
+extends = ["root", "root.strict-mode"]
+
+[scopes.backend.shims.npm]
+action = "passthrough"  # Override root block - allow npm in backend
+
+# Strict-mode mixin (no path, used via extends)
+[scopes.strict-mode]
+
+[scopes.strict-mode.shims.rm]
+action = "block"
+message = "Use trash (strict)"
+
+[scopes.strict-mode.shims.curl]
+action = "warn"
+message = "Consider using httpie"
+
+# External scope: extends from external file
+[scopes.external-test]
+path = "external"
+extends = ["./external/ribbin.toml"]
