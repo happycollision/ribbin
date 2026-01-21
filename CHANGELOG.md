@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8] - 2026-01-21
+
 ### Added
 - **`ribbin find` command**: Discover orphaned sidecars and config files throughout filesystem
   - Searches for `.ribbin-original` sidecar files, `.ribbin-meta` metadata, and config files
