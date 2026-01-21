@@ -49,11 +49,32 @@ Create a `ribbin.jsonc` file in your project:
   "wrappers": {
     "tsc": {
       "action": "redirect",
-      "redirect": "./scripts/typecheck-wrapper.sh"
+      "redirect": "./scripts/typecheck-wrapper.sh",
+      "message": "Using project's TypeScript configuration"
     }
   }
 }
 ```
+
+Your redirect script receives:
+- All original arguments as script arguments
+- Environment variables:
+  - `RIBBIN_ORIGINAL_BIN` - Path to original binary (e.g., `/usr/local/bin/tsc.ribbin-original`)
+  - `RIBBIN_COMMAND` - Command name (e.g., `tsc`)
+  - `RIBBIN_CONFIG` - Path to ribbin.jsonc
+  - `RIBBIN_ACTION` - Always `redirect`
+
+**Example redirect script:**
+```bash
+#!/bin/bash
+# scripts/typecheck-wrapper.sh
+exec "$RIBBIN_ORIGINAL_BIN" --project tsconfig.json "$@"
+```
+
+**Path Resolution:**
+- Relative paths (e.g., `./scripts/foo.sh`) resolve relative to `ribbin.jsonc` directory
+- Absolute paths used as-is
+- Script must be executable (`chmod +x script.sh`)
 
 **Path Restrictions:**
 ```jsonc
@@ -231,8 +252,6 @@ Create `ribbin.local.jsonc` for personal overrides that aren't committed:
 
 When present, `ribbin.local.jsonc` is loaded instead of `ribbin.jsonc`. Add it to `.gitignore`.
 
-See [Configuration Options](../README.md#configuration) for full details.
-
 ## Commands Reference
 
 | Command | Description | Documentation |
@@ -240,8 +259,8 @@ See [Configuration Options](../README.md#configuration) for full details.
 | `ribbin init` | Initialize ribbin.jsonc | [README](../README.md#quick-start) |
 | `ribbin wrap` | Install wrappers | [README](../README.md#quick-start) |
 | `ribbin unwrap` | Remove wrappers | [README](../README.md#commands) |
-| `ribbin activate` | Activate Ribbin (config, shell, or global) | [README](../README.md#activation-modes) |
-| `ribbin deactivate` | Deactivate Ribbin | [README](../README.md#commands) |
+| `ribbin activate` | Activate Ribbin (config, shell, or global) | See below |
+| `ribbin deactivate` | Deactivate Ribbin | See below |
 | `ribbin status` | Show activation status | Run `ribbin status --help` |
 | `ribbin recover` | Recover orphaned wrappers | Run `ribbin recover --help` |
 | `ribbin audit show` | View audit log | [Audit Logging](audit-logging.md) |
@@ -325,7 +344,15 @@ Then in `package.json`, bypass Ribbin for the actual script:
 }
 ```
 
-See [Use Cases](../README.md#use-cases) for more examples.
+## Activation Modes
+
+Ribbin uses a three-tier activation system:
+
+1. **Config-scoped** (`ribbin activate ./ribbin.jsonc`): Only activates wrappers from specific config files. Most precise control.
+2. **Shell-scoped** (`ribbin activate --shell`): Activates all wrappers for the current shell and its children. Useful for development sessions.
+3. **Global** (`ribbin activate --global`): Affects all shells system-wide. Useful when you always want protection.
+
+Use `ribbin status` to see current activation state and `ribbin deactivate` with corresponding flags to turn off.
 
 ## Architecture
 
@@ -341,7 +368,6 @@ Ribbin uses a "sidecar" approach:
 6. If redirected: run redirect script
 7. Otherwise: exec original binary
 
-See [How It Works](../README.md#how-it-works) for details.
 
 ### Directory Structure
 

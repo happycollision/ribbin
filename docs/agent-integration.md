@@ -83,7 +83,7 @@ This approach:
 The `passthrough` option checks the parent process command line:
 
 - **`invocation`**: Array of exact substrings to match. If any substring is found in the parent command, the call passes through.
-- **`invocationRegexp`**: Array of Go regular expressions. If any pattern matches the parent command, the call passes through.
+- **`invocationRegexp`**: Array of [Go regular expressions](https://pkg.go.dev/regexp/syntax). If any pattern matches the parent command, the call passes through.
 
 Both arrays are optional—use one or both depending on your needs.
 
