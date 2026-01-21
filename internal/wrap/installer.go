@@ -407,8 +407,12 @@ func Uninstall(binaryPath string, registry *config.Registry) error {
 func CleanupSidecarFiles(binaryPath string, registry *config.Registry) error {
 	sidecarPath := binaryPath + ".ribbin-original"
 
+	// Log cleanup operation for audit trail
+	security.LogPrivilegedOperation("cleanup_sidecar", binaryPath, true, nil)
+
 	// Remove sidecar file
 	if err := os.Remove(sidecarPath); err != nil && !os.IsNotExist(err) {
+		security.LogPrivilegedOperation("cleanup_sidecar", binaryPath, false, err)
 		return fmt.Errorf("cannot remove sidecar: %w", err)
 	}
 

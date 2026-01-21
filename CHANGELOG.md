@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`ribbin find` command**: Discover orphaned sidecars and config files throughout filesystem
+  - Searches for `.ribbin-original` sidecar files, `.ribbin-meta` metadata, and config files
+  - Categorizes sidecars as "known" (in registry) vs "unknown/orphaned" (not in registry)
+  - Automatically adds discovered orphans to registry for tracking
+  - Supports scoped search: current directory (default), specific directory, or entire system (`--all`)
+- **`ribbin unwrap --all --find`**: Remove all wrappers including filesystem-discovered orphans
+  - `--find` flag requires `--all` flag to be explicit about scope
+  - Searches entire system (`/`) for orphaned sidecars not in registry
+  - Useful for cleanup after interrupted operations or manual file changes
+
+### Changed
+- **`ribbin status` now shows discovered orphans**: After running `ribbin find`, the status command displays orphaned wrappers in a separate "Discovered orphans" section with cleanup instructions
+- **Registry tracks orphan discovery**: Orphans found by `find` are marked with `Config: "(discovered orphan)"` to distinguish them from config-managed wrappers
+
+### Internal
+- Add `TestStatusFindStatusFlow` integration test validating the discovery workflow: `status` → `find` → `status` showing new orphan visibility
+- Add `searchForSidecars()` shared function used by both `find` and `unwrap --find`
+- Update `find-orphaned` scenario documentation and test scripts
+
 ## [0.1.0-alpha.7] - 2026-01-21
 
 ### Changed

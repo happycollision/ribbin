@@ -2870,3 +2870,400 @@ exit 0
 
 	t.Log("system binary test completed!")
 }
+
+func TestFindOrphanedSidecars(t *testing.T) {
+	// Create temp directories for test isolation
+	tmpDir, err := os.MkdirTemp("", "ribbin-find-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create bin directory for test binaries
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+
+	// Create project directory
+	projectDir := filepath.Join(tmpDir, "project")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatalf("failed to create project dir: %v", err)
+	}
+
+	// Create home directory
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("failed to create home dir: %v", err)
+	}
+
+	// Save and set environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	// Find module root before changing directories
+	moduleRoot := findModuleRoot(t)
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+	os.Chdir(projectDir)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	// Build ribbin
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Create test binaries
+	tool1Path := filepath.Join(binDir, "tool1")
+	tool1Content := `#!/bin/sh
+echo "tool1 original"
+`
+	if err := os.WriteFile(tool1Path, []byte(tool1Content), 0755); err != nil {
+		t.Fatalf("failed to create tool1: %v", err)
+	}
+
+	tool2Path := filepath.Join(binDir, "tool2")
+	tool2Content := `#!/bin/sh
+echo "tool2 original"
+`
+	if err := os.WriteFile(tool2Path, []byte(tool2Content), 0755); err != nil {
+		t.Fatalf("failed to create tool2: %v", err)
+	}
+
+	// Create ribbin config
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "tool1": {
+      "action": "block",
+      "message": "tool1 blocked",
+      "paths": ["%s"]
+    },
+    "tool2": {
+      "action": "block",
+      "message": "tool2 blocked",
+      "paths": ["%s"]
+    }
+  }
+}`, tool1Path, tool2Path)
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Wrap the tools
+	t.Log("Wrapping tools...")
+	wrapCmd := exec.Command(ribbinPath, "wrap")
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Wrap output: %s", output)
+
+	// Verify sidecars exist
+	sidecar1 := tool1Path + ".ribbin-original"
+	sidecar2 := tool2Path + ".ribbin-original"
+	if _, err := os.Stat(sidecar1); os.IsNotExist(err) {
+		t.Fatal("sidecar1 should exist")
+	}
+	if _, err := os.Stat(sidecar2); os.IsNotExist(err) {
+		t.Fatal("sidecar2 should exist")
+	}
+
+	// Test: ribbin find should show both as known wrappers
+	t.Log("Testing ribbin find (should show known wrappers)...")
+	findCmd := exec.Command(ribbinPath, "find", binDir)
+	findCmd.Dir = projectDir
+	findCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = findCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin find failed: %v\n%s", err, output)
+	}
+	t.Logf("Find output: %s", output)
+	if !contains(string(output), "Known Wrapped Binaries") {
+		t.Error("should show known wrapped binaries section")
+	}
+
+	// Create orphaned sidecar by manually creating sidecar files without registry entry
+	t.Log("Creating orphaned sidecar...")
+	orphanPath := filepath.Join(binDir, "orphan-tool")
+	orphanSidecar := orphanPath + ".ribbin-original"
+	orphanContent := `#!/bin/sh
+echo "orphan tool original"
+`
+	if err := os.WriteFile(orphanSidecar, []byte(orphanContent), 0755); err != nil {
+		t.Fatalf("failed to create orphan sidecar: %v", err)
+	}
+
+	// Create a symlink wrapper for the orphan (simulating incomplete wrap operation)
+	orphanWrapper := `#!/bin/sh
+echo "orphan wrapper (broken)"
+exit 1
+`
+	if err := os.WriteFile(orphanPath, []byte(orphanWrapper), 0755); err != nil {
+		t.Fatalf("failed to create orphan wrapper: %v", err)
+	}
+
+	// Test: ribbin find should now show orphaned wrapper
+	t.Log("Testing ribbin find (should show orphaned wrapper)...")
+	findCmd = exec.Command(ribbinPath, "find", binDir)
+	findCmd.Dir = projectDir
+	findCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = findCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin find failed: %v\n%s", err, output)
+	}
+	t.Logf("Find output: %s", output)
+	if !contains(string(output), "Unknown/Orphaned Wrapped Binaries") {
+		t.Error("should show orphaned wrapped binaries section")
+	}
+	if !contains(string(output), "orphan-tool") {
+		t.Error("should list orphan-tool as orphaned")
+	}
+
+	// Test: ribbin unwrap --all should remove known wrappers from registry
+	t.Log("Testing ribbin unwrap --all...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", "--all")
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap --all failed: %v\n%s", err, output)
+	}
+	t.Logf("Unwrap --all output: %s", output)
+
+	// Verify known sidecars are gone after unwrap
+	if _, err := os.Stat(sidecar1); !os.IsNotExist(err) {
+		t.Error("sidecar1 should be removed")
+	}
+	if _, err := os.Stat(sidecar2); !os.IsNotExist(err) {
+		t.Error("sidecar2 should be removed")
+	}
+
+	// Orphaned sidecar should still exist (not in registry, so --all doesn't touch it)
+	if _, err := os.Stat(orphanSidecar); os.IsNotExist(err) {
+		t.Error("orphan sidecar should still exist after unwrap --all")
+	}
+
+	// Test: ribbin find should still show the orphaned wrapper
+	t.Log("Testing ribbin find after unwrap --all...")
+	findCmd = exec.Command(ribbinPath, "find", binDir)
+	findCmd.Dir = projectDir
+	findCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = findCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin find failed: %v\n%s", err, output)
+	}
+	t.Logf("Find output after unwrap --all: %s", output)
+	if !contains(string(output), "orphan-tool") {
+		t.Error("should still show orphan-tool after unwrap --all")
+	}
+
+	t.Log("Find and unwrap test completed!")
+}
+
+func TestStatusFindStatusFlow(t *testing.T) {
+	// Create temp directories for test isolation
+	tmpDir, err := os.MkdirTemp("", "ribbin-status-find-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create bin directory for test binaries
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+
+	// Create project directory
+	projectDir := filepath.Join(tmpDir, "project")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatalf("failed to create project dir: %v", err)
+	}
+
+	// Create home directory
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("failed to create home dir: %v", err)
+	}
+
+	// Save and set environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	// Find module root before changing directories
+	moduleRoot := findModuleRoot(t)
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+	os.Chdir(projectDir)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	// Build ribbin
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Create test binary
+	toolPath := filepath.Join(binDir, "mytool")
+	toolContent := `#!/bin/sh
+echo "mytool original"
+`
+	if err := os.WriteFile(toolPath, []byte(toolContent), 0755); err != nil {
+		t.Fatalf("failed to create mytool: %v", err)
+	}
+
+	// Create ribbin config
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "mytool": {
+      "action": "block",
+      "message": "mytool blocked",
+      "paths": ["%s"]
+    }
+  }
+}`, toolPath)
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Wrap the tool
+	t.Log("Wrapping mytool...")
+	wrapCmd := exec.Command(ribbinPath, "wrap")
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Wrap output: %s", output)
+
+	// Step 1: Run status (should show mytool as known wrapper)
+	t.Log("Step 1: Running status (before orphan)...")
+	statusCmd := exec.Command(ribbinPath, "status")
+	statusCmd.Dir = projectDir
+	statusCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = statusCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin status failed: %v\n%s", err, output)
+	}
+	t.Logf("Status output (before): %s", output)
+
+	// Verify mytool is shown as a known wrapper
+	if !contains(string(output), "Known wrappers") {
+		t.Error("status should show 'Known wrappers' section")
+	}
+	if !contains(string(output), toolPath) {
+		t.Error("status should show mytool in known wrappers")
+	}
+	if contains(string(output), "Discovered orphans") {
+		t.Error("status should NOT show orphans section yet")
+	}
+
+	// Step 2: Create an orphaned sidecar (simulating interrupted operation)
+	t.Log("Step 2: Creating orphaned sidecar...")
+	orphanPath := filepath.Join(binDir, "orphan-tool")
+	orphanSidecar := orphanPath + ".ribbin-original"
+	orphanContent := `#!/bin/sh
+echo "orphan tool original"
+`
+	if err := os.WriteFile(orphanSidecar, []byte(orphanContent), 0755); err != nil {
+		t.Fatalf("failed to create orphan sidecar: %v", err)
+	}
+
+	// Create wrapper script for the orphan
+	orphanWrapper := `#!/bin/sh
+echo "orphan wrapper (broken)"
+exit 1
+`
+	if err := os.WriteFile(orphanPath, []byte(orphanWrapper), 0755); err != nil {
+		t.Fatalf("failed to create orphan wrapper: %v", err)
+	}
+
+	// Step 3: Run status again (should still not show orphan - not discovered yet)
+	t.Log("Step 3: Running status again (orphan exists but not discovered)...")
+	statusCmd = exec.Command(ribbinPath, "status")
+	statusCmd.Dir = projectDir
+	statusCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = statusCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin status failed: %v\n%s", err, output)
+	}
+	t.Logf("Status output (after orphan created): %s", output)
+
+	// Should still only show mytool, not the orphan
+	if contains(string(output), "orphan-tool") {
+		t.Error("status should NOT show orphan-tool before find runs")
+	}
+
+	// Step 4: Run find to discover the orphan
+	t.Log("Step 4: Running find to discover orphan...")
+	findCmd := exec.Command(ribbinPath, "find", binDir)
+	findCmd.Dir = projectDir
+	findCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = findCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin find failed: %v\n%s", err, output)
+	}
+	t.Logf("Find output: %s", output)
+
+	// Verify find shows the orphan
+	if !contains(string(output), "Unknown/Orphaned Wrapped Binaries") {
+		t.Error("find should show orphaned section")
+	}
+	if !contains(string(output), "orphan-tool") {
+		t.Error("find should show orphan-tool")
+	}
+	if !contains(string(output), "Added 1 orphaned sidecar(s) to registry") {
+		t.Error("find should report adding orphan to registry")
+	}
+
+	// Step 5: Run status again (should now show the discovered orphan)
+	t.Log("Step 5: Running status again (after find discovers orphan)...")
+	statusCmd = exec.Command(ribbinPath, "status")
+	statusCmd.Dir = projectDir
+	statusCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = statusCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin status failed: %v\n%s", err, output)
+	}
+	t.Logf("Status output (after find): %s", output)
+
+	// Now status should show both known wrapper and discovered orphan
+	if !contains(string(output), "Known wrappers") {
+		t.Error("status should still show known wrappers section")
+	}
+	if !contains(string(output), "Discovered orphans") {
+		t.Error("status should now show discovered orphans section")
+	}
+	if !contains(string(output), "orphan-tool") {
+		t.Error("status should show orphan-tool in discovered orphans")
+	}
+	if !contains(string(output), "These were found by 'ribbin find'") {
+		t.Error("status should explain that orphans were discovered by find command")
+	}
+
+	t.Log("Status→Find→Status flow test completed!")
+}

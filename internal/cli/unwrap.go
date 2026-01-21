@@ -15,7 +15,7 @@ import (
 )
 
 var unwrapGlobal bool
-var unwrapSearch bool
+var unwrapFind bool
 
 var unwrapCmd = &cobra.Command{
 	Use:   "unwrap [config-files...]",
@@ -26,8 +26,8 @@ By default, removes wrappers only for commands listed in the nearest ribbin.json
 You can also specify config file paths explicitly.
 
 Use flags to control which wrappers are removed:
-  --global       Remove all wrappers tracked in the registry
-  --search       Search filesystem for orphaned wrappers (use with --global)
+  --all          Remove all wrappers tracked in the registry
+  --find         Search entire system for orphaned wrappers (requires --all)
 
 For each wrapped command, ribbin:
   1. Removes the symlink at the command's path
@@ -37,14 +37,14 @@ For each wrapped command, ribbin:
 Examples:
   ribbin unwrap                         # Remove wrappers from nearest ribbin.jsonc
   ribbin unwrap ./a.jsonc ./b.jsonc     # Remove wrappers from specific configs
-  ribbin unwrap --global                # Remove all wrappers in the registry
-  ribbin unwrap --global --search       # Search filesystem for any orphaned wrappers`,
+  ribbin unwrap --all                   # Remove all wrappers in the registry
+  ribbin unwrap --all --find            # Remove all wrappers + search for orphaned ones`,
 	RunE: runUnwrap,
 }
 
 func init() {
-	unwrapCmd.Flags().BoolVar(&unwrapGlobal, "global", false, "Remove all wrappers tracked in the registry, not just those in ribbin.jsonc")
-	unwrapCmd.Flags().BoolVar(&unwrapSearch, "search", false, "Search common binary directories for wrappers (use with --global)")
+	unwrapCmd.Flags().BoolVar(&unwrapGlobal, "all", false, "Remove all wrappers tracked in the registry, not just those in ribbin.jsonc")
+	unwrapCmd.Flags().BoolVar(&unwrapFind, "find", false, "Search entire system for orphaned wrappers (requires --all)")
 }
 
 // commonBinDirs returns common binary directories to search for wrappers.
@@ -76,25 +76,49 @@ func runUnwrap(cmd *cobra.Command, args []string) error {
 	// Determine paths to unwrap based on flags and args
 	var pathsToUnwrap []string
 
-	if unwrapGlobal && unwrapSearch {
-		// Search common bin directories for sidecars
-		binDirs, err := commonBinDirs()
-		if err != nil {
-			return fmt.Errorf("failed to get bin directories: %w", err)
-		}
-		sidecars, err := wrap.FindSidecars(binDirs)
-		if err != nil {
-			return fmt.Errorf("failed to search for sidecars: %w", err)
-		}
-		// Convert sidecar paths to original paths (remove .ribbin-original suffix)
-		for _, sidecar := range sidecars {
-			originalPath := strings.TrimSuffix(sidecar, ".ribbin-original")
-			pathsToUnwrap = append(pathsToUnwrap, originalPath)
-		}
-	} else if unwrapGlobal {
+	// --find requires --all
+	if unwrapFind && !unwrapGlobal {
+		return fmt.Errorf("--find requires --all flag")
+	}
+
+	if unwrapGlobal {
 		// Use paths from registry
 		for _, entry := range registry.Wrappers {
 			pathsToUnwrap = append(pathsToUnwrap, entry.Original)
+		}
+
+		// If --find is specified, also search entire filesystem for orphaned sidecars
+		if unwrapFind {
+			fmt.Println("⚠️  Searching your entire system for orphaned ribbin sidecars...")
+			fmt.Println("This may take a while depending on your filesystem size.")
+			fmt.Println()
+
+			// Use shared search function (same as `find --all`)
+			searchedSidecars, err := searchForSidecars("/")
+			if err != nil {
+				return fmt.Errorf("error during filesystem search: %w", err)
+			}
+
+			// Add orphaned sidecars (not already in registry)
+			registryCount := len(pathsToUnwrap)
+			for _, sidecar := range searchedSidecars {
+				originalPath := strings.TrimSuffix(sidecar, ".ribbin-original")
+				// Check if already in pathsToUnwrap
+				alreadyAdded := false
+				for _, existing := range pathsToUnwrap {
+					if existing == originalPath {
+						alreadyAdded = true
+						break
+					}
+				}
+				if !alreadyAdded {
+					pathsToUnwrap = append(pathsToUnwrap, originalPath)
+				}
+			}
+
+			orphanedCount := len(pathsToUnwrap) - registryCount
+			fmt.Printf("Found %d total sidecar(s) to process (%d from registry, %d orphaned).\n\n",
+				len(pathsToUnwrap), registryCount, orphanedCount)
 		}
 	} else {
 		// Determine config files to process

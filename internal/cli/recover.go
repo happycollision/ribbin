@@ -6,10 +6,10 @@ import (
 
 var recoverCmd = &cobra.Command{
 	Use:   "recover",
-	Short: "Recover wrapped binaries (alias for unwrap --global --search)",
+	Short: "Recover wrapped binaries (alias for unwrap --all --find)",
 	Long: `Recover all wrapped binaries by searching common binary directories.
 
-This is an alias for 'ribbin unwrap --global --search'. Use this command
+This is an alias for 'ribbin unwrap --all --find'. Use this command
 to restore all original binaries before uninstalling ribbin, or to recover
 from a situation where wrapped binaries were orphaned.
 
@@ -25,7 +25,7 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Set the flags for unwrap command
 		unwrapGlobal = true
-		unwrapSearch = true
+		unwrapFind = true
 
 		// Run the unwrap command
 		return runUnwrap(cmd, args)

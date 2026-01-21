@@ -56,6 +56,7 @@ func init() {
 	rootCmd.AddCommand(deactivateCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(recoverCmd)
+	rootCmd.AddCommand(findCmd)
 
 	// Set version for metadata in wrap package
 	wrap.Version = Version

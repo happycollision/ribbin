@@ -221,9 +221,11 @@ RIBBIN_BYPASS=1 tsc --version
 | `ribbin init` | Create a `ribbin.jsonc` in the current directory |
 | `ribbin wrap` | Install wrappers for commands in config |
 | `ribbin unwrap` | Remove wrappers and restore originals |
+| `ribbin unwrap --all --find` | Find and remove all wrappers including orphaned ones |
 | `ribbin activate --global` | Enable wrappers globally |
 | `ribbin deactivate --global` | Disable wrappers globally |
 | `ribbin status` | Show current activation status |
+| `ribbin find` | Find orphaned sidecars and config files |
 | `ribbin recover` | Restore orphaned wrapped binaries |
 | `ribbin config show` | Show effective config for current directory |
 

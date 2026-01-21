@@ -71,17 +71,49 @@ Example:
 			}
 		}
 
-		// Wrapped tools section
+		// Wrapped tools section - separate known from discovered orphans
 		fmt.Println()
 		fmt.Println("Wrapped Tools:")
-		if len(registry.Wrappers) == 0 {
-			fmt.Println("  (none)")
-		} else {
-			for name, entry := range registry.Wrappers {
-				fmt.Printf("  %s -> %s\n", name, entry.Original)
-				fmt.Printf("    (from %s)\n", entry.Config)
+
+		var knownWrappers []config.WrapperEntry
+		var discoveredOrphans []config.WrapperEntry
+
+		for _, entry := range registry.Wrappers {
+			if entry.Config == "(discovered orphan)" {
+				discoveredOrphans = append(discoveredOrphans, entry)
+			} else {
+				knownWrappers = append(knownWrappers, entry)
 			}
 		}
+
+		if len(knownWrappers) == 0 && len(discoveredOrphans) == 0 {
+			fmt.Println("  (none)")
+		} else {
+			if len(knownWrappers) > 0 {
+				fmt.Println("  Known wrappers:")
+				for _, entry := range knownWrappers {
+					fmt.Printf("    %s\n", entry.Original)
+					fmt.Printf("      (from %s)\n", entry.Config)
+				}
+			}
+
+			if len(discoveredOrphans) > 0 {
+				if len(knownWrappers) > 0 {
+					fmt.Println()
+				}
+				fmt.Printf("  ⚠️  Discovered orphans (%d):\n", len(discoveredOrphans))
+				for _, entry := range discoveredOrphans {
+					fmt.Printf("    %s\n", entry.Original)
+				}
+				fmt.Println()
+				fmt.Println("  These were found by 'ribbin find' but not created by a config file.")
+				fmt.Println("  To clean them up, run:")
+				fmt.Println("    ribbin unwrap --all")
+			}
+		}
+
+		fmt.Println()
+		fmt.Println("💡 Tip: Run 'ribbin find --all' to search your entire system for unknown sidecars.")
 	},
 }
 

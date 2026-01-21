@@ -106,6 +106,7 @@ make scenario SCENARIO=basic            # Run specific scenario directly
 |----------|-------------|
 | `basic` | Block and redirect actions with local wrapper commands |
 | `extends` | Config inheritance from mixins and external files |
+| `find-orphaned` | Test finding orphaned sidecars and unwrap --all --find |
 | `local-dev-mode` | Simulates Ribbin in node_modules/.bin - tests repo-only shimming |
 | `mixed-permissions` | Demonstrates allowed vs forbidden directory security |
 | `recovery` | Test recovery command |
