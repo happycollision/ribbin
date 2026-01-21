@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7] - 2026-01-21
+
 ### Changed
 - **Directory security model simplified**: Switched from whitelist to blacklist model. Only system directories (`/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/usr/libexec`, `/System`) now require `--confirm-system-dir`. All other directories are allowed by default.
 - `ribbin init` template now includes passthrough and scopes examples
