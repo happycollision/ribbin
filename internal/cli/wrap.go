@@ -37,7 +37,7 @@ Security:
 
 Examples:
   ribbin wrap                            # Wrap commands from nearest ribbin.jsonc
-  ribbin wrap ./a.toml ./b.toml          # Wrap commands from specific configs
+  ribbin wrap ./a.jsonc ./b.jsonc        # Wrap commands from specific configs
   ribbin wrap --confirm-system-dir       # Allow wrapping in /bin, /usr/bin, etc.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		printGlobalWarningIfActive()

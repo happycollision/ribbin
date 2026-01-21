@@ -16,14 +16,14 @@ var (
 
 var configRemoveCmd = &cobra.Command{
 	Use:   "remove <command>",
-	Short: "Remove a shim configuration",
-	Long: `Remove a shim configuration from ribbin.jsonc.
+	Short: "Remove a wrapper configuration",
+	Long: `Remove a wrapper configuration from ribbin.jsonc.
 
 Prompts for confirmation unless --force is used.
 
 Examples:
-  ribbin config remove tsc              Remove 'tsc' shim (with confirmation)
-  ribbin config remove npm --force      Remove 'npm' shim without confirmation`,
+  ribbin config remove tsc              Remove 'tsc' wrapper (with confirmation)
+  ribbin config remove npm --force      Remove 'npm' wrapper without confirmation`,
 	Args: cobra.ExactArgs(1),
 	RunE: runConfigRemove,
 }
@@ -74,7 +74,7 @@ func runConfigRemove(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 
 		// Prompt for confirmation
-		fmt.Printf("Remove shim for '%s'? [y/N] ", cmdName)
+		fmt.Printf("Remove wrapper for '%s'? [y/N] ", cmdName)
 		reader := bufio.NewReader(os.Stdin)
 		response, err := reader.ReadString('\n')
 		if err != nil {
@@ -87,14 +87,14 @@ func runConfigRemove(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Remove shim
+	// Remove wrapper
 	if err := config.RemoveShim(configPath, cmdName); err != nil {
-		return fmt.Errorf("failed to remove shim: %w", err)
+		return fmt.Errorf("failed to remove wrapper: %w", err)
 	}
 
 	// Show success message
-	fmt.Printf("Removed shim for '%s'\n", cmdName)
-	fmt.Printf("Run 'ribbin unshim %s' to remove the installed shim.\n", cmdName)
+	fmt.Printf("Removed wrapper for '%s'\n", cmdName)
+	fmt.Printf("Run 'ribbin unwrap' to remove the installed wrapper.\n")
 
 	return nil
 }

@@ -29,10 +29,10 @@ Scope flags (mutually exclusive):
   --global   Activate everything everywhere
 
 Examples:
-  ribbin activate                    # Activate nearest config
-  ribbin activate ./a.toml ./b.toml  # Activate specific configs
-  ribbin activate --shell            # Activate for this shell
-  ribbin activate --global           # Activate globally`,
+  ribbin activate                        # Activate nearest config
+  ribbin activate ./a.jsonc ./b.jsonc    # Activate specific configs
+  ribbin activate --shell                # Activate for this shell
+  ribbin activate --global               # Activate globally`,
 	Run: func(cmd *cobra.Command, args []string) {
 		printGlobalWarningIfActive()
 

@@ -36,7 +36,7 @@ For each wrapped command, ribbin:
 
 Examples:
   ribbin unwrap                         # Remove wrappers from nearest ribbin.jsonc
-  ribbin unwrap ./a.toml ./b.toml       # Remove wrappers from specific configs
+  ribbin unwrap ./a.jsonc ./b.jsonc     # Remove wrappers from specific configs
   ribbin unwrap --global                # Remove all wrappers in the registry
   ribbin unwrap --global --search       # Search filesystem for any orphaned wrappers`,
 	RunE: runUnwrap,

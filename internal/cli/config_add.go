@@ -20,8 +20,8 @@ var (
 
 var configAddCmd = &cobra.Command{
 	Use:   "add <command>",
-	Short: "Add a new shim configuration",
-	Long: `Add a new shim configuration to ribbin.jsonc.
+	Short: "Add a new wrapper configuration",
+	Long: `Add a new wrapper configuration to ribbin.jsonc.
 
 For block actions, specify --action block and optionally --message.
 For redirect actions, specify --action redirect and --redirect (script path).
@@ -70,7 +70,7 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 
 	// Check if command already exists
 	if _, exists := cfg.Wrappers[cmdName]; exists {
-		return fmt.Errorf("shim for command '%s' already exists. Use 'ribbin config edit' to modify it.", cmdName)
+		return fmt.Errorf("wrapper for command '%s' already exists. Use 'ribbin config edit' to modify it.", cmdName)
 	}
 
 	// Validate redirect-specific requirements
@@ -104,7 +104,7 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build ShimConfig from flags
+	// Build wrapper config from flags
 	shimConfig := config.ShimConfig{
 		Action:   addAction,
 		Message:  addMessage,
@@ -112,13 +112,13 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 		Paths:    addPaths,
 	}
 
-	// Add shim to config
+	// Add wrapper to config
 	if err := config.AddShim(configPath, cmdName, shimConfig); err != nil {
-		return fmt.Errorf("failed to add shim: %w", err)
+		return fmt.Errorf("failed to add wrapper: %w", err)
 	}
 
 	// Show success message
-	fmt.Printf("Added shim for '%s'\n", cmdName)
+	fmt.Printf("Added wrapper for '%s'\n", cmdName)
 	fmt.Printf("  Action: %s\n", addAction)
 	if addMessage != "" {
 		fmt.Printf("  Message: %s\n", addMessage)
@@ -129,7 +129,7 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 	if len(addPaths) > 0 {
 		fmt.Printf("  Paths: %s\n", strings.Join(addPaths, ", "))
 	}
-	fmt.Printf("\nRun 'ribbin shim %s' to install the shim.\n", cmdName)
+	fmt.Printf("\nRun 'ribbin wrap' to install the wrapper.\n")
 
 	return nil
 }

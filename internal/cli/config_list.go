@@ -18,15 +18,15 @@ var (
 
 var configListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all shim configurations",
-	Long: `Display all configured shims from ribbin.jsonc.
+	Short: "List all wrapper configurations",
+	Long: `Display all configured wrappers from ribbin.jsonc.
 
 Shows command name, action type, and configuration details.
 
 Examples:
-  ribbin config list                    List all shims in table format
+  ribbin config list                    List all wrappers in table format
   ribbin config list --json             Output in JSON format
-  ribbin config list --command tsc      Show only the 'tsc' shim configuration`,
+  ribbin config list --command tsc      Show only the 'tsc' wrapper configuration`,
 	RunE: runConfigList,
 }
 
@@ -54,7 +54,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 
 	// Check if config is empty
 	if len(cfg.Wrappers) == 0 {
-		fmt.Println("No shims configured")
+		fmt.Println("No wrappers configured")
 		return nil
 	}
 

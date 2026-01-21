@@ -15,7 +15,7 @@ var auditCmd = &cobra.Command{
 	Long: `View and query the security audit log.
 
 The audit log tracks all security-relevant operations including:
-- Shim installations and uninstallations
+- Wrapper installations and uninstallations
 - Bypass usage (RIBBIN_BYPASS=1)
 - Security violations (path traversal, forbidden directories)
 - Privileged operations (running as root)
@@ -38,8 +38,8 @@ The audit log is stored in JSONL format at:
   ~/.local/state/ribbin/audit.log (or $XDG_STATE_HOME/ribbin/audit.log)
 
 Event types include:
-  shim.install          - Shim installed
-  shim.uninstall        - Shim uninstalled
+  shim.install          - Wrapper installed
+  shim.uninstall        - Wrapper uninstalled
   bypass.used           - RIBBIN_BYPASS=1 used
   security.violation    - Security policy violated
   privileged.operation  - Operation performed as root

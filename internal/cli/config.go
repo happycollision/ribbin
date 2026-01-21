@@ -7,10 +7,10 @@ import (
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage ribbin.jsonc configuration",
-	Long: `Add, remove, list, edit, and show shim configurations without manual file editing.
+	Long: `Add, remove, list, edit, and show wrapper configurations without manual file editing.
 
 Subcommands:
-  list     Display all configured shims
+  list     Display all configured wrappers
   show     Show effective configuration with provenance tracking
 
 Use "ribbin config <command> --help" for more information about a command.`,

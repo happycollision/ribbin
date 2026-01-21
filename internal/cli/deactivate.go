@@ -30,14 +30,14 @@ Modifier flags:
   --everything  Nuclear option: deactivate global + all shells + all configs
 
 Examples:
-  ribbin deactivate                    # Deactivate nearest config
-  ribbin deactivate ./a.toml ./b.toml  # Deactivate specific configs
-  ribbin deactivate --config --all     # Deactivate ALL configs
-  ribbin deactivate --all              # Same as --config --all
-  ribbin deactivate --shell            # Deactivate current shell
-  ribbin deactivate --shell --all      # Deactivate ALL shells
-  ribbin deactivate --global           # Turn off global mode
-  ribbin deactivate --everything       # Nuclear: global + all shells + all configs`,
+  ribbin deactivate                        # Deactivate nearest config
+  ribbin deactivate ./a.jsonc ./b.jsonc    # Deactivate specific configs
+  ribbin deactivate --config --all         # Deactivate ALL configs
+  ribbin deactivate --all                  # Same as --config --all
+  ribbin deactivate --shell                # Deactivate current shell
+  ribbin deactivate --shell --all          # Deactivate ALL shells
+  ribbin deactivate --global               # Turn off global mode
+  ribbin deactivate --everything           # Nuclear: global + all shells + all configs`,
 	Run: func(cmd *cobra.Command, args []string) {
 		printGlobalWarningIfActive()
 

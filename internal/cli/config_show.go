@@ -17,17 +17,17 @@ var (
 
 var configShowCmd = &cobra.Command{
 	Use:   "show",
-	Short: "Show effective shim configuration with provenance",
-	Long: `Display the effective shim configuration for the current working directory.
+	Short: "Show effective wrapper configuration with provenance",
+	Long: `Display the effective wrapper configuration for the current working directory.
 
 Shows which config file applies, which scope matches (if any), and lists
-all effective shims with their sources. This is useful for understanding
+all effective wrappers with their sources. This is useful for understanding
 how scope inheritance and extends work together.
 
 Examples:
-  ribbin config show                    Show all effective shims
+  ribbin config show                    Show all effective wrappers
   ribbin config show --json             Output in JSON format
-  ribbin config show --command npm      Show only the 'npm' shim configuration`,
+  ribbin config show --command npm      Show only the 'npm' wrapper configuration`,
 	RunE: runConfigShow,
 }
 
@@ -154,9 +154,9 @@ func outputShowText(configPath string, matchedScope *config.MatchedScope, shims 
 		fmt.Printf("Scope:  (root)\n")
 	}
 
-	// Check if there are any shims
+	// Check if there are any wrappers
 	if len(shims) == 0 {
-		fmt.Println("\nNo effective shims configured")
+		fmt.Println("\nNo effective wrappers configured")
 		return nil
 	}
 
@@ -167,7 +167,7 @@ func outputShowText(configPath string, matchedScope *config.MatchedScope, shims 
 	}
 	sort.Strings(commands)
 
-	fmt.Println("\nEffective shims:")
+	fmt.Println("\nEffective wrappers:")
 
 	for _, cmd := range commands {
 		resolved := shims[cmd]

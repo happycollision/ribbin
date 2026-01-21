@@ -20,8 +20,8 @@ var (
 
 var configEditCmd = &cobra.Command{
 	Use:   "edit <command>",
-	Short: "Edit an existing shim configuration",
-	Long: `Edit an existing shim configuration in ribbin.jsonc.
+	Short: "Edit an existing wrapper configuration",
+	Long: `Edit an existing wrapper configuration in ribbin.jsonc.
 
 Only specified fields are updated; others remain unchanged.
 
@@ -154,13 +154,13 @@ func runConfigEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("redirect field required when action=redirect")
 	}
 
-	// Update shim
+	// Update wrapper
 	if err := config.UpdateShim(configPath, cmdName, updatedShim); err != nil {
-		return fmt.Errorf("failed to update shim: %w", err)
+		return fmt.Errorf("failed to update wrapper: %w", err)
 	}
 
 	// Show success message with summary of changes
-	fmt.Printf("Updated shim for '%s':\n", cmdName)
+	fmt.Printf("Updated wrapper for '%s':\n", cmdName)
 	if len(changes) > 0 {
 		for _, change := range changes {
 			fmt.Println(change)
