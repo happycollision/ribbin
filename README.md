@@ -4,7 +4,7 @@ Block direct tool calls and redirect to project-specific alternatives.
 
 ## The Problem
 
-AI agents sometimes ignore project instructions and call tools directly (`tsc`, `npm`, `cat`) instead of using project-configured wrappers (`pnpm run typecheck`, `bat`). This leads to misconfigured tool runs, confusion, and repeated mistakes.
+AI agents sometimes ignore project instructions and call tools directly (`tsc`, `npm`, `eslint`) instead of using project-configured wrappers (`pnpm run typecheck`, `pnpm run lint`). This leads to misconfigured tool runs, confusion, and repeated mistakes.
 
 ## The Solution
 
