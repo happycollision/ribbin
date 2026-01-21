@@ -1,4 +1,4 @@
-# ribbin
+# Ribbin
 
 Command shimming tool - blocks direct tool calls and redirects to project-specific alternatives.
 
@@ -76,15 +76,15 @@ To extend the shared config while adding your own rules:
 
 ## Local Development Mode
 
-When ribbin is installed as a dev dependency (e.g., in `node_modules/.bin/`), it automatically enables **Local Development Mode**. In this mode, ribbin can only wrap binaries within the same git repository.
+When Ribbin is installed as a dev dependency (e.g., in `node_modules/.bin/`), it automatically enables **Local Development Mode**. In this mode, Ribbin can only wrap binaries within the same git repository.
 
 This protects developers from malicious packages that might try to wrap system binaries.
 
-**Detection**: ribbin checks if its own executable is inside a git repository by walking up directories looking for `.git`.
+**Detection**: Ribbin checks if its own executable is inside a git repository by walking up directories looking for `.git`.
 
 **Behavior**:
-- If ribbin is inside a git repo → can only wrap binaries in that repo
-- If ribbin is NOT in a git repo (global install) → normal security rules apply
+- If Ribbin is inside a git repo → can only wrap binaries in that repo
+- If Ribbin is NOT in a git repo (global install) → normal security rules apply
 
 This works across ecosystems:
 - npm/pnpm/yarn: `./node_modules/.bin/ribbin`
@@ -93,7 +93,7 @@ This works across ecosystems:
 
 ## Interactive Scenario Testing
 
-Test ribbin in isolated Docker environments without affecting your host system:
+Test Ribbin in isolated Docker environments without affecting your host system:
 
 ```bash
 make scenario                           # Show menu to pick a scenario
@@ -106,12 +106,12 @@ make scenario SCENARIO=basic            # Run specific scenario directly
 |----------|-------------|
 | `basic` | Block and redirect actions with local wrapper commands |
 | `extends` | Config inheritance from mixins and external files |
-| `local-dev-mode` | Simulates ribbin in node_modules/.bin - tests repo-only shimming |
+| `local-dev-mode` | Simulates Ribbin in node_modules/.bin - tests repo-only shimming |
 | `mixed-permissions` | Demonstrates allowed vs forbidden directory security |
 | `recovery` | Test recovery command |
 | `scopes` | Directory-based configs (monorepo style) |
 
-Inside the scenario shell, ribbin is pre-installed and you can test wrap/unwrap/activate commands. Type `exit` to leave.
+Inside the scenario shell, Ribbin is pre-installed and you can test wrap/unwrap/activate commands. Type `exit` to leave.
 
 Scenario files are in `scripts/scenarios/`.
 

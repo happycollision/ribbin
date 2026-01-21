@@ -1,22 +1,30 @@
-# ribbin
+# Ribbin
 
 Block direct tool calls and redirect to project-specific alternatives.
 
 ## The Problem
 
-AI agents sometimes ignore project instructions and call tools directly (`tsc`, `npm`, `eslint`) instead of using project-configured wrappers (`pnpm run typecheck`, `pnpm run lint`). This leads to misconfigured tool runs, confusion, and repeated mistakes.
+AI agents sometimes forget or ignore project instructions and call tools directly instead of using project-configured wrappers. This leads to misconfigured tool runs, confusion, rabbit holes, and repeated mistakes.
+
+| Ecosystem | Agent runs... | But should run... |
+|-----------|---------------|-------------------|
+| **JavaScript** | `tsc`, `jest`, `eslint` | `pnpm run typecheck`, `pnpm test`, `pnpm run lint` |
+| **Python** | `pytest`, `pip install` | `poetry run pytest`, `poetry add` |
+| **Go** | `go test`, `go build` | `make test`, `make build` |
+| **Rust** | `cargo test`, `cargo clippy` | `make test`, `make lint` |
+| **Ruby** | `rspec`, `rubocop` | `bundle exec rspec`, `rake lint` |
 
 ## The Solution
 
-ribbin intercepts calls to specified commands and blocks them with helpful error messages explaining what to do instead.
+Ribbin intercepts calls to specified commands and blocks them with helpful error messages explaining what to do instead.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  ERROR: Direct use of 'tsc' is blocked.            │
+│  ERROR: Direct use of 'tsc' is blocked.             │
 │                                                     │
-│  Use 'pnpm run typecheck' instead                  │
+│  Use 'pnpm run typecheck' instead                   │
 │                                                     │
-│  Bypass: RIBBIN_BYPASS=1 tsc ...                   │
+│  Bypass: RIBBIN_BYPASS=1 tsc ...                    │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -40,7 +48,7 @@ Download the latest release from [GitHub Releases](https://github.com/happycolli
 
 ## Quick Start
 
-1. Initialize ribbin in your project:
+1. Initialize Ribbin in your project:
 
 ```bash
 ribbin init
@@ -69,7 +77,7 @@ ribbin init
 ribbin wrap
 ```
 
-4. Activate ribbin globally:
+4. Activate Ribbin globally:
 
 ```bash
 ribbin activate --global
@@ -175,7 +183,7 @@ Example: For TypeScript, you might redirect `tsc` to automatically add `--projec
 | `ribbin wrap` | Install wrappers for commands in `ribbin.jsonc` |
 | `ribbin unwrap` | Remove wrappers and restore original commands |
 | `ribbin unwrap --global` | Remove all wrappers tracked in the registry |
-| `ribbin activate --shell` | Activate ribbin for the current shell session |
+| `ribbin activate --shell` | Activate Ribbin for the current shell session |
 | `ribbin activate --global` | Enable wrappers globally (all shells) |
 | `ribbin deactivate --global` | Disable wrappers globally |
 | `ribbin deactivate --everything` | Clear all activation state |
@@ -193,12 +201,12 @@ Run `ribbin --help` or `ribbin <command> --help` for detailed usage information.
 
 ## How It Works
 
-ribbin uses a "sidecar" approach:
+Ribbin uses a sidecar approach:
 
 1. When you run `ribbin wrap`, it renames the original binary (e.g., `/usr/local/bin/cat` → `/usr/local/bin/cat.ribbin-original`)
-2. A symlink to ribbin takes its place at the original path
-3. When the command is invoked, ribbin checks:
-   - Is ribbin active? (via `activate --shell` or `activate --global`)
+2. A symlink to Ribbin takes its place at the original path
+3. When the command is invoked, Ribbin checks:
+   - Is Ribbin active? (via `activate --shell` or `activate --global`)
    - Is there a `ribbin.jsonc` in this directory (or any parent)?
    - Is this command configured to be blocked/warned/redirected?
 4. If blocked: show the error message and exit
@@ -222,7 +230,7 @@ Or use the full path to the original:
 
 ## Activation Modes
 
-ribbin uses a three-tier activation system:
+Ribbin uses a three-tier activation system:
 
 1. **Config-scoped** (`ribbin activate ./ribbin.jsonc`): Only activates wrappers from specific config files. Most precise control.
 2. **Shell-scoped** (`ribbin activate --shell`): Activates all wrappers for the current shell and its children. Useful for development sessions.
@@ -232,11 +240,11 @@ Use `ribbin status` to see current activation state and `ribbin deactivate` with
 
 ## Recovery
 
-If ribbin was uninstalled before running `ribbin unwrap`, your original binaries are still safe! The originals are stored alongside their paths with a `.ribbin-original` suffix.
+If Ribbin was uninstalled before running `ribbin unwrap`, your original binaries are still safe! The originals are stored alongside their paths with a `.ribbin-original` suffix.
 
-### Using ribbin recover
+### Using Ribbin recover
 
-If ribbin is still installed:
+If Ribbin is still installed:
 
 ```bash
 ribbin recover
@@ -244,9 +252,9 @@ ribbin recover
 
 This searches common binary directories for wrapped binaries and restores them.
 
-### If ribbin is not installed
+### If Ribbin is not installed
 
-The easiest approach is to reinstall ribbin temporarily:
+The easiest approach is to reinstall Ribbin temporarily:
 
 ```bash
 go install github.com/happycollision/ribbin/cmd/ribbin@latest
@@ -304,7 +312,7 @@ make scenario          # Interactive scenario testing (see below)
 
 ### Interactive Scenario Testing
 
-Test ribbin in isolated Docker environments without affecting your host system:
+Test Ribbin in isolated Docker environments without affecting your host system:
 
 ```bash
 make scenario                           # Show menu to pick a scenario
@@ -317,12 +325,12 @@ make scenario SCENARIO=basic            # Run specific scenario directly
 |----------|-------------|
 | `basic` | Block and redirect actions with local wrapper commands |
 | `extends` | Config inheritance from mixins and external files |
-| `local-dev-mode` | Simulates ribbin in node_modules/.bin - tests repo-only shimming |
+| `local-dev-mode` | Simulates Ribbin in node_modules/.bin - tests repo-only shimming |
 | `mixed-permissions` | Demonstrates allowed vs forbidden directory security |
 | `recovery` | Test recovery command |
 | `scopes` | Directory-based configs (monorepo style) |
 
-Inside the scenario shell, ribbin is pre-installed and you can test commands interactively. Type `exit` to leave.
+Inside the scenario shell, Ribbin is pre-installed and you can test commands interactively. Type `exit` to leave.
 
 ## Use Cases
 

@@ -1,11 +1,11 @@
 # Ribbin Documentation
 
-Comprehensive documentation for ribbin, the command wrapping tool.
+Comprehensive documentation for Ribbin, the command wrapping tool.
 
 ## Getting Started
 
 - [Main README](../README.md) - Quick start guide and basic usage
-- [Installation Guide](../README.md#installation) - How to install ribbin
+- [Installation Guide](../README.md#installation) - How to install Ribbin
 
 ## Features
 
@@ -143,7 +143,7 @@ Scopes let you define different wrapper rules for different directories—ideal 
 - `extends` - Inherit wrappers from other sources (see below)
 - `wrappers` - Additional or overriding wrappers for this scope
 
-When a command runs, ribbin checks the current working directory and applies the most specific matching scope.
+When a command runs, Ribbin checks the current working directory and applies the most specific matching scope.
 
 **Check effective config per directory:**
 ```bash
@@ -240,8 +240,8 @@ See [Configuration Options](../README.md#configuration) for full details.
 | `ribbin init` | Initialize ribbin.jsonc | [README](../README.md#quick-start) |
 | `ribbin wrap` | Install wrappers | [README](../README.md#quick-start) |
 | `ribbin unwrap` | Remove wrappers | [README](../README.md#commands) |
-| `ribbin activate` | Activate ribbin (config, shell, or global) | [README](../README.md#activation-modes) |
-| `ribbin deactivate` | Deactivate ribbin | [README](../README.md#commands) |
+| `ribbin activate` | Activate Ribbin (config, shell, or global) | [README](../README.md#activation-modes) |
+| `ribbin deactivate` | Deactivate Ribbin | [README](../README.md#commands) |
 | `ribbin status` | Show activation status | Run `ribbin status --help` |
 | `ribbin recover` | Recover orphaned wrappers | Run `ribbin recover --help` |
 | `ribbin audit show` | View audit log | [Audit Logging](audit-logging.md) |
@@ -316,7 +316,7 @@ See the full [AI Coding Agents Guide](agent-integration.md) for setup with bypas
 }
 ```
 
-Then in `package.json`, bypass ribbin for the actual script:
+Then in `package.json`, bypass Ribbin for the actual script:
 ```json
 {
   "scripts": {
@@ -335,7 +335,7 @@ Ribbin uses a "sidecar" approach:
 
 1. Original binary renamed: `npm` → `npm.ribbin-original`
 2. Symlink created: `npm` → `ribbin`
-3. When invoked, ribbin checks configuration
+3. When invoked, Ribbin checks configuration
 4. If blocked: show error message
 5. If warned: show warning, then run original
 6. If redirected: run redirect script
@@ -399,7 +399,7 @@ docs/                    # Documentation
 
 ### Wrapper Not Working
 
-1. Check if ribbin is active:
+1. Check if Ribbin is active:
    ```bash
    ribbin status
    ribbin activate --global  # or --shell

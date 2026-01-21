@@ -1,6 +1,6 @@
 # Practical Guide: Using Ribbin with AI Coding Agents
 
-This guide demonstrates ribbin's key features through a practical example: enforcing TypeScript project conventions when working with AI coding agents.
+This guide demonstrates Ribbin's key features through a practical example: enforcing TypeScript project conventions when working with AI coding agents.
 
 ## The Problem
 
@@ -183,7 +183,7 @@ If your AI assistant doesn't have a persistent shell (like Claude Code), use glo
 ribbin activate --global
 ```
 
-This enables ribbin system-wide until you run `ribbin deactivate --global`.
+This enables Ribbin system-wide until you run `ribbin deactivate --global`.
 
 ### For Persistent Shell Sessions
 
@@ -193,7 +193,7 @@ If your agent has a persistent shell, you can activate per-session:
 ribbin activate --shell
 ```
 
-This sets up the current shell so ribbin is active.
+This sets up the current shell so Ribbin is active.
 
 ### Installing the Wrappers
 
@@ -210,7 +210,7 @@ ribbin wrap
 
 ```
 $ tsc --noEmit
-✗ tsc is blocked by ribbin
+✗ tsc is blocked by Ribbin
 
 TypeScript should be run through the project script:
 
@@ -230,7 +230,7 @@ $ pnpm run typecheck
 
 ## How the Bypass Works
 
-When ribbin intercepts a command, it checks:
+When Ribbin intercepts a command, it checks:
 
 1. Is `RIBBIN_BYPASS=1` set in the environment?
 2. If yes, execute the original command
@@ -355,7 +355,7 @@ ribbin audit summary
 | `warn` | Show warning message, then run command |
 | `redirect` | Run a different command instead |
 | `passthrough` | Explicit pass-through action (always allow) |
-| `RIBBIN_BYPASS=1` | Skip ribbin, run original command |
+| `RIBBIN_BYPASS=1` | Skip Ribbin, run original command |
 | `cmd.ribbin-original` | Call the original binary directly |
 
 | Passthrough Option | Effect |

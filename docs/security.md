@@ -170,7 +170,7 @@ Without atomicity, step 2 failure would leave `/bin/curl` missing.
 
 ### 7. Environment Variable Validation
 
-Environment variables that affect ribbin's behavior are validated.
+Environment variables that affect Ribbin's behavior are validated.
 
 **Protected Variables:**
 - `HOME` - Used for registry location
@@ -228,7 +228,7 @@ All privileged operations are logged to the audit log with the `elevated` flag s
    RIBBIN_BYPASS=1 command
    ```
 
-5. **Keep ribbin updated:**
+5. **Keep Ribbin updated:**
    ```bash
    go install github.com/happycollision/ribbin/cmd/ribbin@latest
    ```
@@ -299,7 +299,7 @@ Ribbin does NOT protect against:
 
 ## Reporting Security Issues
 
-If you discover a security vulnerability in ribbin:
+If you discover a security vulnerability in Ribbin:
 
 1. **DO NOT** open a public GitHub issue
 2. Email security concerns to: [security contact - TODO]
