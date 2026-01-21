@@ -102,20 +102,20 @@ Logged when a security policy is violated.
 ```json
 {
   "event": "security.violation",
-  "path": "/etc/passwd",
+  "path": "/usr/bin/mytool",
   "success": false,
-  "error": "path outside allowed directories",
+  "error": "shimming requires explicit confirmation",
   "details": {
-    "original_path": "/etc/passwd",
-    "violation_type": "forbidden_directory"
+    "original_path": "/usr/bin/mytool",
+    "violation_type": "system_directory"
   }
 }
 ```
 
 Violation types:
 - `path_traversal` - `..` sequence detected
-- `forbidden_directory` - Path outside allowed directories
-- `symlink_escape` - Symlink points outside allowed directories
+- `system_directory` - Path in a system directory without confirmation
+- `symlink_escape` - Symlink points to disallowed location
 - `chain_depth_exceeded` - Symlink chain too deep
 
 ### privileged.operation

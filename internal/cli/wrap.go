@@ -32,8 +32,8 @@ the original binary.
 
 Security:
   - Critical system binaries (bash, sudo, ssh) are never wrapped
-  - User directories (~/.local/bin, ~/go/bin) and /usr/local/bin are allowed
   - System directories (/bin, /usr/bin, /sbin) require --confirm-system-dir flag
+  - All other directories are allowed by default
 
 Examples:
   ribbin wrap                            # Wrap commands from nearest ribbin.jsonc

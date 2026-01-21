@@ -283,53 +283,32 @@ func TestAttack_Allowlist_SystemDirectoriesRequireConfirmation(t *testing.T) {
 	}
 }
 
-func TestAttack_Allowlist_UnknownDirectoriesRequireConfirmation(t *testing.T) {
-	// Unknown directories (not in allowed or confirmation lists) require confirmation
-	// This allows testing in /tmp and custom install locations while still requiring explicit opt-in
-	unknownPaths := []string{
+func TestAttack_Allowlist_NonSystemDirectoriesAllowed(t *testing.T) {
+	// With the blacklist model, any directory NOT in SystemDirs is allowed
+	// This includes user directories, project directories, /tmp, etc.
+	allowedPaths := []string{
 		"/etc/sometool",
 		"/var/sometool",
 		"/tmp/sometool",
 		"/root/sometool",
-	}
-
-	for _, path := range unknownPaths {
-		t.Run(path, func(t *testing.T) {
-			category, err := GetDirectoryCategory(path)
-			if err != nil {
-				// Error is acceptable
-				return
-			}
-			if category != CategoryRequiresConfirmation {
-				t.Errorf("should require confirmation: %s (got %v)", path, category)
-			}
-
-			// Without confirmation should fail
-			err = ValidateBinaryForShim(path, false)
-			if err == nil {
-				t.Errorf("should require confirmation flag: %s", path)
-			}
-
-			// With confirmation should succeed
-			err = ValidateBinaryForShim(path, true)
-			if err != nil {
-				t.Errorf("should allow with confirmation: %s, got error: %v", path, err)
-			}
-		})
-	}
-}
-
-func TestAttack_Allowlist_AllowedDirectories(t *testing.T) {
-	// These paths are now allowed without confirmation
-	allowedPaths := []string{
 		"/usr/local/bin/mytool",
 		"/opt/homebrew/bin/mytool",
+		"/home/user/project/bin/tool",
 	}
 
 	for _, path := range allowedPaths {
 		t.Run(path, func(t *testing.T) {
+			category, err := GetDirectoryCategory(path)
+			if err != nil {
+				t.Errorf("GetDirectoryCategory(%s) returned error: %v", path, err)
+				return
+			}
+			if category != CategoryAllowed {
+				t.Errorf("should be allowed: %s (got %v)", path, category)
+			}
+
 			// Should succeed without confirmation flag
-			err := ValidateBinaryForShim(path, false)
+			err = ValidateBinaryForShim(path, false)
 			if err != nil {
 				t.Errorf("should be allowed without confirmation: %s, got error: %v", path, err)
 			}

@@ -2,7 +2,6 @@ package security
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -16,49 +15,27 @@ const (
 	CategoryForbidden                         // Critical dirs, never allow
 )
 
-// AllowlistConfig defines which directories are safe for shimming
-type AllowlistConfig struct {
-	// Directories where shimming is always safe
-	AllowedDirs []string
+// SecurityConfig defines security rules for shimming.
+// Uses a blacklist model: everything is allowed except known system directories.
+type SecurityConfig struct {
+	// SystemDirs are directories that require --confirm-system-dir flag.
+	// These are directories that affect system-wide behavior.
+	SystemDirs []string
 
-	// Directories that require explicit confirmation
-	ConfirmationDirs []string
-
-	// Directories that are never allowed
-	ForbiddenDirs []string
-
-	// Specific critical binaries that must never be shimmed
+	// CriticalBinaries are specific binaries that must never be shimmed
 	CriticalBinaries []string
 }
 
-// DefaultAllowlist returns the default secure allowlist
-func DefaultAllowlist() *AllowlistConfig {
-	home, _ := os.UserHomeDir()
-
-	return &AllowlistConfig{
-		AllowedDirs: []string{
-			filepath.Join(home, ".local", "bin"),
-			filepath.Join(home, "go", "bin"),
-			filepath.Join(home, ".cargo", "bin"),
-			filepath.Join(home, "bin"),
-			"./bin",               // Project-local bin
-			"./node_modules/.bin", // npm bins
-			"/usr/local/bin",
-			"/opt/homebrew/bin",
-			"/opt/*/bin",
-		},
-
-		ConfirmationDirs: []string{
+// DefaultSecurityConfig returns the default security configuration
+func DefaultSecurityConfig() *SecurityConfig {
+	return &SecurityConfig{
+		SystemDirs: []string{
 			"/bin",
 			"/sbin",
 			"/usr/bin",
 			"/usr/sbin",
 			"/usr/libexec",
 			"/System",
-		},
-
-		ForbiddenDirs: []string{
-			// Empty - critical binaries are blocked by name, not directory
 		},
 
 		CriticalBinaries: []string{
@@ -72,36 +49,9 @@ func DefaultAllowlist() *AllowlistConfig {
 	}
 }
 
-// IsAllowedDirectory checks if path is within an allowed directory
-func IsAllowedDirectory(path string) (bool, error) {
-	abs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false, err
-	}
-
-	config := DefaultAllowlist()
-
-	// Check forbidden first
-	for _, forbidden := range config.ForbiddenDirs {
-		if isWithinDir(abs, forbidden) {
-			return false, nil
-		}
-	}
-
-	// Check allowed
-	for _, allowed := range config.AllowedDirs {
-		if isWithinDir(abs, allowed) {
-			return true, nil
-		}
-	}
-
-	// Not explicitly allowed
-	return false, nil
-}
-
 // IsCriticalSystemBinary checks if binary name is critical
 func IsCriticalSystemBinary(path string) bool {
-	config := DefaultAllowlist()
+	config := DefaultSecurityConfig()
 	binName := filepath.Base(path)
 
 	for _, critical := range config.CriticalBinaries {
@@ -113,23 +63,17 @@ func IsCriticalSystemBinary(path string) bool {
 	return false
 }
 
-// RequiresConfirmation checks if path needs user confirmation
+// RequiresConfirmation checks if path needs user confirmation (is in a system directory)
 func RequiresConfirmation(path string) bool {
 	abs, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return true // Err on side of caution
 	}
 
-	config := DefaultAllowlist()
+	config := DefaultSecurityConfig()
 
-	for _, confirmDir := range config.ConfirmationDirs {
-		// Handle wildcards like /opt/*/bin
-		if strings.Contains(confirmDir, "*") {
-			matched, _ := filepath.Match(confirmDir, abs)
-			if matched {
-				return true
-			}
-		} else if isWithinDir(abs, confirmDir) {
+	for _, sysDir := range config.SystemDirs {
+		if isWithinDir(abs, sysDir) {
 			return true
 		}
 	}
@@ -144,31 +88,13 @@ func GetDirectoryCategory(path string) (DirectoryCategory, error) {
 		return CategoryForbidden, err
 	}
 
-	config := DefaultAllowlist()
-
-	// Check forbidden first
-	for _, forbidden := range config.ForbiddenDirs {
-		if isWithinDir(abs, forbidden) {
-			return CategoryForbidden, nil
-		}
-	}
-
-	// Check if requires confirmation
+	// Check if requires confirmation (system directory)
 	if RequiresConfirmation(abs) {
 		return CategoryRequiresConfirmation, nil
 	}
 
-	// Check allowed
-	for _, allowed := range config.AllowedDirs {
-		if isWithinDir(abs, allowed) {
-			return CategoryAllowed, nil
-		}
-	}
-
-	// Default: require confirmation for unknown directories
-	// Unknown directories aren't necessarily dangerous (could be test dirs, custom install locations, etc.)
-	// Users can use --confirm-system-dir to allow them explicitly
-	return CategoryRequiresConfirmation, nil
+	// Default: allow all other directories
+	return CategoryAllowed, nil
 }
 
 // ValidateBinaryForShim performs comprehensive validation
@@ -191,10 +117,6 @@ func ValidateBinaryForShim(path string, allowConfirmed bool) error {
 	}
 
 	switch category {
-	case CategoryForbidden:
-		return fmt.Errorf("cannot shim binaries in system directory: %s\n\nDirectory %s is protected for security reasons.",
-			abs, filepath.Dir(abs))
-
 	case CategoryRequiresConfirmation:
 		if !allowConfirmed {
 			return fmt.Errorf("shimming %s requires explicit confirmation\n\nUse --confirm-system-dir flag if you understand the security implications",

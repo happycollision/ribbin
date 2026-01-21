@@ -24,7 +24,7 @@ Request to wrap /usr/bin/curl
         ↓
 Path validation (no traversal)
         ↓
-Allowlist check (is /usr/bin allowed?)
+System directory check (is /usr/bin a system dir?)
         ↓
 Confirmation required (--confirm-system-dir)
         ↓

@@ -19,7 +19,7 @@ If Ribbin allowed this, a compromised dependency could intercept any command on 
 When Ribbin detects it's installed inside a git repository, it enters **Local Development Mode**. In this mode, it can only wrap binaries within that repository.
 
 ```
-~/.local/bin/ribbin          → Normal mode (can wrap allowed directories)
+~/.local/bin/ribbin          → Normal mode (can wrap any non-system directory)
 ./node_modules/.bin/ribbin   → Local dev mode (repo-only)
 ./.venv/bin/ribbin           → Local dev mode (repo-only)
 ./vendor/bundle/bin/ribbin   → Local dev mode (repo-only)

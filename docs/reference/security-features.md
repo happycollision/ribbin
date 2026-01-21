@@ -15,7 +15,7 @@ All file paths are validated before use.
 **Protections:**
 - Path traversal detection (`..` sequences)
 - Canonicalization and absolute path resolution
-- Directory allowlist enforcement
+- System directory detection
 - Null byte rejection
 
 **Blocked:**
@@ -24,23 +24,28 @@ ribbin wrap /usr/local/bin/../../etc/passwd  # Path traversal
 ribbin wrap /etc/shadow                       # Forbidden directory
 ```
 
-## 2. Directory Allowlist
+## 2. Directory Security
 
 **Implementation:** [internal/security/allowlist.go](../../internal/security/allowlist.go)
 
-Only specific directories are allowed for wrapping.
-
-### Allowed Without Confirmation
-
-- User-local: `~/.local/bin`, `~/bin`
-- Project-local: `./bin`, `./node_modules/.bin`
-- Homebrew: `/usr/local/bin`, `/opt/homebrew/bin`
+Ribbin uses a blacklist model: all directories are allowed by default except known system directories.
 
 ### Requires --confirm-system-dir
 
-- Core system: `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`
-- Configuration: `/etc`
-- macOS system: `/System`
+These system directories require explicit confirmation:
+
+- `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`
+- `/usr/libexec`
+- `/System` (macOS)
+
+### Allowed by Default
+
+All other directories are allowed without confirmation, including:
+
+- User-local: `~/.local/bin`, `~/bin`
+- Project-local: `./bin`, `./node_modules/.bin`, `./test-bin`
+- Homebrew: `/usr/local/bin`, `/opt/homebrew/bin`
+- Any custom directory
 
 ### Always Blocked (by name)
 
@@ -181,7 +186,7 @@ Ribbin protects against:
 | TOCTOU race conditions | File locking |
 | Symlink attacks | Target validation, chain limits |
 | Unauthorized privilege escalation | Critical binary blocklist |
-| Directory traversal | Allowlist enforcement |
+| System directory modification | Confirmation requirement |
 
 ### Out of Scope
 
