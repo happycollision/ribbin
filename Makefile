@@ -1,14 +1,22 @@
-.PHONY: build install test test-unit test-coverage test-host benchmark benchmark-grep benchmark-all benchmark-full scenario release clean
+.PHONY: build install install-next test test-unit test-coverage test-host benchmark benchmark-grep benchmark-all benchmark-full scenario release clean
 
 BINARY_NAME=ribbin
 BUILD_DIR=bin
 TEST_IMAGE=ribbin-test
+INSTALL_DIR=$(HOME)/.local/bin
 
 build:
 	go build -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/ribbin
 
 install: build
 	go install ./cmd/ribbin
+
+# Build and install as ribbin-next to ~/.local/bin (bypasses local dev mode)
+install-next: build
+	mkdir -p $(INSTALL_DIR)
+	cp $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/ribbin-next
+	chmod +x $(INSTALL_DIR)/ribbin-next
+	@echo "Installed ribbin-next to $(INSTALL_DIR)/ribbin-next"
 
 # Run all tests in Docker container (safe - doesn't modify host system)
 test:
