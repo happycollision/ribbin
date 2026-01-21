@@ -142,7 +142,7 @@ Block direct calls but allow when run from approved scripts:
 }
 ```
 
-This keeps `package.json` unchanged—no `RIBBIN_BYPASS` needed. See the [AI Coding Agents Guide](docs/agent-integration.md) for details.
+This keeps `package.json` unchanged—no `RIBBIN_BYPASS` needed. See the [AI Coding Agents Guide](docs/how-to/integrate-ai-agents.md) for details.
 
 ### Monorepo Scopes
 
@@ -165,7 +165,7 @@ Different rules for different directories:
 }
 ```
 
-See [Configuration Guide](docs/README.md#configuration) for scopes, inheritance, and local overrides.
+See the [Configuration Schema](docs/reference/config-schema.md) for scopes, inheritance, and local overrides.
 
 ## Common Use Cases
 
@@ -231,10 +231,11 @@ Run `ribbin --help` for all commands and options.
 
 ## Documentation
 
-- **[Full Documentation](docs/README.md)** - Complete configuration reference
-- **[AI Coding Agents Guide](docs/agent-integration.md)** - Passthrough, bypass patterns, real-world examples
-- **[Security Features](docs/security.md)** - Path validation, audit logging, protections
-- **[Audit Logging](docs/audit-logging.md)** - Security event tracking
+- **[Documentation Index](docs/index.md)** - Full documentation organized by topic
+- **[Getting Started](docs/tutorials/getting-started.md)** - Installation and first steps
+- **[AI Coding Agents Guide](docs/how-to/integrate-ai-agents.md)** - Passthrough, bypass patterns, real-world examples
+- **[CLI Reference](docs/reference/cli-commands.md)** - All commands and options
+- **[Security Features](docs/reference/security-features.md)** - Path validation, audit logging, protections
 
 ## How It Works
 
@@ -242,6 +243,20 @@ Run `ribbin --help` for all commands and options.
 2. A symlink to Ribbin takes its place
 3. When invoked, Ribbin checks the config and applies the action
 4. If no rule matches, the original runs transparently
+
+## What Ribbin Is Not
+
+**Not an AI sandbox or containment system.** Ribbin provides helpful guardrails, not security boundaries. It reminds agents (and humans) to use the right commands—it doesn't prevent a determined actor from bypassing it.
+
+**Not a security hardening tool.** Ribbin is about workflow enforcement and real-time feedback, not preventing malicious behavior. The bypass mechanism (`RIBBIN_BYPASS=1`) exists by design.
+
+**Not a version manager.** Tools like mise, nvm, and asdf manage multiple versions of the same tool. Ribbin intercepts commands to provide feedback and guide you toward project-specific alternatives—it doesn't manage tool versions.
+
+**Not an alias manager.** Shell aliases only work in interactive shells. Ribbin intercepts actual binary execution via PATH manipulation, so it works even when scripts or other tools invoke commands directly.
+
+**Not a permissions system.** Ribbin doesn't control *who* can run commands, just *how* commands are invoked within a project context.
+
+**Not a container or VM.** Commands still run directly on your system with full access. Ribbin adds a decision layer, not isolation.
 
 ## Development
 
