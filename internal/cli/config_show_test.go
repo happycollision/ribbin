@@ -352,8 +352,8 @@ func TestConfigShowCommand_NoShims(t *testing.T) {
 		t.Fatalf("runConfigShow error = %v", err)
 	}
 
-	if !strings.Contains(output, "No effective shims configured") {
-		t.Errorf("output should indicate no shims, got: %s", output)
+	if !strings.Contains(output, "No effective wrappers configured") {
+		t.Errorf("output should indicate no wrappers, got: %s", output)
 	}
 }
 
