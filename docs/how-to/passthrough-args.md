@@ -16,6 +16,7 @@ Use the `passthrough` option:
     "tsc": {
       "action": "block",
       "message": "Use 'pnpm run typecheck' instead",
+      "paths": ["./node_modules/.bin/tsc"],
       "passthrough": {
         "invocation": ["pnpm run typecheck", "pnpm run build"]
       }
@@ -23,6 +24,8 @@ Use the `passthrough` option:
   }
 }
 ```
+
+> **Note:** For project-local tools like `tsc`, you must specify `paths` since they're not in the system PATH.
 
 Now:
 - Direct `tsc` calls are blocked
@@ -86,6 +89,7 @@ Use both for different patterns:
     "tsc": {
       "action": "block",
       "message": "Use 'pnpm run typecheck' or 'pnpm run build'",
+      "paths": ["./node_modules/.bin/tsc"],
       "passthrough": {
         "invocationRegexp": ["pnpm (run )?(typecheck|build)"]
       }
@@ -119,6 +123,7 @@ Use both for different patterns:
     "eslint": {
       "action": "block",
       "message": "Use 'pnpm run lint'",
+      "paths": ["./node_modules/.bin/eslint"],
       "passthrough": {
         "invocationRegexp": ["pnpm (run )?lint"]
       }

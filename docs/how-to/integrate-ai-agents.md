@@ -18,7 +18,8 @@ AI coding agents sometimes:
   "wrappers": {
     "tsc": {
       "action": "block",
-      "message": "Use 'pnpm run typecheck' instead"
+      "message": "Use 'pnpm run typecheck' instead",
+      "paths": ["./node_modules/.bin/tsc"]
     },
     "npm": {
       "action": "block",
@@ -27,6 +28,8 @@ AI coding agents sometimes:
   }
 }
 ```
+
+> **Note:** For project-local tools like `tsc` (installed via npm/pnpm), you must specify `paths` since they're not in the system PATH. Global tools like `npm` are found automatically.
 
 2. **Install and activate:**
 
@@ -53,6 +56,7 @@ ribbin activate --global
     "tsc": {
       "action": "block",
       "message": "Use 'pnpm run typecheck' instead",
+      "paths": ["./node_modules/.bin/tsc"],
       "passthrough": {
         "invocation": ["pnpm run typecheck"]
       }
@@ -112,6 +116,7 @@ Best when you don't want to modify shared files.
     "tsc": {
       "action": "block",
       "message": "Use 'pnpm run typecheck' instead",
+      "paths": ["./node_modules/.bin/tsc"],
       "passthrough": {
         "invocationRegexp": ["pnpm (run )?(typecheck|build)"]
       }
@@ -135,18 +140,23 @@ Best when you don't want to modify shared files.
 ```jsonc
 {
   "wrappers": {
+    // Project-local tools need explicit paths
     "tsc": {
       "action": "block",
-      "message": "Use 'pnpm run typecheck' or 'pnpm run build'"
+      "message": "Use 'pnpm run typecheck' or 'pnpm run build'",
+      "paths": ["./node_modules/.bin/tsc"]
     },
     "eslint": {
       "action": "block",
-      "message": "Use 'pnpm run lint' - includes project plugins"
+      "message": "Use 'pnpm run lint' - includes project plugins",
+      "paths": ["./node_modules/.bin/eslint"]
     },
     "prettier": {
       "action": "block",
-      "message": "Use 'pnpm run format' - uses project config"
+      "message": "Use 'pnpm run format' - uses project config",
+      "paths": ["./node_modules/.bin/prettier"]
     },
+    // Global tools are found automatically
     "npm": {
       "action": "block",
       "message": "This project uses pnpm"

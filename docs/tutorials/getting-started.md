@@ -57,11 +57,14 @@ Open `ribbin.jsonc` and add the commands you want to control. Here's a simple ex
   "wrappers": {
     "tsc": {
       "action": "block",
-      "message": "Use 'pnpm run typecheck' instead"
+      "message": "Use 'pnpm run typecheck' instead",
+      "paths": ["./node_modules/.bin/tsc"]
     }
   }
 }
 ```
+
+> **Note:** For project-local tools like `tsc` (in `node_modules/.bin/`), you must specify `paths` since they're not in the system PATH. Global tools like `npm` are found automatically.
 
 Save the file.
 

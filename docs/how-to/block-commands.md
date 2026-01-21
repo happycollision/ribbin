@@ -11,11 +11,14 @@ Add a wrapper with `action: "block"`:
   "wrappers": {
     "tsc": {
       "action": "block",
-      "message": "Use 'pnpm run typecheck' instead"
+      "message": "Use 'pnpm run typecheck' instead",
+      "paths": ["./node_modules/.bin/tsc"]
     }
   }
 }
 ```
+
+> **Note:** For project-local tools like `tsc` (in `node_modules/.bin/`), you must specify `paths` since they're not in the system PATH. Global tools like `npm` are found automatically.
 
 When someone runs `tsc`, they see:
 
@@ -32,6 +35,7 @@ Bypass: RIBBIN_BYPASS=1 tsc ...
 ```jsonc
 {
   "wrappers": {
+    // Global tools - no paths needed
     "npm": {
       "action": "block",
       "message": "This project uses pnpm"
@@ -40,9 +44,11 @@ Bypass: RIBBIN_BYPASS=1 tsc ...
       "action": "block",
       "message": "This project uses pnpm"
     },
+    // Project-local tools - paths required
     "tsc": {
       "action": "block",
-      "message": "Use 'pnpm run typecheck'"
+      "message": "Use 'pnpm run typecheck'",
+      "paths": ["./node_modules/.bin/tsc"]
     }
   }
 }

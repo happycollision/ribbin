@@ -70,11 +70,30 @@ Error or warning message to display. Supports `\n` for line breaks.
 
 ### paths
 
-Optional array of specific binary paths to wrap. If omitted, wraps all found binaries.
+Array of specific binary paths to wrap.
+
+- If omitted, Ribbin searches the system PATH for the command
+- **Required for project-local tools** (e.g., `./node_modules/.bin/tsc`) since they're typically not in the system PATH
+- Supports relative paths (relative to config file) or absolute paths
 
 ```jsonc
 {
-  "paths": ["/usr/bin/curl", "/usr/local/bin/curl"]
+  // Project-local tool - paths required
+  "tsc": {
+    "action": "block",
+    "message": "Use 'pnpm run typecheck'",
+    "paths": ["./node_modules/.bin/tsc"]
+  },
+  // Global tool - paths optional (found via PATH)
+  "npm": {
+    "action": "block",
+    "message": "This project uses pnpm"
+  },
+  // Multiple specific paths
+  "curl": {
+    "action": "block",
+    "paths": ["/usr/bin/curl", "/usr/local/bin/curl"]
+  }
 }
 ```
 
@@ -160,13 +179,16 @@ Scope-specific wrapper definitions. Override inherited wrappers.
   "$schema": "https://github.com/happycollision/ribbin/ribbin.schema.json",
 
   "wrappers": {
+    // Global tools - found via PATH
     "npm": {
       "action": "block",
       "message": "This project uses pnpm"
     },
+    // Project-local tools - paths required
     "tsc": {
       "action": "block",
       "message": "Use 'pnpm run typecheck'",
+      "paths": ["./node_modules/.bin/tsc"],
       "passthrough": {
         "invocation": ["pnpm run typecheck"]
       }
