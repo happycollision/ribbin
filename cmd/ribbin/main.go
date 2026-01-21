@@ -19,7 +19,7 @@ func main() {
 	// Mode detection: check if invoked as "ribbin" or as a shimmed command
 	execName := filepath.Base(os.Args[0])
 
-	if execName == "ribbin" {
+	if execName == "ribbin" || execName == "ribbin-next" {
 		// CLI mode
 		if err := cli.Execute(); err != nil {
 			fmt.Fprintf(os.Stderr, "ribbin: %v\n", err)
