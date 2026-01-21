@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Directory security model simplified**: Switched from whitelist to blacklist model. Only system directories (`/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/usr/libexec`, `/System`) now require `--confirm-system-dir`. All other directories are allowed by default.
+- `ribbin init` template now includes passthrough and scopes examples
+
+### Documentation
+- **Restructured docs using Diátaxis framework**: Documentation reorganized into four quadrants:
+  - `tutorials/` - Step-by-step learning guides
+  - `how-to/` - Goal-oriented problem solving
+  - `reference/` - Technical lookup material
+  - `explanation/` - Background and design rationale
+- Clarify that `paths` is required for project-local tools (e.g., `./node_modules/.bin/tsc`) since they're not in the system PATH
+- Streamlined README to quick start guide, moved detailed docs to `docs/`
+- Added "What Ribbin Is Not" section to clarify scope
+- Document passthrough matching (invocation substring and invocationRegexp patterns)
+- Document scopes (monorepo support) and config inheritance (extends)
+- Capitalize "Ribbin" consistently in prose, add ecosystem examples (npm, pip, bundler)
+
+### Internal
+- Add e2e integration tests for package manager shims (npm, pnpm with real installs)
+- Add integration tests for mise-managed, asdf-managed, and system binaries
+- Use real mise and asdf in Docker test environment
+- Fix integration tests to be discoverable by `go test`
+- Fix test expecting old 'shims' terminology (now 'wrappers')
+- Update CLI help text: `.toml` → `.jsonc`, `shim` → `wrapper`
+- Simplify runner.go sidecar handling (no marker resolution needed)
+- Remove cat from example tools agents shouldn't use
+
 ## [0.1.0-alpha.6] - 2026-01-20
 
 ### Breaking Changes
