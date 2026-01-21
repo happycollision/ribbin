@@ -66,6 +66,16 @@ const defaultConfig = `{
     //   "message": "This project uses pnpm. Run 'pnpm install' instead."
     // },
 
+    // Example: Block direct calls but allow via pnpm scripts (passthrough)
+    // "tsc": {
+    //   "action": "block",
+    //   "message": "Use 'pnpm run typecheck' instead",
+    //   "passthrough": {
+    //     "invocation": ["pnpm run typecheck", "pnpm run build"],
+    //     "invocationRegexp": ["pnpm (typecheck|build)"]
+    //   }
+    // },
+
     // Example: Block curl, suggest project API client
     // "curl": {
     //   "action": "block",
@@ -73,26 +83,48 @@ const defaultConfig = `{
     //   "paths": ["/bin/curl", "/usr/bin/curl"]  // Optional: only block specific paths
     // },
 
-    // Example: Redirect npm to pnpm (absolute path)
-    // "npm": {
-    //   "action": "redirect",
-    //   "redirect": "/usr/local/bin/pnpm",
-    //   "message": "This project uses pnpm"
-    // },
-
     // Example: Custom wrapper script (relative path)
     // "node": {
     //   "action": "redirect",
     //   "redirect": "./scripts/node-wrapper.sh"
-    // },
-
-    // Example: Enforce TypeScript project config
-    // "tsc": {
-    //   "action": "redirect",
-    //   "redirect": "./scripts/typecheck.sh",
-    //   "message": "Using project-specific TypeScript configuration"
     // }
   }
+
+  // Scopes: Different rules for different directories (great for monorepos)
+  // "scopes": {
+  //   // Frontend app: stricter rules
+  //   "frontend": {
+  //     "path": "apps/frontend",
+  //     "extends": ["root"],  // Inherit root wrappers
+  //     "wrappers": {
+  //       "yarn": {
+  //         "action": "block",
+  //         "message": "Use pnpm in frontend"
+  //       }
+  //     }
+  //   },
+  //
+  //   // Backend app: allow npm for legacy reasons
+  //   "backend": {
+  //     "path": "apps/backend",
+  //     "extends": ["root"],
+  //     "wrappers": {
+  //       "npm": {
+  //         "action": "passthrough"  // Override root's block
+  //       }
+  //     }
+  //   },
+  //
+  //   // Mixin (no path): can only be extended by other scopes
+  //   "hardened": {
+  //     "wrappers": {
+  //       "rm": {
+  //         "action": "block",
+  //         "message": "Use trash-cli instead"
+  //       }
+  //     }
+  //   }
+  // }
 }
 `
 

@@ -42,11 +42,99 @@ Use `action = "block"` with `RIBBIN_BYPASS` in package.json.
 
 Direct `tsc` calls are blocked. The `RIBBIN_BYPASS=1` prefix in package.json lets the scripts through.
 
-### Approach B: Keep Codebase Unchanged
+### Approach B: Keep Codebase Unchanged (Passthrough)
 
-If you don't want to modify shared files like package.json, use `action = "redirect"` to a wrapper script. You can put `ribbin.jsonc` and the wrapper in a parent directory outside the repo.
+If you don't want to modify shared files like package.json, use the `passthrough` option. This blocks direct invocations but allows the command when called from approved parent processes (like pnpm scripts).
 
 **ribbin.jsonc** (can be in parent directory):
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead of running tsc directly",
+      "passthrough": {
+        "invocation": ["pnpm run typecheck", "pnpm run build"],
+        "invocationRegexp": ["pnpm (typecheck|build)"]
+      }
+    }
+  }
+}
+```
+
+**package.json** (unchanged):
+```json
+{
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  }
+}
+```
+
+This approach:
+- Keeps the codebase unchanged—no `RIBBIN_BYPASS` needed in scripts
+- Blocks direct `tsc` calls from agents or the command line
+- Allows `tsc` when the parent process matches the passthrough rules
+- No wrapper scripts needed—everything is declarative in the config
+
+#### Passthrough Matching
+
+The `passthrough` option checks the parent process command line:
+
+- **`invocation`**: Array of exact substrings to match. If any substring is found in the parent command, the call passes through.
+- **`invocationRegexp`**: Array of Go regular expressions. If any pattern matches the parent command, the call passes through.
+
+Both arrays are optional—use one or both depending on your needs.
+
+**Examples:**
+
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use project scripts",
+      "passthrough": {
+        // Simple substring matching
+        "invocation": ["pnpm run"]
+      }
+    },
+    "eslint": {
+      "action": "block",
+      "message": "Use 'pnpm run lint'",
+      "passthrough": {
+        // Regex for flexible matching
+        "invocationRegexp": ["pnpm (run )?lint"]
+      }
+    },
+    "pytest": {
+      "action": "block",
+      "message": "Use 'make test' or 'poetry run pytest'",
+      "passthrough": {
+        // Multiple patterns
+        "invocation": ["make test"],
+        "invocationRegexp": ["poetry run pytest", "make (test|check)"]
+      }
+    }
+  }
+}
+```
+
+#### When to Use Passthrough vs RIBBIN_BYPASS
+
+| Approach | Best For |
+|----------|----------|
+| `RIBBIN_BYPASS=1` | You control the scripts calling the command |
+| `passthrough` | You can't or don't want to modify the calling scripts |
+
+Both can be combined—`RIBBIN_BYPASS` is checked first, then passthrough rules.
+
+### Approach C: Redirect Script (Advanced)
+
+For complex logic that can't be expressed declaratively, use `action = "redirect"` to a wrapper script.
+
+**ribbin.jsonc:**
 ```jsonc
 {
   "wrappers": {
@@ -58,7 +146,7 @@ If you don't want to modify shared files like package.json, use `action = "redir
 }
 ```
 
-**scripts/tsc-wrapper.sh** (can be in parent directory):
+**scripts/tsc-wrapper.sh:**
 ```bash
 #!/bin/bash
 
@@ -79,20 +167,11 @@ case "$PARENT_CMD" in
 esac
 ```
 
-**package.json** (unchanged):
-```json
-{
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsc"
-  }
-}
-```
-
-This approach:
-- Keeps the codebase unchanged
-- Checks for specific approved commands (blocks `pnpm tsc` while allowing `pnpm run typecheck`)
-- Uses `$RIBBIN_ORIGINAL` environment variable (set by ribbin for redirect scripts)
+Use redirect scripts when you need:
+- Custom logic beyond pattern matching
+- Argument inspection or modification
+- Logging or metrics collection
+- Different behavior based on arguments
 
 ## Activating Ribbin
 
@@ -275,8 +354,14 @@ ribbin audit summary
 | `block` | Show error message, don't run command |
 | `warn` | Show warning message, then run command |
 | `redirect` | Run a different command instead |
+| `passthrough` | Explicit pass-through action (always allow) |
 | `RIBBIN_BYPASS=1` | Skip ribbin, run original command |
 | `cmd.ribbin-original` | Call the original binary directly |
+
+| Passthrough Option | Effect |
+|--------------------|--------|
+| `passthrough.invocation` | Allow if parent command contains any of these substrings |
+| `passthrough.invocationRegexp` | Allow if parent command matches any of these regexes |
 
 ## See Also
 

@@ -68,6 +68,169 @@ Create a `ribbin.jsonc` file in your project:
 }
 ```
 
+**Conditional Passthrough:**
+```jsonc
+{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead",
+      "passthrough": {
+        // Allow when called from pnpm scripts
+        "invocation": ["pnpm run typecheck", "pnpm run build"],
+        // Or use regex for flexible matching
+        "invocationRegexp": ["pnpm (typecheck|build)"]
+      }
+    }
+  }
+}
+```
+
+The `passthrough` option allows commands through when the parent process matches specified patterns. See [AI Coding Agents Guide](agent-integration.md#approach-b-keep-codebase-unchanged-passthrough) for detailed examples.
+
+### Scopes (Monorepo Support)
+
+Scopes let you define different wrapper rules for different directories—ideal for monorepos where different apps have different requirements.
+
+```jsonc
+{
+  // Root-level wrappers apply everywhere unless overridden
+  "wrappers": {
+    "npm": {
+      "action": "block",
+      "message": "Use pnpm instead"
+    },
+    "rm": {
+      "action": "warn",
+      "message": "Be careful with rm"
+    }
+  },
+
+  "scopes": {
+    // Frontend: stricter rules
+    "frontend": {
+      "path": "apps/frontend",
+      "extends": ["root"],
+      "wrappers": {
+        "yarn": {
+          "action": "block",
+          "message": "Use pnpm in frontend"
+        },
+        // Override rm to be stricter
+        "rm": {
+          "action": "block",
+          "message": "Use trash-cli in frontend"
+        }
+      }
+    },
+
+    // Backend: allow npm for legacy reasons
+    "backend": {
+      "path": "apps/backend",
+      "extends": ["root"],
+      "wrappers": {
+        "npm": {
+          "action": "passthrough"
+        }
+      }
+    }
+  }
+}
+```
+
+**How scopes work:**
+- `path` - Directory this scope applies to (relative to config file)
+- `extends` - Inherit wrappers from other sources (see below)
+- `wrappers` - Additional or overriding wrappers for this scope
+
+When a command runs, ribbin checks the current working directory and applies the most specific matching scope.
+
+**Check effective config per directory:**
+```bash
+ribbin config show                    # From project root
+cd apps/frontend && ribbin config show  # See frontend rules
+cd apps/backend && ribbin config show   # See backend rules
+```
+
+### Config Inheritance (extends)
+
+The `extends` field lets scopes inherit wrappers from multiple sources:
+
+**1. Root wrappers:**
+```jsonc
+{
+  "wrappers": { /* root-level */ },
+  "scopes": {
+    "myapp": {
+      "path": "apps/myapp",
+      "extends": ["root"],  // Inherit root wrappers
+      "wrappers": { /* additions/overrides */ }
+    }
+  }
+}
+```
+
+**2. Other scopes (mixins):**
+```jsonc
+{
+  "scopes": {
+    // Mixin: no path, can only be extended
+    "hardened": {
+      "wrappers": {
+        "rm": { "action": "block", "message": "Use trash" },
+        "curl": { "action": "warn", "message": "Use httpie" }
+      }
+    },
+
+    "production": {
+      "path": "apps/prod",
+      "extends": ["root", "root.hardened"],  // Inherit from mixin
+      "wrappers": { }
+    }
+  }
+}
+```
+
+**3. External files:**
+```jsonc
+{
+  "scopes": {
+    "myapp": {
+      "path": "apps/myapp",
+      "extends": [
+        "./team-configs/security-baseline.jsonc",  // External file
+        "./team-configs/production.jsonc"
+      ]
+    }
+  }
+}
+```
+
+**Inheritance order:** Later entries in `extends` override earlier ones. Local `wrappers` override everything.
+
+**Mixins vs Scopes:**
+- **Scope**: Has a `path` → applies when working in that directory
+- **Mixin**: No `path` → can only be referenced via `extends`
+
+### User-Local Config Override
+
+Create `ribbin.local.jsonc` for personal overrides that aren't committed:
+
+```jsonc
+{
+  "scopes": {
+    "local": {
+      "extends": ["./ribbin.jsonc"],  // Inherit shared config
+      "wrappers": {
+        // Your personal overrides
+      }
+    }
+  }
+}
+```
+
+When present, `ribbin.local.jsonc` is loaded instead of `ribbin.jsonc`. Add it to `.gitignore`.
+
 See [Configuration Options](../README.md#configuration) for full details.
 
 ## Commands Reference
