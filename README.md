@@ -1,6 +1,6 @@
 # Ribbin
 
-Block direct tool calls and redirect to project-specific alternatives.
+Wrap up commands for agents: Block direct tool calls and redirect to project-specific alternatives.
 
 ## The Problem
 
