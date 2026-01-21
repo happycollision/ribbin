@@ -283,24 +283,37 @@ func TestAttack_Allowlist_SystemDirectoriesRequireConfirmation(t *testing.T) {
 	}
 }
 
-func TestAttack_Allowlist_UnknownDirectoriesForbidden(t *testing.T) {
-	// Unknown directories (not in allowed or confirmation lists) are forbidden
-	forbiddenPaths := []string{
+func TestAttack_Allowlist_UnknownDirectoriesRequireConfirmation(t *testing.T) {
+	// Unknown directories (not in allowed or confirmation lists) require confirmation
+	// This allows testing in /tmp and custom install locations while still requiring explicit opt-in
+	unknownPaths := []string{
 		"/etc/sometool",
 		"/var/sometool",
 		"/tmp/sometool",
 		"/root/sometool",
 	}
 
-	for _, path := range forbiddenPaths {
+	for _, path := range unknownPaths {
 		t.Run(path, func(t *testing.T) {
 			category, err := GetDirectoryCategory(path)
 			if err != nil {
 				// Error is acceptable
 				return
 			}
-			if category != CategoryForbidden {
-				t.Errorf("should be forbidden: %s (got %v)", path, category)
+			if category != CategoryRequiresConfirmation {
+				t.Errorf("should require confirmation: %s (got %v)", path, category)
+			}
+
+			// Without confirmation should fail
+			err = ValidateBinaryForShim(path, false)
+			if err == nil {
+				t.Errorf("should require confirmation flag: %s", path)
+			}
+
+			// With confirmation should succeed
+			err = ValidateBinaryForShim(path, true)
+			if err != nil {
+				t.Errorf("should allow with confirmation: %s, got error: %v", path, err)
 			}
 		})
 	}

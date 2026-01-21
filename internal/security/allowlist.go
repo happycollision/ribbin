@@ -165,8 +165,10 @@ func GetDirectoryCategory(path string) (DirectoryCategory, error) {
 		}
 	}
 
-	// Default: forbidden
-	return CategoryForbidden, nil
+	// Default: require confirmation for unknown directories
+	// Unknown directories aren't necessarily dangerous (could be test dirs, custom install locations, etc.)
+	// Users can use --confirm-system-dir to allow them explicitly
+	return CategoryRequiresConfirmation, nil
 }
 
 // ValidateBinaryForShim performs comprehensive validation

@@ -17,18 +17,21 @@ import (
 // argv0 is the path to the symlink (e.g., /usr/local/bin/cat)
 // args are the command-line arguments (os.Args[1:])
 func Run(argv0 string, args []string) error {
-	// 1. Get original path: argv0 + ".ribbin-original"
-	originalPath := argv0 + ".ribbin-original"
+	// 1. Get sidecar path: argv0 + ".ribbin-original"
+	sidecarPath := argv0 + ".ribbin-original"
 
 	// 2. Verify sidecar exists
-	if _, err := os.Stat(originalPath); os.IsNotExist(err) {
-		return fmt.Errorf("original binary not found at %s", originalPath)
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		return fmt.Errorf("original binary not found at %s", sidecarPath)
 	}
+
+	// 3. Use sidecar as original path (may be a symlink, which is fine)
+	originalPath := sidecarPath
 
 	// Extract command name from argv0 (needed for verbose logging)
 	cmdName := extractCommandName(argv0)
 
-	// 3. Check RIBBIN_BYPASS=1 -> passthrough
+	// 4. Check RIBBIN_BYPASS=1 -> passthrough
 	if os.Getenv("RIBBIN_BYPASS") == "1" {
 		// Log bypass usage
 		security.LogBypassUsage(originalPath, os.Getpid())

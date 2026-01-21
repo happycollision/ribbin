@@ -4,6 +4,7 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1814,4 +1815,871 @@ exit 0
 	t.Logf("Backend npm passthrough works: %s", output)
 
 	t.Log("End-to-end scoped blocking test completed!")
+}
+
+// TestNodeModulesTscWrappingNpm tests wrapping node_modules/.bin/tsc installed via npm.
+// This is an end-to-end test that verifies ribbin can wrap binaries in node_modules/.bin/
+// from a parent directory, using npm as the package manager.
+//
+// This test requires Node.js and npm to be installed.
+func TestNodeModulesTscWrappingNpm(t *testing.T) {
+	if _, err := exec.LookPath("npm"); err != nil {
+		t.Skip("npm not found, skipping test")
+	}
+
+	testNodeModulesTscWrapping(t, "npm")
+}
+
+// TestNodeModulesTscWrappingPnpm tests wrapping node_modules/.bin/tsc installed via pnpm.
+// This is an end-to-end test that verifies ribbin can wrap binaries in node_modules/.bin/
+// from a parent directory, using pnpm as the package manager.
+//
+// This test requires Node.js and pnpm to be installed.
+func TestNodeModulesTscWrappingPnpm(t *testing.T) {
+	if _, err := exec.LookPath("pnpm"); err != nil {
+		t.Skip("pnpm not found, skipping test")
+	}
+
+	testNodeModulesTscWrapping(t, "pnpm")
+}
+
+// testNodeModulesTscWrapping is the shared test implementation for both npm and pnpm.
+// It tests the full lifecycle of wrapping node_modules/.bin/tsc from a parent directory.
+// This is an end-to-end test that uses the actual ribbin CLI commands.
+func testNodeModulesTscWrapping(t *testing.T, packageManager string) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-"+packageManager+"-modules-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	homeDir := filepath.Join(tmpDir, "home")
+	parentDir := filepath.Join(tmpDir, "parent")
+	projectDir := filepath.Join(parentDir, "project")
+	binDir := filepath.Join(tmpDir, "bin")
+
+	for _, dir := range []string{homeDir, parentDir, projectDir, binDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Build ribbin
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+
+	// Create package.json with TypeScript as a dev dependency
+	packageJSON := `{
+  "name": "test-project",
+  "version": "1.0.0",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}`
+	if err := os.WriteFile(filepath.Join(projectDir, "package.json"), []byte(packageJSON), 0644); err != nil {
+		t.Fatalf("failed to write package.json: %v", err)
+	}
+
+	// Install dependencies
+	t.Logf("Installing TypeScript with %s...", packageManager)
+	installCmd := exec.Command(packageManager, "install")
+	installCmd.Dir = projectDir
+	installCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+		"CI=true",
+	)
+	if output, err := installCmd.CombinedOutput(); err != nil {
+		t.Fatalf("%s install failed: %v\n%s", packageManager, err, output)
+	}
+	t.Logf("%s install completed", packageManager)
+
+	// Verify tsc exists in node_modules/.bin/
+	tscPath := filepath.Join(projectDir, "node_modules", ".bin", "tsc")
+	if _, err := os.Stat(tscPath); os.IsNotExist(err) {
+		t.Fatalf("tsc not found at %s after %s install", tscPath, packageManager)
+	}
+
+	// Log what type of binary tsc is (symlink or regular file)
+	tscInfo, err := os.Lstat(tscPath)
+	if err != nil {
+		t.Fatalf("failed to lstat tsc: %v", err)
+	}
+	isSymlink := tscInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("tsc is symlink: %v", isSymlink)
+	if isSymlink {
+		target, _ := os.Readlink(tscPath)
+		t.Logf("tsc symlink target: %s", target)
+	}
+
+	// Verify tsc runs before shimming
+	t.Log("Verifying tsc works before shimming...")
+	tscCmd := exec.Command(tscPath, "--version")
+	tscCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := tscCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("tsc --version failed before shimming: %v\n%s", err, output)
+	}
+	t.Logf("tsc version: %s", output)
+
+	// Create ribbin.jsonc in PARENT directory (testing parent dir config)
+	// Use explicit paths to wrap the tsc in node_modules
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' instead of tsc directly",
+      "paths": ["%s"]
+    }
+  }
+}`, tscPath)
+	configPath := filepath.Join(parentDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write ribbin.jsonc: %v", err)
+	}
+
+	// Use CLI to wrap tsc (need --confirm-system-dir for test temp directories)
+	t.Log("Running ribbin wrap...")
+	wrapCmd := exec.Command(ribbinPath, "wrap", "--confirm-system-dir", configPath)
+	wrapCmd.Dir = parentDir
+	wrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin wrap output: %s", output)
+
+	// Use CLI to activate globally
+	t.Log("Running ribbin activate --global...")
+	activateCmd := exec.Command(ribbinPath, "activate", "--global")
+	activateCmd.Dir = parentDir
+	activateCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = activateCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin activate --global failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin activate output: %s", output)
+
+	// Verify shim structure
+	shimInfo, err := os.Lstat(tscPath)
+	if err != nil {
+		t.Fatalf("failed to lstat shimmed tsc: %v", err)
+	}
+	if shimInfo.Mode()&os.ModeSymlink == 0 {
+		t.Error("shimmed tsc should be a symlink to ribbin")
+	} else {
+		linkTarget, _ := os.Readlink(tscPath)
+		if linkTarget != ribbinPath {
+			t.Errorf("shimmed tsc should point to ribbin, got %s", linkTarget)
+		}
+	}
+
+	// Verify sidecar exists
+	sidecarPath := tscPath + ".ribbin-original"
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		t.Fatal("sidecar should exist after shim install")
+	}
+	t.Logf("Sidecar exists: %s", sidecarPath)
+
+	// Test 1: From project directory, tsc should be BLOCKED
+	t.Log("Test 1: tsc should be blocked from project directory")
+	os.Chdir(projectDir)
+	tscCmd = exec.Command(tscPath, "--version")
+	tscCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = tscCmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("tsc should be blocked, but succeeded: %s", output)
+	} else {
+		if !contains(string(output), "block") && !contains(string(output), "typecheck") {
+			t.Logf("Note: output doesn't contain expected block message: %s", output)
+		}
+		t.Logf("Test 1 PASSED - tsc blocked: %s", output)
+	}
+
+	// Test 2: With RIBBIN_BYPASS=1, tsc should work
+	t.Log("Test 2: tsc should work with RIBBIN_BYPASS=1")
+	tscCmd = exec.Command(tscPath, "--version")
+	tscCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+		"RIBBIN_BYPASS=1",
+	)
+	output, err = tscCmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("tsc with bypass should work: %v\n%s", err, output)
+	} else {
+		if !contains(string(output), "Version") {
+			t.Errorf("expected TypeScript version output, got: %s", output)
+		}
+		t.Logf("Test 2 PASSED - tsc with bypass: %s", output)
+	}
+
+	// Test 3: Run tsc by name (via PATH) from project directory
+	t.Log("Test 3: tsc by name should be blocked")
+	nodeModulesBin := filepath.Join(projectDir, "node_modules", ".bin")
+	tscCmd = exec.Command("tsc", "--version")
+	tscCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+nodeModulesBin+":"+binDir+":"+origPath,
+	)
+	output, err = tscCmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("tsc by name should be blocked, but succeeded: %s", output)
+	} else {
+		t.Logf("Test 3 PASSED - tsc by name blocked: %s", output)
+	}
+
+	// Use CLI to unwrap
+	t.Log("Running ribbin unwrap...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", configPath)
+	unwrapCmd.Dir = parentDir
+	unwrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin unwrap output: %s", output)
+
+	// Verify tsc works after unshimming
+	t.Log("Verifying tsc works after unshimming...")
+	tscCmd = exec.Command(tscPath, "--version")
+	tscCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = tscCmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("tsc should work after unshimming: %v\n%s", err, output)
+	} else {
+		t.Logf("tsc restored and working: %s", output)
+	}
+
+	// Verify sidecar is removed
+	if _, err := os.Stat(sidecarPath); !os.IsNotExist(err) {
+		t.Error("sidecar should be removed after uninstall")
+	}
+
+	t.Logf("%s node_modules test completed!", packageManager)
+}
+
+// TestMiseManagedBinaryWrapping tests wrapping a binary managed by mise (symlink-based shims).
+// mise creates symlinks in ~/.local/bin that point to the actual tool versions.
+// This is an end-to-end test that uses the actual ribbin CLI commands.
+// Uses --confirm-system-dir flag since test temp directories aren't in default allowlist.
+func TestMiseManagedBinaryWrapping(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-mise-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	binDir := filepath.Join(tmpDir, "bin")
+
+	for _, dir := range []string{homeDir, projectDir, binDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Build ribbin
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+	miseDataDir := filepath.Join(homeDir, ".local", "share", "mise")
+	miseShimsDir := filepath.Join(miseDataDir, "shims")
+	os.MkdirAll(miseShimsDir, 0755)
+
+	// Create a fake tool version directory (simulating mise's structure)
+	toolDir := filepath.Join(miseDataDir, "installs", "mytool", "1.0.0", "bin")
+	os.MkdirAll(toolDir, 0755)
+
+	// Create the actual binary
+	actualBinary := filepath.Join(toolDir, "mytool")
+	binaryContent := `#!/bin/sh
+echo "mytool v1.0.0"
+`
+	if err := os.WriteFile(actualBinary, []byte(binaryContent), 0755); err != nil {
+		t.Fatalf("failed to write actual binary: %v", err)
+	}
+
+	// Create mise-style symlink shim
+	shimPath := filepath.Join(miseShimsDir, "mytool")
+	if err := os.Symlink(actualBinary, shimPath); err != nil {
+		t.Fatalf("failed to create mise shim symlink: %v", err)
+	}
+
+	// Log what type of binary it is
+	shimInfo, err := os.Lstat(shimPath)
+	if err != nil {
+		t.Fatalf("failed to lstat shim: %v", err)
+	}
+	isSymlink := shimInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("mise shim is symlink: %v", isSymlink)
+	if isSymlink {
+		target, _ := os.Readlink(shimPath)
+		t.Logf("mise shim target: %s", target)
+	}
+
+	// Verify it works before shimming
+	t.Log("Verifying mytool works before shimming...")
+	cmd := exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+miseShimsDir+":"+binDir+":"+origPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mytool failed before shimming: %v\n%s", err, output)
+	}
+	t.Logf("mytool output: %s", output)
+
+	// Create ribbin.jsonc with explicit path to the mise shim
+	os.Chdir(projectDir)
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "mytool": {
+      "action": "block",
+      "message": "Use the project wrapper instead",
+      "paths": ["%s"]
+    }
+  }
+}`, shimPath)
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write ribbin.jsonc: %v", err)
+	}
+
+	// Use CLI to wrap (need --confirm-system-dir for test temp directories)
+	t.Log("Running ribbin wrap...")
+	wrapCmd := exec.Command(ribbinPath, "wrap", "--confirm-system-dir", configPath)
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin wrap output: %s", output)
+
+	// Use CLI to activate globally
+	t.Log("Running ribbin activate --global...")
+	activateCmd := exec.Command(ribbinPath, "activate", "--global")
+	activateCmd.Dir = projectDir
+	activateCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = activateCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin activate --global failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin activate output: %s", output)
+
+	// Verify sidecar exists and is a symlink (moved from original location)
+	sidecarPath := shimPath + ".ribbin-original"
+	sidecarInfo, err := os.Lstat(sidecarPath)
+	if err != nil {
+		t.Fatalf("sidecar not found: %v", err)
+	}
+	sidecarIsSymlink := sidecarInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("Sidecar is symlink: %v", sidecarIsSymlink)
+	if !sidecarIsSymlink {
+		t.Error("sidecar should be a symlink (the original mise shim)")
+	}
+
+	// Test: mytool should be blocked
+	t.Log("Test: mytool should be blocked")
+	cmd = exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+miseShimsDir+":"+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("mytool should be blocked, but succeeded: %s", output)
+	} else {
+		t.Logf("mytool blocked: %s", output)
+	}
+
+	// Test: bypass should work
+	t.Log("Test: bypass should work")
+	cmd = exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+miseShimsDir+":"+binDir+":"+origPath, "RIBBIN_BYPASS=1")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("mytool with bypass should work: %v\n%s", err, output)
+	} else {
+		if !contains(string(output), "v1.0.0") {
+			t.Errorf("expected version output, got: %s", output)
+		}
+		t.Logf("bypass works: %s", output)
+	}
+
+	// Use CLI to unwrap
+	t.Log("Running ribbin unwrap...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", configPath)
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin unwrap output: %s", output)
+
+	// Verify restoration - should be a symlink again
+	restoredInfo, err := os.Lstat(shimPath)
+	if err != nil {
+		t.Fatalf("restored shim not found: %v", err)
+	}
+	if restoredInfo.Mode()&os.ModeSymlink == 0 {
+		t.Error("restored shim should be a symlink")
+	}
+
+	// Verify it works after unshimming
+	cmd = exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+miseShimsDir+":"+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("mytool should work after unshimming: %v\n%s", err, output)
+	} else {
+		t.Logf("mytool restored: %s", output)
+	}
+
+	t.Log("mise-managed binary test completed!")
+}
+
+// TestAsdfManagedBinaryWrapping tests wrapping a binary managed by asdf (script-based shims).
+// asdf creates shell script shims that look up the correct version at runtime.
+// This is an end-to-end test that uses the actual ribbin CLI commands.
+func TestAsdfManagedBinaryWrapping(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-asdf-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	binDir := filepath.Join(tmpDir, "bin")
+
+	for _, dir := range []string{homeDir, projectDir, binDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Build ribbin
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+	asdfDataDir := filepath.Join(homeDir, ".asdf")
+	asdfShimsDir := filepath.Join(asdfDataDir, "shims")
+	os.MkdirAll(asdfShimsDir, 0755)
+
+	// Create a fake tool version directory (simulating asdf's structure)
+	toolDir := filepath.Join(asdfDataDir, "installs", "mytool", "1.0.0", "bin")
+	os.MkdirAll(toolDir, 0755)
+
+	// Create the actual binary
+	actualBinary := filepath.Join(toolDir, "mytool")
+	binaryContent := `#!/bin/sh
+echo "mytool v1.0.0 (asdf)"
+`
+	if err := os.WriteFile(actualBinary, []byte(binaryContent), 0755); err != nil {
+		t.Fatalf("failed to write actual binary: %v", err)
+	}
+
+	// Create asdf-style script shim (not a symlink - it's a shell script)
+	shimPath := filepath.Join(asdfShimsDir, "mytool")
+	shimContent := fmt.Sprintf(`#!/bin/sh
+exec "%s" "$@"
+`, actualBinary)
+	if err := os.WriteFile(shimPath, []byte(shimContent), 0755); err != nil {
+		t.Fatalf("failed to write asdf shim: %v", err)
+	}
+
+	// Log what type of binary it is
+	shimInfo, err := os.Lstat(shimPath)
+	if err != nil {
+		t.Fatalf("failed to lstat shim: %v", err)
+	}
+	isSymlink := shimInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("asdf shim is symlink: %v (should be false - asdf uses scripts)", isSymlink)
+
+	// Verify it works before shimming
+	t.Log("Verifying mytool works before shimming...")
+	cmd := exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+asdfShimsDir+":"+binDir+":"+origPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mytool failed before shimming: %v\n%s", err, output)
+	}
+	t.Logf("mytool output: %s", output)
+
+	// Create ribbin.jsonc with explicit path to the asdf shim
+	os.Chdir(projectDir)
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "mytool": {
+      "action": "block",
+      "message": "Use the project wrapper instead",
+      "paths": ["%s"]
+    }
+  }
+}`, shimPath)
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write ribbin.jsonc: %v", err)
+	}
+
+	// Use CLI to wrap (need --confirm-system-dir for test temp directories)
+	t.Log("Running ribbin wrap...")
+	wrapCmd := exec.Command(ribbinPath, "wrap", "--confirm-system-dir", configPath)
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin wrap output: %s", output)
+
+	// Use CLI to activate globally
+	t.Log("Running ribbin activate --global...")
+	activateCmd := exec.Command(ribbinPath, "activate", "--global")
+	activateCmd.Dir = projectDir
+	activateCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = activateCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin activate --global failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin activate output: %s", output)
+
+	// Verify sidecar exists and is NOT a symlink (it's a regular file - the script)
+	sidecarPath := shimPath + ".ribbin-original"
+	sidecarInfo, err := os.Lstat(sidecarPath)
+	if err != nil {
+		t.Fatalf("sidecar not found: %v", err)
+	}
+	sidecarIsSymlink := sidecarInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("Sidecar is symlink: %v (should be false)", sidecarIsSymlink)
+	if sidecarIsSymlink {
+		t.Error("sidecar should NOT be a symlink (asdf uses script shims)")
+	}
+
+	// Test: mytool should be blocked
+	t.Log("Test: mytool should be blocked")
+	cmd = exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+asdfShimsDir+":"+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("mytool should be blocked, but succeeded: %s", output)
+	} else {
+		t.Logf("mytool blocked: %s", output)
+	}
+
+	// Test: bypass should work
+	t.Log("Test: bypass should work")
+	cmd = exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+asdfShimsDir+":"+binDir+":"+origPath, "RIBBIN_BYPASS=1")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("mytool with bypass should work: %v\n%s", err, output)
+	} else {
+		if !contains(string(output), "asdf") {
+			t.Errorf("expected version output, got: %s", output)
+		}
+		t.Logf("bypass works: %s", output)
+	}
+
+	// Use CLI to unwrap
+	t.Log("Running ribbin unwrap...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", configPath)
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+binDir+":"+origPath,
+	)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin unwrap output: %s", output)
+
+	// Verify restoration - should be a regular file
+	restoredInfo, err := os.Lstat(shimPath)
+	if err != nil {
+		t.Fatalf("restored shim not found: %v", err)
+	}
+	if restoredInfo.Mode()&os.ModeSymlink != 0 {
+		t.Error("restored shim should be a regular file (not symlink)")
+	}
+
+	// Verify it works after unshimming
+	cmd = exec.Command(shimPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+asdfShimsDir+":"+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("mytool should work after unshimming: %v\n%s", err, output)
+	} else {
+		t.Logf("mytool restored: %s", output)
+	}
+
+	t.Log("asdf-managed binary test completed!")
+}
+
+// TestSystemBinaryWrapping tests wrapping a system-installed binary.
+// This uses a copy of a real system binary to avoid modifying actual system files.
+func TestSystemBinaryWrapping(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ribbin-system-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	binDir := filepath.Join(tmpDir, "bin")
+	localBinDir := filepath.Join(tmpDir, "local-bin") // simulates /usr/local/bin
+
+	for _, dir := range []string{homeDir, projectDir, binDir, localBinDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create dir %s: %v", dir, err)
+		}
+	}
+
+	// Build ribbin
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(binDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+
+	// Save original environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	os.Setenv("HOME", homeDir)
+
+	// Copy a real system binary (echo is simple and universally available)
+	// We use 'true' command as it's simple and has no dependencies
+	systemBinaryPath, err := exec.LookPath("true")
+	if err != nil {
+		t.Skip("'true' command not found, skipping test")
+	}
+
+	// Create a wrapper script that mimics a system binary
+	localBinaryPath := filepath.Join(localBinDir, "mytool")
+	binaryContent := `#!/bin/sh
+echo "system mytool v1.0.0"
+exit 0
+`
+	if err := os.WriteFile(localBinaryPath, []byte(binaryContent), 0755); err != nil {
+		t.Fatalf("failed to write binary: %v", err)
+	}
+
+	// Log what type it is
+	binaryInfo, err := os.Lstat(localBinaryPath)
+	if err != nil {
+		t.Fatalf("failed to lstat binary: %v", err)
+	}
+	isSymlink := binaryInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("system binary is symlink: %v", isSymlink)
+	t.Logf("system binary path: %s", localBinaryPath)
+	t.Logf("original system 'true' path: %s", systemBinaryPath)
+
+	// Verify it works before shimming
+	t.Log("Verifying mytool works before shimming...")
+	cmd := exec.Command(localBinaryPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+localBinDir+":"+binDir+":"+origPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mytool failed before shimming: %v\n%s", err, output)
+	}
+	t.Logf("mytool output: %s", output)
+
+	// Create ribbin.jsonc with explicit paths for CLI
+	os.Chdir(projectDir)
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "mytool": {
+      "action": "block",
+      "message": "System mytool is blocked in this project",
+      "paths": ["%s"]
+    }
+  }
+}`, localBinaryPath)
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write ribbin.jsonc: %v", err)
+	}
+
+	// Use CLI to wrap mytool (need --confirm-system-dir for test temp directories)
+	t.Log("Running ribbin wrap...")
+	wrapCmd := exec.Command(ribbinPath, "wrap", "--confirm-system-dir", configPath)
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+localBinDir+":"+binDir+":"+origPath,
+	)
+	output, err = wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin wrap output: %s", output)
+
+	// Use CLI to activate globally
+	t.Log("Running ribbin activate --global...")
+	activateCmd := exec.Command(ribbinPath, "activate", "--global")
+	activateCmd.Dir = projectDir
+	activateCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+localBinDir+":"+binDir+":"+origPath,
+	)
+	output, err = activateCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin activate --global failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin activate output: %s", output)
+
+	// Verify sidecar exists
+	sidecarPath := localBinaryPath + ".ribbin-original"
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		t.Fatal("sidecar should exist after shim install")
+	}
+	t.Logf("Sidecar exists: %s", sidecarPath)
+
+	// Test: mytool should be blocked
+	t.Log("Test: mytool should be blocked")
+	cmd = exec.Command(localBinaryPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+localBinDir+":"+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Errorf("mytool should be blocked, but succeeded: %s", output)
+	} else {
+		t.Logf("mytool blocked: %s", output)
+	}
+
+	// Test: bypass should work
+	t.Log("Test: bypass should work")
+	cmd = exec.Command(localBinaryPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+localBinDir+":"+binDir+":"+origPath, "RIBBIN_BYPASS=1")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("mytool with bypass should work: %v\n%s", err, output)
+	} else {
+		if !contains(string(output), "system mytool") {
+			t.Errorf("expected version output, got: %s", output)
+		}
+		t.Logf("bypass works: %s", output)
+	}
+
+	// Use CLI to unwrap
+	t.Log("Running ribbin unwrap...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", configPath)
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(),
+		"HOME="+homeDir,
+		"PATH="+localBinDir+":"+binDir+":"+origPath,
+	)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap failed: %v\n%s", err, output)
+	}
+	t.Logf("ribbin unwrap output: %s", output)
+
+	// Verify restoration
+	if _, err := os.Stat(localBinaryPath); os.IsNotExist(err) {
+		t.Fatal("binary should be restored after uninstall")
+	}
+
+	// Verify sidecar is removed
+	if _, err := os.Stat(sidecarPath); !os.IsNotExist(err) {
+		t.Error("sidecar should be removed after uninstall")
+	}
+
+	// Verify it works after unshimming
+	cmd = exec.Command(localBinaryPath)
+	cmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+localBinDir+":"+binDir+":"+origPath)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("mytool should work after unshimming: %v\n%s", err, output)
+	} else {
+		t.Logf("mytool restored: %s", output)
+	}
+
+	t.Log("system binary test completed!")
 }

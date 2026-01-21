@@ -5,6 +5,12 @@ FROM golang:1.23-alpine
 # Install basic dependencies
 RUN apk add --no-cache bash coreutils curl git
 
+# Install Node.js and npm for node_modules tests
+RUN apk add --no-cache nodejs npm
+
+# Install pnpm globally
+RUN npm install -g pnpm
+
 # Install mise (version manager - uses symlink-based shims)
 RUN curl https://mise.run | sh
 ENV PATH="/root/.local/bin:${PATH}"

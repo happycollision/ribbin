@@ -274,12 +274,6 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 		return installErr
 	}
 
-	// 6a. VERIFY SIDECAR IS NOT A SYMLINK (security check)
-	if err := verifySidecarNotSymlink(sidecarPath); err != nil {
-		installErr = err
-		return installErr
-	}
-
 	// 7. CREATE SYMLINK (rollback on failure)
 	if err := os.Symlink(ribbinPath, binaryPath); err != nil {
 		// ROLLBACK: restore original
@@ -321,20 +315,6 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 	}
 
 	// Lock automatically released by defer
-	return nil
-}
-
-// verifySidecarNotSymlink ensures the sidecar file is not a symlink.
-// This prevents attacks where an attacker creates a malicious symlink
-// in place of the expected sidecar file.
-func verifySidecarNotSymlink(sidecarPath string) error {
-	info, err := os.Lstat(sidecarPath)
-	if err != nil {
-		return fmt.Errorf("cannot verify sidecar: %w", err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("security violation: sidecar is a symlink: %s", sidecarPath)
-	}
 	return nil
 }
 

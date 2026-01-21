@@ -113,9 +113,9 @@ func TestGetDirectoryCategory(t *testing.T) {
 			category: CategoryRequiresConfirmation,
 		},
 		{
-			name:     "random directory",
+			name:     "unknown directory requires confirmation",
 			path:     "/tmp/mybinary",
-			category: CategoryForbidden,
+			category: CategoryRequiresConfirmation, // Unknown dirs require confirmation, not forbidden
 		},
 	}
 
