@@ -110,21 +110,23 @@ Path to script for `action: "redirect"`. Relative to config file or absolute.
 
 ### passthrough
 
-Allow command when parent process matches patterns.
+Allow command when any ancestor process matches patterns.
 
 ```jsonc
 {
   "passthrough": {
     "invocation": ["pnpm run"],
-    "invocationRegexp": ["make (test|build)"]
+    "invocationRegexp": ["make (test|build)"],
+    "depth": 0
   }
 }
 ```
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `invocation` | string[] | Substrings to match in parent command |
-| `invocationRegexp` | string[] | Regex patterns to match parent command |
+| `invocation` | string[] | Substrings to match in ancestor commands |
+| `invocationRegexp` | string[] | Regex patterns to match ancestor commands |
+| `depth` | integer | How many ancestors to check (0 = unlimited, default) |
 
 ## Scope Definition
 

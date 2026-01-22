@@ -17,10 +17,12 @@ var ErrInvalidScopePath = errors.New("invalid scope path")
 
 // PassthroughConfig defines conditions under which a shim should pass through to the original command
 type PassthroughConfig struct {
-	// Invocation is a list of exact strings to match against the parent process invocation
+	// Invocation is a list of substrings to match against ancestor process command lines
 	Invocation []string `json:"invocation,omitempty"`
-	// InvocationRegexp is a list of regular expressions to match against the parent process invocation
+	// InvocationRegexp is a list of regular expressions to match against ancestor process command lines
 	InvocationRegexp []string `json:"invocationRegexp,omitempty"`
+	// Depth limits how many ancestor levels to check. nil/0 = unlimited, 1 = parent only, N = up to N ancestors
+	Depth *int `json:"depth,omitempty"`
 }
 
 // WrapperConfig defines the behavior for a wrapped command

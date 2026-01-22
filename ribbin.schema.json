@@ -75,14 +75,20 @@
           "items": {
             "type": "string"
           },
-          "description": "Exact strings to match against the parent process invocation"
+          "description": "Substrings to match against ancestor process command lines"
         },
         "invocationRegexp": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Regular expressions to match against the parent process invocation"
+          "description": "Regular expressions to match against ancestor process command lines"
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "How many ancestor levels to check. 0 = unlimited (default), 1 = immediate parent only, 2 = parent and grandparent, etc."
         }
       }
     },

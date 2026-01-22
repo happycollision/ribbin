@@ -139,3 +139,97 @@ func TestGetParentCommand(t *testing.T) {
 		t.Logf("Parent command: %s", cmd)
 	})
 }
+
+func TestGetAncestorCommands(t *testing.T) {
+	t.Run("returns at least one ancestor", func(t *testing.T) {
+		cmds, err := GetAncestorCommands(0)
+		if err != nil {
+			t.Fatalf("GetAncestorCommands error: %v", err)
+		}
+		if len(cmds) == 0 {
+			t.Error("expected at least one ancestor command")
+		}
+		t.Logf("Found %d ancestors", len(cmds))
+		for i, cmd := range cmds {
+			t.Logf("  Ancestor %d: %s", i+1, cmd)
+		}
+	})
+
+	t.Run("first ancestor matches GetParentCommand", func(t *testing.T) {
+		parentCmd, err := GetParentCommand()
+		if err != nil {
+			t.Fatalf("GetParentCommand error: %v", err)
+		}
+
+		cmds, err := GetAncestorCommands(0)
+		if err != nil {
+			t.Fatalf("GetAncestorCommands error: %v", err)
+		}
+		if len(cmds) == 0 {
+			t.Fatal("expected at least one ancestor")
+		}
+
+		if cmds[0] != parentCmd {
+			t.Errorf("first ancestor %q doesn't match parent command %q", cmds[0], parentCmd)
+		}
+	})
+
+	t.Run("respects maxDepth=1", func(t *testing.T) {
+		cmds, err := GetAncestorCommands(1)
+		if err != nil {
+			t.Fatalf("GetAncestorCommands error: %v", err)
+		}
+		if len(cmds) != 1 {
+			t.Errorf("expected exactly 1 ancestor with maxDepth=1, got %d", len(cmds))
+		}
+	})
+
+	t.Run("respects maxDepth=2", func(t *testing.T) {
+		cmds, err := GetAncestorCommands(2)
+		if err != nil {
+			t.Fatalf("GetAncestorCommands error: %v", err)
+		}
+		// Should return at most 2, but could be fewer if process tree is shallow
+		if len(cmds) > 2 {
+			t.Errorf("expected at most 2 ancestors with maxDepth=2, got %d", len(cmds))
+		}
+	})
+
+	t.Run("unlimited depth returns more than depth=1", func(t *testing.T) {
+		cmdsLimited, err := GetAncestorCommands(1)
+		if err != nil {
+			t.Fatalf("GetAncestorCommands(1) error: %v", err)
+		}
+
+		cmdsUnlimited, err := GetAncestorCommands(0)
+		if err != nil {
+			t.Fatalf("GetAncestorCommands(0) error: %v", err)
+		}
+
+		// Unlimited should return at least as many as limited (usually more)
+		if len(cmdsUnlimited) < len(cmdsLimited) {
+			t.Errorf("unlimited (%d) should return at least as many as depth=1 (%d)",
+				len(cmdsUnlimited), len(cmdsLimited))
+		}
+	})
+}
+
+func TestGetCommandForPID(t *testing.T) {
+	t.Run("returns command for current process parent", func(t *testing.T) {
+		ppid := os.Getppid()
+		cmd, err := getCommandForPID(ppid)
+		if err != nil {
+			t.Fatalf("getCommandForPID error: %v", err)
+		}
+		if cmd == "" {
+			t.Error("expected non-empty command for parent PID")
+		}
+	})
+
+	t.Run("returns error for non-existent PID", func(t *testing.T) {
+		_, err := getCommandForPID(99999999)
+		if err == nil {
+			t.Error("expected error for non-existent PID")
+		}
+	})
+}

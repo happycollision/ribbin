@@ -300,31 +300,40 @@ func printBoxLine(content string, width int) {
 	fmt.Fprintf(os.Stderr, "\u2502  %s%s\u2502\n", content, strings.Repeat(" ", padding))
 }
 
-// shouldPassthrough checks if the parent process invocation matches any passthrough conditions.
+// shouldPassthrough checks if any ancestor process invocation matches passthrough conditions.
 // Returns true if the shim should pass through to the original command.
 func shouldPassthrough(pt *config.PassthroughConfig) bool {
-	parentCmd, err := process.GetParentCommand()
-	if err != nil {
-		// If we can't get parent command, don't passthrough
+	// Determine max depth (0 = unlimited)
+	maxDepth := 0
+	if pt.Depth != nil {
+		maxDepth = *pt.Depth
+	}
+
+	// Get ancestor commands up to depth limit
+	ancestorCmds, err := process.GetAncestorCommands(maxDepth)
+	if err != nil || len(ancestorCmds) == 0 {
 		return false
 	}
 
-	// Check exact matches
-	for _, pattern := range pt.Invocation {
-		if strings.Contains(parentCmd, pattern) {
-			return true
+	// Check each ancestor against patterns
+	for _, cmd := range ancestorCmds {
+		// Check exact matches
+		for _, pattern := range pt.Invocation {
+			if strings.Contains(cmd, pattern) {
+				return true
+			}
 		}
-	}
 
-	// Check regexp matches
-	for _, pattern := range pt.InvocationRegexp {
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			// Invalid regex, skip it
-			continue
-		}
-		if re.MatchString(parentCmd) {
-			return true
+		// Check regexp matches
+		for _, pattern := range pt.InvocationRegexp {
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				// Invalid regex, skip it
+				continue
+			}
+			if re.MatchString(cmd) {
+				return true
+			}
 		}
 	}
 

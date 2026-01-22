@@ -1,6 +1,6 @@
 # How to Allow Commands from Approved Scripts
 
-Use passthrough matching to block direct invocations while allowing commands when run from approved parent processes.
+Use passthrough matching to block direct invocations while allowing commands when run from approved ancestor processes.
 
 ## The Problem
 
@@ -36,7 +36,7 @@ Now:
 
 ### Substring Matching
 
-`invocation` checks if any substring appears in the parent command:
+`invocation` checks if any substring appears in any ancestor command:
 
 ```jsonc
 {
@@ -46,7 +46,7 @@ Now:
 }
 ```
 
-This allows `tsc` when the parent command contains `pnpm run` anywhere.
+This allows `tsc` when any ancestor command contains `pnpm run` anywhere.
 
 ### Regex Matching
 
@@ -132,14 +132,56 @@ Use both for different patterns:
 }
 ```
 
+## Ancestor Matching
+
+By default, passthrough checks **all ancestor processes** in the process tree, not just the immediate parent. This handles task runners like nx, turborepo, and make that spawn intermediate processes.
+
+### Example: nx monorepo
+
+When you run `pnpm nx typecheck`, the process tree looks like:
+
+```
+pnpm nx typecheck → nx → node worker → tsc
+```
+
+With this config, tsc will pass through because "pnpm nx" is found in an ancestor:
+
+```jsonc
+{
+  "passthrough": {
+    "invocation": ["pnpm nx"]
+  }
+}
+```
+
+### Limiting Search Depth
+
+Use `depth` to limit how far up the tree to search:
+
+```jsonc
+{
+  "passthrough": {
+    "invocation": ["pnpm run"],
+    "depth": 1
+  }
+}
+```
+
+| depth | behavior |
+|-------|----------|
+| 0 or omitted | unlimited (check all ancestors) |
+| 1 | immediate parent only |
+| 2 | parent + grandparent |
+| N | up to N ancestors |
+
 ## How It Works
 
 When Ribbin intercepts a command:
 
 1. Check if `RIBBIN_BYPASS=1` is set → allow
-2. Get the parent process command line
-3. Check if any `invocation` substring matches → allow
-4. Check if any `invocationRegexp` pattern matches → allow
+2. Get ancestor process command lines (up to `depth` limit)
+3. Check if any `invocation` substring matches any ancestor → allow
+4. Check if any `invocationRegexp` pattern matches any ancestor → allow
 5. Apply the configured action (block/warn/redirect)
 
 ## Passthrough vs RIBBIN_BYPASS

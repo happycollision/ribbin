@@ -90,8 +90,12 @@ func GetParentCommand() (string, error) {
 		return "", err
 	}
 
-	// Read /proc/<ppid>/cmdline which contains null-separated arguments
-	cmdlinePath := "/proc/" + strconv.Itoa(ppid) + "/cmdline"
+	return getCommandForPID(ppid)
+}
+
+// getCommandForPID returns the command line for a given PID using /proc filesystem.
+func getCommandForPID(pid int) (string, error) {
+	cmdlinePath := "/proc/" + strconv.Itoa(pid) + "/cmdline"
 	data, err := os.ReadFile(cmdlinePath)
 	if err != nil {
 		return "", err
@@ -100,4 +104,33 @@ func GetParentCommand() (string, error) {
 	// Replace null bytes with spaces to form command line
 	cmdline := strings.ReplaceAll(string(data), "\x00", " ")
 	return strings.TrimSpace(cmdline), nil
+}
+
+// GetAncestorCommands walks up the process tree and returns command strings.
+// maxDepth of 0 means unlimited. Returns commands from nearest (parent) to farthest.
+func GetAncestorCommands(maxDepth int) ([]string, error) {
+	var commands []string
+	currentPID := os.Getpid()
+	depth := 0
+
+	for currentPID > 1 {
+		parentPID, err := getParentPID(currentPID)
+		if err != nil {
+			break // Can't continue up the tree
+		}
+
+		cmd, err := getCommandForPID(parentPID)
+		if err == nil && cmd != "" {
+			commands = append(commands, cmd)
+		}
+
+		depth++
+		if maxDepth > 0 && depth >= maxDepth {
+			break
+		}
+
+		currentPID = parentPID
+	}
+
+	return commands, nil
 }

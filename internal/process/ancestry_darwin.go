@@ -85,12 +85,45 @@ func GetParentCommand() (string, error) {
 		return "", err
 	}
 
-	// Use ps to get the full command line
-	cmd := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(ppid))
+	return getCommandForPID(ppid)
+}
+
+// getCommandForPID returns the command line for a given PID using ps.
+func getCommandForPID(pid int) (string, error) {
+	cmd := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid))
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// GetAncestorCommands walks up the process tree and returns command strings.
+// maxDepth of 0 means unlimited. Returns commands from nearest (parent) to farthest.
+func GetAncestorCommands(maxDepth int) ([]string, error) {
+	var commands []string
+	currentPID := os.Getpid()
+	depth := 0
+
+	for currentPID > 1 {
+		parentPID, err := getParentPID(currentPID)
+		if err != nil {
+			break // Can't continue up the tree
+		}
+
+		cmd, err := getCommandForPID(parentPID)
+		if err == nil && cmd != "" {
+			commands = append(commands, cmd)
+		}
+
+		depth++
+		if maxDepth > 0 && depth >= maxDepth {
+			break
+		}
+
+		currentPID = parentPID
+	}
+
+	return commands, nil
 }
