@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/happycollision/ribbin/ribbin.schema.json",
+  "$id": "https://github.com/happycollision/ribbin/schemas/v1/ribbin.schema.json",
   "title": "Ribbin Configuration",
   "description": "Configuration schema for ribbin - a command shimming tool that blocks direct tool calls and redirects to project-specific alternatives",
   "type": "object",

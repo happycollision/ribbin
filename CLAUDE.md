@@ -34,7 +34,7 @@ Project config uses JSONC (`ribbin.jsonc`) - JSON with comments:
 
 ```jsonc
 {
-  "$schema": "https://github.com/happycollision/ribbin/ribbin.schema.json",
+  "$schema": "https://github.com/happycollision/ribbin/schemas/v1/ribbin.schema.json",
   "wrappers": {
     // Block direct tsc usage
     "tsc": {
@@ -51,7 +51,7 @@ Project config uses JSONC (`ribbin.jsonc`) - JSON with comments:
 }
 ```
 
-A JSON Schema is available at `ribbin.schema.json` for editor autocompletion and validation.
+A JSON Schema is available at `schemas/v1/ribbin.schema.json` for editor autocompletion and validation.
 
 ### User-Local Config Override
 

@@ -15,11 +15,11 @@ Ribbin uses JSONC (JSON with Comments). Comments start with `//`.
 
 ## Schema
 
-A JSON Schema is available at `ribbin.schema.json` for editor autocompletion.
+A JSON Schema is available at `schemas/v1/ribbin.schema.json` for editor autocompletion.
 
 ```jsonc
 {
-  "$schema": "https://github.com/happycollision/ribbin/ribbin.schema.json"
+  "$schema": "https://github.com/happycollision/ribbin/schemas/v1/ribbin.schema.json"
 }
 ```
 
@@ -178,7 +178,7 @@ Scope-specific wrapper definitions. Override inherited wrappers.
 
 ```jsonc
 {
-  "$schema": "https://github.com/happycollision/ribbin/ribbin.schema.json",
+  "$schema": "https://github.com/happycollision/ribbin/schemas/v1/ribbin.schema.json",
 
   "wrappers": {
     // Global tools - found via PATH
