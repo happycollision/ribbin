@@ -1,0 +1,13 @@
+{
+  // Base config for testing external extends
+  "wrappers": {
+    "base-cmd": {
+      "action": "block",
+      "message": "Base command blocked"
+    },
+    "shared-cmd": {
+      "action": "warn",
+      "message": "Shared command from base"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  // Test fixture for external file extends
+  "wrappers": {
+    "root-cmd": {
+      "action": "block",
+      "message": "Root command blocked"
+    }
+  },
+  "scopes": {
+    "main": {
+      "path": "main",
+      "extends": ["./base/ribbin.jsonc"],
+      "wrappers": {
+        "local-cmd": {
+          "action": "block",
+          "message": "Local command blocked"
+        },
+        // Override shared-cmd from base
+        "shared-cmd": {
+          "action": "block",
+          "message": "Shared command overridden to block"
+        }
+      }
+    }
+  }
+}

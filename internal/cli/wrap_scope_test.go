@@ -10,11 +10,16 @@ import (
 	_ "github.com/happycollision/ribbin/internal/testsafety"
 
 	"github.com/happycollision/ribbin/internal/config"
+	"github.com/happycollision/ribbin/internal/testutil"
+	"github.com/happycollision/ribbin/internal/wrap"
 )
 
 // TestWrapCommandWithScopeWrappers tests that `ribbin wrap` correctly installs
 // wrappers that are defined ONLY in scopes (not at root level).
 func TestWrapCommandWithScopeWrappers(t *testing.T) {
+	// Find module root before setupTestEnv changes the working directory
+	moduleRoot := testutil.FindModuleRoot(t)
+
 	tempHome, tempDir, cleanup := setupTestEnv(t)
 	defer cleanup()
 
@@ -101,10 +106,12 @@ func TestWrapCommandWithScopeWrappers(t *testing.T) {
 		Wrappers: make(map[string]config.WrapperEntry),
 	})
 
-	// Get ribbin executable path
-	ribbinPath, err := os.Executable()
-	if err != nil {
-		t.Fatalf("failed to get executable path: %v", err)
+	// Build ribbin binary
+	ribbinPath := filepath.Join(tempDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, buildErr := buildCmd.CombinedOutput(); buildErr != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", buildErr, output)
 	}
 
 	// Load the config to verify structure
@@ -236,13 +243,5 @@ func TestWrapCommandWithScopeWrappers(t *testing.T) {
 // installWrapper is a helper that calls the Install function from wrap package
 func installWrapper(t *testing.T, binaryPath, ribbinPath string, registry *config.Registry, configPath string) error {
 	t.Helper()
-
-	// Import dynamically to avoid circular dependencies
-	// Use the same logic as the wrap command
-	return func() error {
-		// This mimics what the wrap command does
-		// We can't import wrap here due to package structure, so we'll use exec
-		// Actually, we CAN import it since this is a test file
-		return nil
-	}()
+	return wrap.Install(binaryPath, ribbinPath, registry, configPath)
 }

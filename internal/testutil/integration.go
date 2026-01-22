@@ -56,7 +56,7 @@ func SetupIntegrationEnv(t *testing.T) *IntegrationEnv {
 	}
 
 	// Find module root before changing directories
-	env.ModuleRoot = findModuleRoot(t)
+	env.ModuleRoot = FindModuleRoot(t)
 
 	// Save original environment
 	env.origHome = os.Getenv("HOME")
@@ -383,8 +383,8 @@ func (env *IntegrationEnv) AssertOutputNotContains(output, substr string) {
 	}
 }
 
-// findModuleRoot finds the Go module root directory.
-func findModuleRoot(t *testing.T) string {
+// FindModuleRoot finds the Go module root directory.
+func FindModuleRoot(t *testing.T) string {
 	t.Helper()
 
 	// Start from the current file's location

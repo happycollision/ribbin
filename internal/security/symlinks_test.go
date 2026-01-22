@@ -182,21 +182,28 @@ func TestValidateSymlinkTargetSafe_PathTraversal(t *testing.T) {
 }
 
 func TestValidateSymlinkTargetSafe_CriticalBinary(t *testing.T) {
-	// Skip if not on a Unix-like system
-	if _, err := os.Stat("/usr/bin/bash"); os.IsNotExist(err) {
-		t.Skip("skipping: /usr/bin/bash not found")
+	// Find a critical shell binary that exists on this system
+	var shellPath string
+	for _, candidate := range []string{"/usr/bin/bash", "/bin/sh", "/bin/bash"} {
+		if _, err := os.Stat(candidate); err == nil {
+			shellPath = candidate
+			break
+		}
+	}
+	if shellPath == "" {
+		t.Fatal("no shell binary found for testing")
 	}
 
 	tmpDir := t.TempDir()
 	link := filepath.Join(tmpDir, "link")
 
-	if err := os.Symlink("/usr/bin/bash", link); err != nil {
+	if err := os.Symlink(shellPath, link); err != nil {
 		t.Fatal(err)
 	}
 
-	err := ValidateSymlinkTargetSafe(link, "/usr/bin/bash")
+	err := ValidateSymlinkTargetSafe(link, shellPath)
 	if err == nil {
-		t.Error("expected error for critical binary, got nil")
+		t.Errorf("expected error for critical binary %s, got nil", shellPath)
 	}
 	if err != nil && !contains(err.Error(), "critical system binary") {
 		t.Errorf("expected 'critical system binary' error, got: %v", err)

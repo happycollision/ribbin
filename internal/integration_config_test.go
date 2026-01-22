@@ -280,10 +280,9 @@ func TestScopedConfigExternalExtends(t *testing.T) {
 	env := testutil.SetupIntegrationEnv(t)
 	fixtureDir := filepath.Join(env.ModuleRoot, "testdata", "projects", "extends")
 
-	// Check if the extends fixture exists
 	configPath := filepath.Join(fixtureDir, "ribbin.jsonc")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		t.Skip("extends fixture not found")
+		t.Fatalf("extends fixture not found at %s", configPath)
 	}
 
 	cfg, err := config.LoadProjectConfig(configPath)
@@ -291,12 +290,39 @@ func TestScopedConfigExternalExtends(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	t.Logf("Loaded config with %d root wrappers", len(cfg.Wrappers))
-
-	// The extends fixture tests external file inheritance
-	if len(cfg.Wrappers) == 0 && len(cfg.Scopes) == 0 {
-		t.Log("Config is empty - might be testing scoped extends only")
+	// Get the main scope which extends base.jsonc
+	mainScope, exists := cfg.Scopes["main"]
+	if !exists {
+		t.Fatal("expected 'main' scope to exist")
 	}
+
+	// Use resolver to get effective shims with extends applied
+	resolver := config.NewResolver()
+	effectiveShims, err := resolver.ResolveEffectiveShims(cfg, configPath, &mainScope)
+	if err != nil {
+		t.Fatalf("failed to resolve effective shims: %v", err)
+	}
+
+	// Verify wrappers from base.jsonc are inherited
+	if _, exists := effectiveShims["base-cmd"]; !exists {
+		t.Error("expected base-cmd to be inherited from base.jsonc")
+	}
+
+	// Verify local wrappers exist
+	if _, exists := effectiveShims["local-cmd"]; !exists {
+		t.Error("expected local-cmd to be defined")
+	}
+
+	// Verify shared-cmd is overridden (should be "block" not "warn")
+	if sharedCmd, exists := effectiveShims["shared-cmd"]; exists {
+		if sharedCmd.Action != "block" {
+			t.Errorf("expected shared-cmd to be overridden to 'block', got '%s'", sharedCmd.Action)
+		}
+	} else {
+		t.Error("expected shared-cmd to exist")
+	}
+
+	t.Logf("Resolved %d effective shims for 'main' scope", len(effectiveShims))
 }
 
 // TestProvenanceTracking tests that wrapper provenance is tracked correctly
