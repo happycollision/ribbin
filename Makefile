@@ -25,20 +25,20 @@ install-next: build
 test:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
 ifdef RUN
-	docker run --rm $(TEST_IMAGE) go test -v ./... -run "$(RUN)"
+	docker run --rm $(TEST_IMAGE) gotestsum --format testdox -- ./... -run "$(RUN)"
 else
-	docker run --rm $(TEST_IMAGE) go test -v ./...
+	docker run --rm $(TEST_IMAGE) gotestsum --format testdox -- ./...
 endif
 
 # Run unit tests only (faster, excludes internal/ integration tests)
 test-unit:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
-	docker run --rm $(TEST_IMAGE) go test ./cmd/... ./internal/cli/... ./internal/config/... ./internal/process/... ./internal/security/... ./internal/wrap/...
+	docker run --rm $(TEST_IMAGE) gotestsum --format testdox -- ./cmd/... ./internal/cli/... ./internal/config/... ./internal/process/... ./internal/security/... ./internal/wrap/...
 
 # Run tests with coverage report
 test-coverage:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
-	docker run --rm $(TEST_IMAGE) go test -cover ./...
+	docker run --rm $(TEST_IMAGE) gotestsum --format testdox -- -cover ./...
 
 # Run tests interactively (for debugging)
 test-shell:

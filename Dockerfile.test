@@ -19,10 +19,13 @@ ENV PATH="/root/.local/bin:${PATH}"
 RUN git clone https://github.com/asdf-vm/asdf.git /root/.asdf --branch v0.14.0
 ENV PATH="/root/.asdf/shims:/root/.asdf/bin:${PATH}"
 
+# Install gotestsum for better test output (v1.12.0 supports Go 1.23)
+RUN go install gotest.tools/gotestsum@v1.12.0
+
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-CMD ["go", "test", "-v", "./..."]
+CMD ["gotestsum", "--format", "testdox", "./..."]
