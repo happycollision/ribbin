@@ -35,7 +35,17 @@ Example:
 	RunE: runInit,
 }
 
+// LatestSchemaVersion is the current schema version used by ribbin init.
+// Update this when releasing a new schema version.
+const LatestSchemaVersion = "v1"
+
+// LatestSchemaURL is the full URL to the latest schema version.
+// Update the version in the path when releasing a new schema version.
+const LatestSchemaURL = "https://github.com/happycollision/ribbin/schemas/" + LatestSchemaVersion + "/ribbin.schema.json"
+
 const defaultConfig = `{
+  "$schema": "` + LatestSchemaURL + `",
+
   // ribbin - Command wrapping tool
   // https://github.com/happycollision/ribbin
   //
