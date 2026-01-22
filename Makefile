@@ -19,9 +19,16 @@ install-next: build
 	@echo "Installed ribbin-next to $(INSTALL_DIR)/ribbin-next"
 
 # Run all tests in Docker container (safe - doesn't modify host system)
+# Usage:
+#   make test                    # Run all tests
+#   make test RUN=TestNodeModules  # Run tests matching pattern
 test:
 	docker build -f Dockerfile.test -t $(TEST_IMAGE) .
+ifdef RUN
+	docker run --rm $(TEST_IMAGE) go test -v ./... -run "$(RUN)"
+else
 	docker run --rm $(TEST_IMAGE) go test -v ./...
+endif
 
 # Run unit tests only (faster, excludes internal/ integration tests)
 test-unit:

@@ -8,9 +8,9 @@ This project uses Go (managed via mise).
 
 - `make build` - Build binary to bin/ribbin
 - `make install` - Install to GOPATH/bin
-- `make test` - Run unit tests (in Docker container for safety)
+- `make test` - Run all tests (in Docker container for safety)
+- `make test RUN=TestName` - Run specific tests matching pattern
 - `make test-coverage` - Run tests with coverage report
-- `make test-integration` - Run integration tests
 - `make scenario` - Interactive scenario testing (see below)
 - `make clean` - Remove build artifacts
 - `go build ./cmd/ribbin` - Direct build
