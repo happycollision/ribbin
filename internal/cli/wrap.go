@@ -149,7 +149,17 @@ Examples:
 					}
 					paths = []string{resolvedPath}
 				} else {
-					paths = wrapperCfg.Paths
+					// Resolve relative paths relative to the config file's directory
+					configDir := filepath.Dir(configPath)
+					for _, p := range wrapperCfg.Paths {
+						if filepath.IsAbs(p) {
+							paths = append(paths, p)
+						} else {
+							absPath := filepath.Join(configDir, p)
+							// Clean the path to resolve any . or .. components
+							paths = append(paths, filepath.Clean(absPath))
+						}
+					}
 				}
 
 				// Process each path
