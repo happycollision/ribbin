@@ -13,19 +13,67 @@ import (
 	"github.com/happycollision/ribbin/internal/security"
 )
 
+// findSidecar attempts to locate the .ribbin-original sidecar file.
+// It checks multiple locations in order:
+// 1. Next to argv0 (e.g., if argv0 is "/path/to/tsc", checks "/path/to/tsc.ribbin-original")
+// 2. Resolved to absolute path if argv0 is relative
+// 3. Next to the executable (for dual-sidecar support with symlink chains)
+// 4. Registry lookup (handles cases where argv0 doesn't match wrapped location)
+// Returns the path to the sidecar, or empty string if not found.
+func findSidecar(argv0 string) string {
+	cmdName := filepath.Base(argv0)
+
+	// Strategy 1: Check next to argv0
+	sidecarPath := argv0 + ".ribbin-original"
+	if _, err := os.Stat(sidecarPath); err == nil {
+		return sidecarPath
+	}
+
+	// Strategy 2: If argv0 is relative or just a command name, resolve to absolute
+	if !filepath.IsAbs(argv0) {
+		if absPath, err := filepath.Abs(argv0); err == nil {
+			sidecarPath = absPath + ".ribbin-original"
+			if _, err := os.Stat(sidecarPath); err == nil {
+				return sidecarPath
+			}
+		}
+	}
+
+	// Strategy 3: Check next to the executable (for symlink chains)
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		sidecarPath = filepath.Join(exeDir, cmdName+".ribbin-original")
+		if _, err := os.Stat(sidecarPath); err == nil {
+			return sidecarPath
+		}
+	}
+
+	// Strategy 4: Look up in registry to find where this command was wrapped
+	// This handles cases like `pnpm exec tsc` where argv0 doesn't match the wrapped location
+	if registry, err := config.LoadRegistry(); err == nil {
+		if entry, ok := registry.Wrappers[cmdName]; ok {
+			sidecarPath = entry.Original + ".ribbin-original"
+			if _, err := os.Stat(sidecarPath); err == nil {
+				return sidecarPath
+			}
+		}
+	}
+
+	return ""
+}
+
 // Run is the main entry point for shim mode.
 // argv0 is the path to the symlink (e.g., /usr/local/bin/cat)
 // args are the command-line arguments (os.Args[1:])
 func Run(argv0 string, args []string) error {
-	// 1. Get sidecar path: argv0 + ".ribbin-original"
-	sidecarPath := argv0 + ".ribbin-original"
-
-	// 2. Verify sidecar exists
-	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
-		return fmt.Errorf("original binary not found at %s", sidecarPath)
+	// 1. Find the sidecar file
+	// It could be at argv0 + ".ribbin-original" OR next to the actual executable
+	sidecarPath := findSidecar(argv0)
+	if sidecarPath == "" {
+		return fmt.Errorf("original binary not found (no .ribbin-original sidecar found)")
 	}
 
-	// 3. Use sidecar as original path (may be a symlink, which is fine)
+	// 2. Use sidecar as original path (may be a symlink, which is fine)
 	originalPath := sidecarPath
 
 	// Extract command name from argv0 (needed for verbose logging)

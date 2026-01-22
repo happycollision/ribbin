@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "github.com/happycollision/ribbin/internal/testsafety"
@@ -3051,12 +3052,13 @@ exit 1
 		t.Error("sidecar2 should be removed")
 	}
 
-	// Orphaned sidecar should still exist (not in registry, so --all doesn't touch it)
-	if _, err := os.Stat(orphanSidecar); os.IsNotExist(err) {
-		t.Error("orphan sidecar should still exist after unwrap --all")
+	// Orphaned sidecar should be cleaned up (find added it to registry, then unwrap cleaned it)
+	// This is the new behavior: inconsistent state (sidecar but no symlink) gets cleaned up
+	if _, err := os.Stat(orphanSidecar); !os.IsNotExist(err) {
+		t.Error("orphan sidecar should be removed after unwrap --all (inconsistent state cleanup)")
 	}
 
-	// Test: ribbin find should still show the orphaned wrapper
+	// Test: ribbin find should show no artifacts after cleanup
 	t.Log("Testing ribbin find after unwrap --all...")
 	findCmd = exec.Command(ribbinPath, "find", binDir)
 	findCmd.Dir = projectDir
@@ -3066,8 +3068,8 @@ exit 1
 		t.Fatalf("ribbin find failed: %v\n%s", err, output)
 	}
 	t.Logf("Find output after unwrap --all: %s", output)
-	if !contains(string(output), "orphan-tool") {
-		t.Error("should still show orphan-tool after unwrap --all")
+	if contains(string(output), "orphan-tool") {
+		t.Error("orphan-tool should be cleaned up after unwrap --all")
 	}
 
 	t.Log("Find and unwrap test completed!")
@@ -3266,4 +3268,941 @@ exit 1
 	}
 
 	t.Log("Status→Find→Status flow test completed!")
+}
+
+// TestScopeWrappersWrapUnwrap tests that `ribbin wrap` installs wrappers
+// defined in scopes (not just root level) and that `ribbin unwrap` removes them
+func TestScopeWrappersWrapUnwrap(t *testing.T) {
+	// Create temp directories for test isolation
+	tmpDir, err := os.MkdirTemp("", "ribbin-scope-wrap-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create bin directory for test binaries
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+
+	// Create project directory with subdirectories for scopes
+	projectDir := filepath.Join(tmpDir, "project")
+	frontendDir := filepath.Join(projectDir, "frontend")
+	backendDir := filepath.Join(projectDir, "backend")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatalf("failed to create frontend dir: %v", err)
+	}
+	if err := os.MkdirAll(backendDir, 0755); err != nil {
+		t.Fatalf("failed to create backend dir: %v", err)
+	}
+
+	// Initialize git repo (required for ribbin)
+	cmd := exec.Command("git", "init")
+	cmd.Dir = projectDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to init git repo: %v", err)
+	}
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	// Create home directory
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("failed to create home dir: %v", err)
+	}
+
+	// Save and set environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	// Step 1: Create mock binaries
+	mockBinaries := map[string]string{
+		"tsc":    "#!/bin/sh\necho 'tsc: TypeScript compiler executed'\nexit 0\n",
+		"eslint": "#!/bin/sh\necho 'eslint: Linter executed'\nexit 0\n",
+		"jest":   "#!/bin/sh\necho 'jest: Test runner executed'\nexit 0\n",
+	}
+
+	for name, content := range mockBinaries {
+		binPath := filepath.Join(binDir, name)
+		if err := os.WriteFile(binPath, []byte(content), 0755); err != nil {
+			t.Fatalf("failed to create mock binary %s: %v", name, err)
+		}
+	}
+	t.Log("Step 1: Created mock binaries (tsc, eslint, jest)")
+
+	// Step 2: Build ribbin binary
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(tmpDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+	t.Log("Step 2: Built ribbin binary")
+
+	// Step 3: Create ribbin.jsonc with wrappers ONLY in scopes (no root wrappers)
+	configContent := fmt.Sprintf(`{
+  "scopes": {
+    "frontend": {
+      "path": "frontend",
+      "wrappers": {
+        "tsc": {
+          "action": "block",
+          "message": "Use 'pnpm nx type-check' instead",
+          "paths": ["%s"]
+        },
+        "eslint": {
+          "action": "block",
+          "message": "Use 'pnpm nx lint' instead",
+          "paths": ["%s"]
+        }
+      }
+    },
+    "backend": {
+      "path": "backend",
+      "wrappers": {
+        "jest": {
+          "action": "block",
+          "message": "Use 'pnpm nx test' instead",
+          "paths": ["%s"]
+        }
+      }
+    }
+  }
+}`, filepath.Join(binDir, "tsc"), filepath.Join(binDir, "eslint"), filepath.Join(binDir, "jest"))
+
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Commit the config
+	cmd = exec.Command("git", "add", "ribbin.jsonc")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "commit", "-m", "Add config")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	t.Log("Step 3: Created ribbin.jsonc with scope wrappers only")
+
+	// Verify no root wrappers exist
+	cfg, err := config.LoadProjectConfig(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	if len(cfg.Wrappers) != 0 {
+		t.Errorf("expected 0 root wrappers, got %d", len(cfg.Wrappers))
+	}
+	if len(cfg.Scopes) != 2 {
+		t.Fatalf("expected 2 scopes, got %d", len(cfg.Scopes))
+	}
+
+	// Step 4: Run `ribbin wrap`
+	t.Log("Step 4: Running 'ribbin wrap'...")
+	wrapCmd := exec.Command(ribbinPath, "wrap")
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Wrap output: %s", output)
+
+	// Verify 3 binaries were wrapped
+	if !contains(string(output), "3 wrapped") {
+		t.Errorf("expected '3 wrapped' in output, got: %s", output)
+	}
+
+	// Step 5: Verify sidecar files exist
+	t.Log("Step 5: Verifying sidecar files...")
+	for name := range mockBinaries {
+		binPath := filepath.Join(binDir, name)
+		sidecarPath := binPath + ".ribbin-original"
+		if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+			t.Errorf("expected sidecar %s to exist", sidecarPath)
+		}
+
+		// Verify binary is now a symlink
+		info, err := os.Lstat(binPath)
+		if err != nil {
+			t.Errorf("failed to stat %s: %v", binPath, err)
+			continue
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			t.Errorf("expected %s to be a symlink after wrapping", binPath)
+		}
+
+		// Verify symlink points to ribbin
+		target, err := os.Readlink(binPath)
+		if err != nil {
+			t.Errorf("failed to readlink %s: %v", binPath, err)
+			continue
+		}
+		if target != ribbinPath {
+			t.Errorf("expected %s symlink to point to %s, got %s", binPath, ribbinPath, target)
+		}
+	}
+	t.Log("✓ All sidecar files and symlinks verified")
+
+	// Step 6: Verify registry was updated
+	t.Log("Step 6: Verifying registry...")
+	registryPath := filepath.Join(homeDir, ".config", "ribbin", "registry.json")
+	registryData, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatalf("failed to read registry: %v", err)
+	}
+
+	var registry config.Registry
+	if err := json.Unmarshal(registryData, &registry); err != nil {
+		t.Fatalf("failed to parse registry: %v", err)
+	}
+
+	for name := range mockBinaries {
+		if _, exists := registry.Wrappers[name]; !exists {
+			t.Errorf("expected %s to be in registry", name)
+		}
+	}
+	t.Log("✓ Registry entries verified")
+
+	// Step 7: Test that wrapped commands are intercepted
+	// Note: In a real scenario, ribbin would block based on config.
+	// Here we just verify the shimming mechanism is in place.
+	t.Log("Step 7: Verifying commands are shimmed...")
+	for name := range mockBinaries {
+		binPath := filepath.Join(binDir, name)
+		// Just verify the symlink is there - actual blocking behavior
+		// is tested in other integration tests
+		info, err := os.Lstat(binPath)
+		if err != nil {
+			t.Errorf("failed to verify %s: %v", name, err)
+			continue
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			t.Errorf("expected %s to still be shimmed", name)
+		}
+	}
+	t.Log("✓ All commands shimmed correctly")
+
+	// Step 8: Run `ribbin unwrap --all`
+	t.Log("Step 8: Running 'ribbin unwrap --all'...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", "--all")
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Unwrap output: %s", output)
+
+	// Verify 3 binaries were unwrapped (output says "restored")
+	if !contains(string(output), "3 restored") {
+		t.Errorf("expected '3 restored' in output, got: %s", output)
+	}
+
+	// Step 9: Verify sidecars are gone and originals restored
+	t.Log("Step 9: Verifying originals restored...")
+	for name := range mockBinaries {
+		binPath := filepath.Join(binDir, name)
+		sidecarPath := binPath + ".ribbin-original"
+
+		// Sidecar should be gone
+		if _, err := os.Stat(sidecarPath); !os.IsNotExist(err) {
+			t.Errorf("expected sidecar %s to be removed", sidecarPath)
+		}
+
+		// Binary should not be a symlink anymore
+		info, err := os.Lstat(binPath)
+		if err != nil {
+			t.Errorf("failed to stat %s: %v", binPath, err)
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			t.Errorf("expected %s to NOT be a symlink after unwrapping", binPath)
+		}
+
+		// Binary should be executable
+		if info.Mode().Perm()&0111 == 0 {
+			t.Errorf("expected %s to be executable after unwrapping", binPath)
+		}
+	}
+	t.Log("✓ All originals restored")
+
+	// Step 10: Verify registry is empty
+	t.Log("Step 10: Verifying registry is clean...")
+	registryData, err = os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatalf("failed to read registry: %v", err)
+	}
+
+	var cleanRegistry config.Registry
+	if err := json.Unmarshal(registryData, &cleanRegistry); err != nil {
+		t.Fatalf("failed to parse registry: %v", err)
+	}
+
+	if len(cleanRegistry.Wrappers) != 0 {
+		t.Errorf("expected registry to be empty after unwrap, got %d entries", len(cleanRegistry.Wrappers))
+	}
+	t.Log("✓ Registry cleaned")
+
+	t.Log("Scope wrappers wrap/unwrap test completed successfully!")
+}
+
+// TestScopeWrappersWithRealPnpm tests that scope wrappers work with a real pnpm
+// installation and real TypeScript. This test validates the key use case:
+// - Config is at project root with a SCOPED wrapper for "frontend"
+// - TypeScript is installed in the frontend subdirectory
+// - Running `pnpm exec tsc` from frontend/ should be blocked
+// - Running `pnpm exec tsc` from project root should NOT be blocked (different scope)
+func TestScopeWrappersWithRealPnpm(t *testing.T) {
+	// Skip if pnpm is not available
+	if _, err := exec.LookPath("pnpm"); err != nil {
+		t.Skip("pnpm not available, skipping test")
+	}
+
+	// Create temp directories for test isolation
+	tmpDir, err := os.MkdirTemp("", "ribbin-real-pnpm-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create project directory with frontend scope
+	projectDir := filepath.Join(tmpDir, "project")
+	frontendDir := filepath.Join(projectDir, "frontend")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatalf("failed to create frontend dir: %v", err)
+	}
+
+	// Initialize git repo (required for ribbin)
+	cmd := exec.Command("git", "init")
+	cmd.Dir = projectDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to init git repo: %v", err)
+	}
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	// Create home directory for test
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("failed to create home dir: %v", err)
+	}
+
+	// Save and set environment
+	origHome := os.Getenv("HOME")
+	origDir, _ := os.Getwd()
+
+	// Find module root BEFORE changing directories
+	moduleRoot := findModuleRoot(t)
+
+	os.Setenv("HOME", homeDir)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Chdir(origDir)
+	}()
+
+	// Change to frontend directory (where we'll install TypeScript)
+	if err := os.Chdir(frontendDir); err != nil {
+		t.Fatalf("failed to chdir to frontend: %v", err)
+	}
+
+	// Step 1: Create package.json with TypeScript IN THE FRONTEND DIRECTORY
+	packageJSON := `{
+  "name": "frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}`
+	if err := os.WriteFile(filepath.Join(frontendDir, "package.json"), []byte(packageJSON), 0644); err != nil {
+		t.Fatalf("failed to create package.json: %v", err)
+	}
+	t.Log("Step 1: Created package.json with TypeScript in frontend/")
+
+	// Step 2: Run pnpm install IN THE FRONTEND DIRECTORY
+	t.Log("Step 2: Running pnpm install in frontend/ (this may take a moment)...")
+	installCmd := exec.Command("pnpm", "install")
+	installCmd.Dir = frontendDir
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+	if err := installCmd.Run(); err != nil {
+		t.Fatalf("failed to run pnpm install: %v", err)
+	}
+	t.Log("Step 2: pnpm install completed")
+
+	// Verify tsc was installed in frontend/node_modules
+	tscPath := filepath.Join(frontendDir, "node_modules", ".bin", "tsc")
+	if _, err := os.Stat(tscPath); os.IsNotExist(err) {
+		t.Fatalf("tsc not found at %s after pnpm install", tscPath)
+	}
+	t.Logf("Step 2: Verified tsc exists at %s", tscPath)
+
+	// Step 3: Build ribbin binary
+	ribbinPath := filepath.Join(tmpDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+	t.Log("Step 3: Built ribbin binary")
+
+	// Step 4: Create ribbin.jsonc at PROJECT ROOT with wrapper in FRONTEND SCOPE
+	// This is the key test: the wrapper only applies when CWD is in frontend/
+	configContent := fmt.Sprintf(`{
+  "scopes": {
+    "frontend": {
+      "path": "frontend",
+      "wrappers": {
+        "tsc": {
+          "action": "block",
+          "message": "Use 'pnpm run type-check' instead",
+          "paths": ["%s"]
+        }
+      }
+    }
+  }
+}`, tscPath)
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create ribbin.jsonc: %v", err)
+	}
+	t.Log("Step 4: Created ribbin.jsonc")
+
+	// Commit config file to git
+	cmd = exec.Command("git", "add", "ribbin.jsonc")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "commit", "-m", "Add ribbin config")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	// Step 5: Wrap tsc
+	t.Log("Step 5: Running ribbin wrap...")
+	wrapCmd := exec.Command(ribbinPath, "wrap")
+	wrapCmd.Dir = projectDir
+	wrapOutput, err := wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to wrap: %v\n%s", err, wrapOutput)
+	}
+	t.Logf("Step 5: Wrap output:\n%s", wrapOutput)
+
+	// Verify wrap was successful
+	if !strings.Contains(string(wrapOutput), "1 wrapped") {
+		t.Fatalf("expected '1 wrapped' in output, got: %s", wrapOutput)
+	}
+
+	// Verify sidecar exists at symlink level
+	sidecarPath := tscPath + ".ribbin-original"
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		t.Fatalf("sidecar file not found at %s", sidecarPath)
+	}
+	t.Logf("Step 5: Verified sidecar exists at %s", sidecarPath)
+
+	// Verify symlink exists
+	info, err := os.Lstat(tscPath)
+	if err != nil {
+		t.Fatalf("failed to stat tsc: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("expected tsc to be a symlink after wrapping")
+	}
+	t.Log("Step 5: Verified tsc is now a symlink")
+
+	// Step 5b: Activate ribbin globally
+	t.Log("Step 5b: Activating ribbin globally...")
+	activateCmd := exec.Command(ribbinPath, "activate", "--global")
+	activateCmd.Dir = projectDir
+	if activateOutput, err := activateCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to activate ribbin: %v\n%s", err, activateOutput)
+	}
+	t.Log("Step 5b: Activated ribbin globally")
+
+	// Step 6: Test that pnpm exec tsc FROM FRONTEND DIR is blocked (in scope)
+	t.Log("Step 6: Testing pnpm exec tsc from frontend/ (should be blocked - in scope)...")
+	execCmd := exec.Command("pnpm", "exec", "tsc", "--version")
+	execCmd.Dir = frontendDir // Run from frontend directory
+	execOutput, execErr := execCmd.CombinedOutput()
+
+	// Should be blocked, so expect non-zero exit
+	if execErr == nil {
+		t.Fatalf("expected tsc to be blocked from frontend/, but it succeeded: %s", execOutput)
+	}
+
+	// Check that the block message appears in output
+	outputStr := string(execOutput)
+	if !strings.Contains(outputStr, "Use 'pnpm run type-check' instead") {
+		t.Fatalf("expected block message in output, got: %s", outputStr)
+	}
+	t.Log("Step 6: ✓ tsc was blocked from frontend/ (scope matched)")
+
+	// Step 7: Test that pnpm run type-check from frontend/ is also blocked
+	t.Log("Step 7: Testing pnpm run type-check from frontend/ (should also be blocked)...")
+	runCmd := exec.Command("pnpm", "run", "type-check")
+	runCmd.Dir = frontendDir
+	runOutput, runErr := runCmd.CombinedOutput()
+
+	// Should be blocked
+	if runErr == nil {
+		t.Fatalf("expected type-check to be blocked, but it succeeded")
+	}
+
+	runStr := string(runOutput)
+	if !strings.Contains(runStr, "Use 'pnpm run type-check' instead") {
+		t.Fatalf("expected block message in output, got: %s", runStr)
+	}
+	t.Log("Step 7: ✓ pnpm run type-check was blocked from frontend/")
+
+	// Step 8: Unwrap
+	t.Log("Step 8: Running ribbin unwrap...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap")
+	unwrapCmd.Dir = projectDir
+	unwrapOutput, err := unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to unwrap: %v\n%s", err, unwrapOutput)
+	}
+	t.Logf("Step 8: Unwrap output:\n%s", unwrapOutput)
+
+	// Verify tsc is restored
+	if info, err := os.Lstat(tscPath); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("expected tsc to no longer be a symlink after unwrap")
+	}
+	t.Log("Step 8: ✓ tsc restored to original")
+
+	// Step 9: Verify tsc works normally now
+	t.Log("Step 9: Testing pnpm exec tsc after unwrap (should work normally)...")
+	finalCmd := exec.Command("pnpm", "exec", "tsc", "--version")
+	finalCmd.Dir = frontendDir
+	finalOutput, finalErr := finalCmd.CombinedOutput()
+	if finalErr != nil {
+		t.Fatalf("expected tsc to work after unwrap, got error: %v\n%s", finalErr, finalOutput)
+	}
+	t.Logf("Step 9: ✓ tsc works normally: %s", strings.TrimSpace(string(finalOutput)))
+
+	t.Log("Scoped pnpm/TypeScript test completed successfully!")
+}
+
+// TestScopeWrappersUnwrapWithoutAll tests that `ribbin unwrap` (without --all)
+// correctly unwraps binaries that were defined in scopes. This is a regression
+// test for the issue where wrapped binaries from scopes showed in status but
+// couldn't be unwrapped without the --all flag.
+func TestScopeWrappersUnwrapWithoutAll(t *testing.T) {
+	// Create temp directories for test isolation
+	tmpDir, err := os.MkdirTemp("", "ribbin-scope-unwrap-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create bin directory for test binaries
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+
+	// Create project directory with subdirectories for scopes
+	projectDir := filepath.Join(tmpDir, "project")
+	frontendDir := filepath.Join(projectDir, "frontend")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatalf("failed to create frontend dir: %v", err)
+	}
+
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = projectDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to init git repo: %v", err)
+	}
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	// Create home directory
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("failed to create home dir: %v", err)
+	}
+
+	// Save and set environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	// Step 1: Create mock binary
+	tscPath := filepath.Join(binDir, "tsc")
+	tscContent := "#!/bin/sh\necho 'tsc: TypeScript compiler executed'\nexit 0\n"
+	if err := os.WriteFile(tscPath, []byte(tscContent), 0755); err != nil {
+		t.Fatalf("failed to create mock binary: %v", err)
+	}
+	t.Log("Step 1: Created mock tsc binary")
+
+	// Step 2: Build ribbin binary
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(tmpDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+	t.Log("Step 2: Built ribbin binary")
+
+	// Step 3: Create ribbin.jsonc with wrapper ONLY in scope
+	configContent := fmt.Sprintf(`{
+  "scopes": {
+    "frontend": {
+      "path": "frontend",
+      "wrappers": {
+        "tsc": {
+          "action": "block",
+          "message": "Use 'pnpm nx type-check' instead",
+          "paths": ["%s"]
+        }
+      }
+    }
+  }
+}`, tscPath)
+
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Commit the config
+	cmd = exec.Command("git", "add", "ribbin.jsonc")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "commit", "-m", "Add config")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	t.Log("Step 3: Created ribbin.jsonc with scope wrapper")
+
+	// Step 4: Run `ribbin wrap`
+	t.Log("Step 4: Running 'ribbin wrap'...")
+	wrapCmd := exec.Command(ribbinPath, "wrap")
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Wrap output: %s", output)
+
+	if !contains(string(output), "1 wrapped") {
+		t.Errorf("expected '1 wrapped' in output, got: %s", output)
+	}
+
+	// Step 5: Verify wrapper was created
+	t.Log("Step 5: Verifying wrapper was created...")
+	sidecarPath := tscPath + ".ribbin-original"
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		t.Fatalf("expected sidecar to exist at %s", sidecarPath)
+	}
+
+	// Step 6: Run `ribbin status` to see it's tracked
+	t.Log("Step 6: Running 'ribbin status'...")
+	statusCmd := exec.Command(ribbinPath, "status")
+	statusCmd.Dir = projectDir
+	statusCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = statusCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin status failed: %v\n%s", err, output)
+	}
+	t.Logf("Status output: %s", output)
+
+	// Should show the wrapped binary
+	if !contains(string(output), tscPath) {
+		t.Errorf("expected status to show wrapped tsc at %s", tscPath)
+	}
+	if !contains(string(output), "ribbin.jsonc") {
+		t.Error("expected status to show config path")
+	}
+
+	// Step 7: Run `ribbin unwrap` WITHOUT --all flag (from project root)
+	t.Log("Step 7: Running 'ribbin unwrap' (without --all)...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap")
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = unwrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin unwrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Unwrap output: %s", output)
+
+	// CRITICAL: This should unwrap the tsc binary even though it's in a scope
+	// The bug was that unwrap without --all only looked at root wrappers
+	if contains(string(output), "No wrappers to remove") {
+		t.Errorf("BUG: unwrap should have found the wrapper from scope, but got 'No wrappers to remove'")
+	}
+
+	if !contains(string(output), "1 restored") && !contains(string(output), "Restored") {
+		t.Errorf("expected unwrap to restore tsc, got: %s", output)
+	}
+
+	// Step 8: Verify sidecar is gone and original restored
+	t.Log("Step 8: Verifying original restored...")
+	if _, err := os.Stat(sidecarPath); !os.IsNotExist(err) {
+		t.Error("expected sidecar to be removed")
+	}
+
+	info, err := os.Lstat(tscPath)
+	if err != nil {
+		t.Fatalf("failed to stat tsc: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Error("expected tsc to NOT be a symlink after unwrap")
+	}
+
+	t.Log("Scope wrappers unwrap-without-all test completed successfully!")
+}
+
+// TestUnwrapInconsistentState tests unwrapping when sidecar exists but binary
+// is not a symlink (e.g., the tool was reinstalled after wrapping).
+// This should clean up the orphaned sidecar files and registry entry.
+func TestUnwrapInconsistentState(t *testing.T) {
+	// Create temp directories for test isolation
+	tmpDir, err := os.MkdirTemp("", "ribbin-inconsistent-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create bin directory for test binaries
+	binDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+
+	// Create project directory
+	projectDir := filepath.Join(tmpDir, "project")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatalf("failed to create project dir: %v", err)
+	}
+
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = projectDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to init git repo: %v", err)
+	}
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	// Create home directory
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("failed to create home dir: %v", err)
+	}
+
+	// Save and set environment
+	origHome := os.Getenv("HOME")
+	origPath := os.Getenv("PATH")
+	origDir, _ := os.Getwd()
+
+	os.Setenv("HOME", homeDir)
+	os.Setenv("PATH", binDir+":"+origPath)
+
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("PATH", origPath)
+		os.Chdir(origDir)
+	}()
+
+	// Step 1: Create mock binary
+	tscPath := filepath.Join(binDir, "tsc")
+	originalContent := "#!/bin/sh\necho 'tsc: original version'\nexit 0\n"
+	if err := os.WriteFile(tscPath, []byte(originalContent), 0755); err != nil {
+		t.Fatalf("failed to create mock binary: %v", err)
+	}
+	t.Log("Step 1: Created mock tsc binary")
+
+	// Step 2: Build ribbin binary
+	moduleRoot := findModuleRoot(t)
+	ribbinPath := filepath.Join(tmpDir, "ribbin")
+	buildCmd := exec.Command("go", "build", "-o", ribbinPath, "./cmd/ribbin")
+	buildCmd.Dir = moduleRoot
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build ribbin: %v\n%s", err, output)
+	}
+	t.Log("Step 2: Built ribbin binary")
+
+	// Step 3: Create ribbin.jsonc
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use project script instead",
+      "paths": ["%s"]
+    }
+  }
+}`, tscPath)
+
+	configPath := filepath.Join(projectDir, "ribbin.jsonc")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	cmd = exec.Command("git", "add", "ribbin.jsonc")
+	cmd.Dir = projectDir
+	cmd.Run()
+	cmd = exec.Command("git", "commit", "-m", "Add config")
+	cmd.Dir = projectDir
+	cmd.Run()
+
+	t.Log("Step 3: Created ribbin.jsonc")
+
+	// Step 4: Wrap the binary
+	t.Log("Step 4: Running 'ribbin wrap'...")
+	wrapCmd := exec.Command(ribbinPath, "wrap")
+	wrapCmd.Dir = projectDir
+	wrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err := wrapCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ribbin wrap failed: %v\n%s", err, output)
+	}
+	t.Logf("Wrap output: %s", output)
+
+	// Verify wrapping succeeded
+	sidecarPath := tscPath + ".ribbin-original"
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		t.Fatalf("expected sidecar to exist")
+	}
+
+	info, err := os.Lstat(tscPath)
+	if err != nil {
+		t.Fatalf("failed to stat tsc: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("expected tsc to be a symlink after wrapping")
+	}
+
+	// Step 5: Simulate the tool being reinstalled - replace symlink with regular file
+	t.Log("Step 5: Simulating tool reinstall (replacing symlink with regular file)...")
+	if err := os.Remove(tscPath); err != nil {
+		t.Fatalf("failed to remove symlink: %v", err)
+	}
+
+	reinstalledContent := "#!/bin/sh\necho 'tsc: NEW reinstalled version'\nexit 0\n"
+	if err := os.WriteFile(tscPath, []byte(reinstalledContent), 0755); err != nil {
+		t.Fatalf("failed to write reinstalled binary: %v", err)
+	}
+
+	// Now we have an inconsistent state:
+	// - tsc is a regular file (not a symlink)
+	// - tsc.ribbin-original exists (sidecar)
+	// - tsc.ribbin-meta exists (metadata)
+	// - Registry knows about tsc
+
+	// Step 6: Verify inconsistent state
+	t.Log("Step 6: Verifying inconsistent state...")
+	info, err = os.Lstat(tscPath)
+	if err != nil {
+		t.Fatalf("failed to stat tsc: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("expected tsc to NOT be a symlink after reinstall")
+	}
+	if _, err := os.Stat(sidecarPath); os.IsNotExist(err) {
+		t.Fatal("expected sidecar to still exist")
+	}
+
+	// Step 7: Run unwrap - should detect inconsistent state and clean up
+	t.Log("Step 7: Running 'ribbin unwrap --all'...")
+	unwrapCmd := exec.Command(ribbinPath, "unwrap", "--all")
+	unwrapCmd.Dir = projectDir
+	unwrapCmd.Env = append(os.Environ(), "HOME="+homeDir, "PATH="+binDir+":"+origPath)
+	output, err = unwrapCmd.CombinedOutput()
+	// Note: This may fail with current code - that's what we're fixing
+	t.Logf("Unwrap output: %s", output)
+
+	// The test expectation: unwrap should clean up the orphaned sidecar
+	// and registry entry without failing
+	if err != nil {
+		t.Logf("Unwrap failed (this is the bug we're fixing): %v", err)
+	}
+
+	// Step 8: Verify cleanup happened
+	t.Log("Step 8: Verifying cleanup...")
+
+	// Sidecar should be removed
+	if _, err := os.Stat(sidecarPath); !os.IsNotExist(err) {
+		t.Error("expected sidecar to be removed after unwrap")
+	}
+
+	// Metadata should be removed
+	metaPath := tscPath + ".ribbin-meta"
+	if _, err := os.Stat(metaPath); !os.IsNotExist(err) {
+		t.Error("expected metadata to be removed after unwrap")
+	}
+
+	// Current binary should still be there (the reinstalled version)
+	if _, err := os.Stat(tscPath); os.IsNotExist(err) {
+		t.Error("expected current binary to remain after unwrap")
+	}
+
+	// Verify it's the reinstalled version
+	content, err := os.ReadFile(tscPath)
+	if err != nil {
+		t.Fatalf("failed to read tsc: %v", err)
+	}
+	if !contains(string(content), "NEW reinstalled version") {
+		t.Error("expected current binary to be the reinstalled version")
+	}
+
+	// Registry should be cleaned
+	registryPath := filepath.Join(homeDir, ".config", "ribbin", "registry.json")
+	registryData, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatalf("failed to read registry: %v", err)
+	}
+
+	var registry config.Registry
+	if err := json.Unmarshal(registryData, &registry); err != nil {
+		t.Fatalf("failed to parse registry: %v", err)
+	}
+
+	if _, exists := registry.Wrappers["tsc"]; exists {
+		t.Error("expected tsc to be removed from registry after unwrap")
+	}
+
+	t.Log("Unwrap inconsistent state test completed successfully!")
 }

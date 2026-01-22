@@ -27,15 +27,30 @@ func main() {
 		}
 	} else {
 		// Shim mode - invoked as a shimmed command (e.g., "cat", "tsc")
-		// Resolve the symlink path (not the target) from os.Args[0]
+		// We need to find the actual symlink path that was invoked.
 		shimPath := os.Args[0]
+
 		if !filepath.IsAbs(shimPath) {
-			// If invoked as just "npm" (not "/path/to/npm"), look it up in PATH
-			// This gives us the symlink path, not the ribbin binary path
+			// If invoked as just "npm" (not "/path/to/npm"), try to resolve it
+
+			// First, try looking it up in PATH
 			if resolved, err := resolveInPath(shimPath); err == nil {
 				shimPath = resolved
+			} else {
+				// PATH lookup failed (e.g., pnpm exec runs binaries not in PATH)
+				// This happens when a package manager like pnpm executes a binary
+				// directly without it being in PATH.
+
+				// Convert to absolute path based on CWD
+				// The sidecar lookup in wrap.Run() will handle finding the actual sidecar
+				if absPath, err := filepath.Abs(os.Args[0]); err == nil {
+					shimPath = absPath
+				} else {
+					shimPath = os.Args[0]
+				}
 			}
 		}
+
 		if err := wrap.Run(shimPath, os.Args[1:]); err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", execName, err)
 			os.Exit(1)

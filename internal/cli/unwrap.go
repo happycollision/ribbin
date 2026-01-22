@@ -151,8 +151,23 @@ func runUnwrap(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to load project config %s: %w", configPath, err)
 			}
 
-			// For each command in project config, find its path in registry
+			// Collect all wrapper command names from root and scopes
+			allCommandNames := make(map[string]bool)
+
+			// Add root-level wrapper commands
 			for commandName := range projectConfig.Wrappers {
+				allCommandNames[commandName] = true
+			}
+
+			// Add wrapper commands from all scopes
+			for _, scopeCfg := range projectConfig.Scopes {
+				for commandName := range scopeCfg.Wrappers {
+					allCommandNames[commandName] = true
+				}
+			}
+
+			// For each command in project config (root + scopes), find its path in registry
+			for commandName := range allCommandNames {
 				if entry, ok := registry.Wrappers[commandName]; ok {
 					pathsToUnwrap = append(pathsToUnwrap, entry.Original)
 				} else {
@@ -198,6 +213,35 @@ func runUnwrap(cmd *cobra.Command, args []string) error {
 func unwrapSinglePath(path string, registry *config.Registry) wrap.UnwrapResult {
 	result := wrap.UnwrapResult{BinaryPath: path}
 
+	// Check if sidecar exists
+	sidecarPath := path + ".ribbin-original"
+	hasSidecar := false
+	if _, err := os.Stat(sidecarPath); err == nil {
+		hasSidecar = true
+	}
+
+	// Check if binary is a symlink
+	info, err := os.Lstat(path)
+	isSymlink := false
+	if err == nil && info.Mode()&os.ModeSymlink != 0 {
+		isSymlink = true
+	}
+
+	// Handle inconsistent state: sidecar exists but binary is not a symlink
+	// This happens when a tool is reinstalled after wrapping
+	if hasSidecar && !isSymlink {
+		fmt.Printf("Cleaning up orphaned sidecar for %s (tool was reinstalled)\n", filepath.Base(path))
+		err := wrap.CleanupSidecarFiles(path, registry)
+		if err != nil {
+			result.Error = err
+			result.Success = false
+		} else {
+			result.Success = true
+			result.Resolution = wrap.ResolutionCleanup
+		}
+		return result
+	}
+
 	// Check for hash conflict before unwrapping
 	hasConflict, currentHash, originalHash := wrap.CheckHashConflict(path)
 	if hasConflict {
@@ -225,7 +269,7 @@ func unwrapSinglePath(path string, registry *config.Registry) wrap.UnwrapResult 
 	}
 
 	// Normal unwrap
-	err := wrap.Uninstall(path, registry)
+	err = wrap.Uninstall(path, registry)
 	if err != nil {
 		result.Error = err
 		result.Success = false

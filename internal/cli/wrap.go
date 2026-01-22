@@ -117,7 +117,27 @@ Examples:
 				fmt.Printf("Processing %s...\n", configPath)
 			}
 
+			// Collect all wrappers from root and scopes
+			allWrappers := make(map[string]config.WrapperConfig)
+
+			// Add root-level wrappers
 			for name, wrapperCfg := range projectConfig.Wrappers {
+				allWrappers[name] = wrapperCfg
+			}
+
+			// Add wrappers from all scopes
+			for scopeName, scopeCfg := range projectConfig.Scopes {
+				for name, wrapperCfg := range scopeCfg.Wrappers {
+					// If a wrapper with this name already exists, we could warn or skip
+					// For now, scope wrappers override root wrappers
+					if _, exists := allWrappers[name]; exists {
+						fmt.Printf("Note: scope '%s' overrides wrapper for '%s'\n", scopeName, name)
+					}
+					allWrappers[name] = wrapperCfg
+				}
+			}
+
+			for name, wrapperCfg := range allWrappers {
 				var paths []string
 
 				// If Paths is empty, resolve via wrap.ResolveCommand

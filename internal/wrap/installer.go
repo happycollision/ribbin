@@ -54,6 +54,29 @@ func hashFile(path string) (string, error) {
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// copyFile copies a file from src to dst, preserving permissions
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcInfo.Mode())
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
+}
+
 // LoadMetadata reads metadata from a .ribbin-meta file
 func LoadMetadata(binaryPath string) (*WrapperMetadata, error) {
 	metaPath := MetadataPath(binaryPath)
@@ -189,6 +212,7 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 	}
 
 	// 2a. VALIDATE SYMLINKS (if binary is a symlink)
+	var finalTarget string // If binary is a symlink, track the final target for dual-sidecar creation
 	info, err := os.Lstat(binaryPath)
 	if err != nil && !os.IsNotExist(err) {
 		installErr = fmt.Errorf("cannot stat binary: %w", err)
@@ -196,9 +220,10 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 	}
 	if info != nil && info.Mode()&os.ModeSymlink != 0 {
 		// Binary is a symlink - validate it's safe
-		finalTarget, err := security.ValidateSymlinkForShimming(binaryPath)
-		if err != nil {
-			installErr = err
+		var validateErr error
+		finalTarget, validateErr = security.ValidateSymlinkForShimming(binaryPath)
+		if validateErr != nil {
+			installErr = validateErr
 			return installErr
 		}
 
@@ -210,7 +235,7 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 				fmt.Fprintf(os.Stderr, "(chain depth %d) ", symlinkInfo.ChainDepth)
 			}
 			fmt.Fprintf(os.Stderr, "-> %s\n", finalTarget)
-			fmt.Fprintf(os.Stderr, "   The shim will redirect to the symlink, not the final target\n")
+			fmt.Fprintf(os.Stderr, "   Creating sidecars at symlink and target for robustness\n")
 		}
 	}
 
@@ -304,6 +329,21 @@ func Install(binaryPath, ribbinPath string, registry *config.Registry, configPat
 			}
 			// Best effort - don't fail installation if metadata write fails
 			_ = saveMetadata(binaryPath, meta)
+		}
+	}
+
+	// 7b. CREATE SECOND SIDECAR AT FINAL TARGET (if binary was a symlink)
+	if finalTarget != "" {
+		// Create a copy of the sidecar at the final target location
+		targetSidecarPath := finalTarget + ".ribbin-original"
+
+		// Only create if it doesn't already exist
+		if _, err := os.Stat(targetSidecarPath); os.IsNotExist(err) {
+			// Copy the sidecar content to the target location
+			if copyErr := copyFile(sidecarPath, targetSidecarPath); copyErr == nil {
+				fmt.Fprintf(os.Stderr, "   Created sidecar at target: %s\n", targetSidecarPath)
+			}
+			// Best effort - don't fail if this fails
 		}
 	}
 
