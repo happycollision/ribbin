@@ -30,3 +30,6 @@ go.work.sum
 
 # Personal command overrides
 bin-overrides.local/
+
+# Claude Code - ignore local settings, keep shared settings
+.claude/settings.local.json
