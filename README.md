@@ -77,10 +77,10 @@ ribbin init
 ribbin wrap
 ```
 
-4. Activate Ribbin globally:
+4. Activate Ribbin:
 
 ```bash
-ribbin activate --global
+ribbin activate
 ```
 
 Now when you (or an AI agent) runs `tsc` in this project, they'll see the helpful error instead.
@@ -220,13 +220,10 @@ RIBBIN_BYPASS=1 tsc --version
 |---------|-------------|
 | `ribbin init` | Create a `ribbin.jsonc` in the current directory |
 | `ribbin wrap` | Install wrappers for commands in config |
-| `ribbin unwrap` | Remove wrappers and restore originals |
-| `ribbin unwrap --all --find` | Find and remove all wrappers including orphaned ones |
-| `ribbin activate --global` | Enable wrappers globally |
-| `ribbin deactivate --global` | Disable wrappers globally |
+| `ribbin unwrap` | Remove wrappers and restore originals for the current config|
+| `ribbin activate` | Enable wrappers for the closest config |
+| `ribbin deactivate` | Disable wrappers for the closest config |
 | `ribbin status` | Show current activation status |
-| `ribbin find` | Find orphaned sidecars and config files |
-| `ribbin recover` | Restore orphaned wrapped binaries |
 | `ribbin config show` | Show effective config for current directory |
 
 Run `ribbin --help` for all commands and options.
