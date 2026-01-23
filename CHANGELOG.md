@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`ribbin config validate` command**: Validate config files against the JSON schema
+  - Supports loose mode (default) and strict mode (`--strict`) that disallows unknown properties
+- **`ribbin config --example` flag**: Display a comprehensive example config with all features documented
+- **`$schema` field in generated configs**: `ribbin init` now includes `$schema` for editor autocompletion
+
+### Changed
+- **`ribbin init` simplified**: Default config now contains brief description with links to documentation instead of verbose examples
+- **Flexible `extends` filenames**: Extended configs no longer need to be named `ribbin.jsonc` - any valid JSONC/JSON file works (e.g., `team-defaults.jsonc`, `hardened.jsonc`)
+
+### Documentation
+- Document task runner caching gotcha: when runners like nx cache a blocked command, the cached failure replays even after fixing config (solution: `nx reset`)
+- Add external config how-to guide
+
+### Internal
+- Add `TestPassthroughWithPnpmNx` integration test validating passthrough with real pnpm, nx, and TypeScript
+- Add `LatestSchemaVersion` and `LatestSchemaURL` constants for schema version tracking
+- Build step copies schemas for `go:embed`
+
 ## [0.1.0-alpha.8] - 2026-01-21
 
 ### Added
