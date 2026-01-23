@@ -28,6 +28,10 @@ Ribbin intercepts calls to specified commands and blocks them with helpful error
 └─────────────────────────────────────────────────────┘
 ```
 
+### Why Not AGENTS.md, Hooks, Aliases, or other AI specific tools?
+
+Ribbin works at the shell level, so it catches mistakes from any AI agent (or human)—not just one tool. Instructions arrive at the moment of the mistake, not upfront. See [Why Ribbin?](docs/explanation/why-ribbin.md) for the full comparison.
+
 ## Installation
 
 ### Quick Install (Linux/macOS)

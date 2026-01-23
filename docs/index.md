@@ -42,6 +42,7 @@ Look up specific details:
 
 Understand how and why:
 
+- [Why Ribbin?](explanation/why-ribbin.md) - Comparison with AGENTS.md, hooks, and alternatives
 - [How Ribbin Works](explanation/how-ribbin-works.md) - Architecture and execution flow
 - [Security Model](explanation/security-model.md) - Threat model and design decisions
 - [Local Development Mode](explanation/local-dev-mode.md) - Repository-scoped protection
