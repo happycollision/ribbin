@@ -485,3 +485,156 @@ exit 0
 
 	t.Log("system binary test completed!")
 }
+
+// TestPassthroughWithPnpmNx tests passthrough.invocation matching with real pnpm and nx.
+// This verifies that:
+// 1. Direct `pnpm exec tsc` is blocked
+// 2. `pnpm run typecheck` passes through (matches "pnpm run")
+// 3. `pnpm nx typecheck` passes through (matches "pnpm nx")
+func TestPassthroughWithPnpmNx(t *testing.T) {
+	if _, err := exec.LookPath("pnpm"); err != nil {
+		t.Skip("pnpm not available, skipping test")
+	}
+
+	env := testutil.SetupIntegrationEnv(t)
+
+	// Create package.json with nx and TypeScript
+	packageJSON := `{
+  "name": "test-project",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --version"
+  },
+  "devDependencies": {
+    "nx": "19.8.4",
+    "typescript": "^5.0.0"
+  }
+}`
+	if err := os.WriteFile(filepath.Join(env.ProjectDir, "package.json"), []byte(packageJSON), 0644); err != nil {
+		t.Fatalf("failed to create package.json: %v", err)
+	}
+
+	// Create nx.json to disable caching (important for reliable testing)
+	nxJSON := `{
+  "targetDefaults": {
+    "typecheck": {
+      "cache": false
+    }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(env.ProjectDir, "nx.json"), []byte(nxJSON), 0644); err != nil {
+		t.Fatalf("failed to create nx.json: %v", err)
+	}
+
+	// Create project.json with the typecheck target (nx requires this separate from package.json)
+	projectJSON := `{
+  "name": "test-project",
+  "targets": {
+    "typecheck": {
+      "command": "tsc --version"
+    }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(env.ProjectDir, "project.json"), []byte(projectJSON), 0644); err != nil {
+		t.Fatalf("failed to create project.json: %v", err)
+	}
+
+	// Init git repo (required by nx)
+	env.InitGitRepo(env.ProjectDir)
+	env.GitAdd(env.ProjectDir, "package.json")
+	env.GitAdd(env.ProjectDir, "nx.json")
+	env.GitAdd(env.ProjectDir, "project.json")
+	env.GitCommit(env.ProjectDir, "Initial commit")
+
+	// Install dependencies
+	t.Log("Installing pnpm dependencies (nx + typescript)...")
+	installCmd := exec.Command("pnpm", "install")
+	installCmd.Dir = env.ProjectDir
+	installCmd.Env = env.Environ()
+	if output, err := installCmd.CombinedOutput(); err != nil {
+		t.Fatalf("pnpm install failed: %v\n%s", err, output)
+	}
+	t.Log("pnpm install completed")
+
+	// Find the installed tsc path
+	tscPath := filepath.Join(env.ProjectDir, "node_modules", ".bin", "tsc")
+	env.AssertFileExists(tscPath)
+
+	// Build ribbin
+	env.BuildRibbin("")
+
+	// Create ribbin config that blocks tsc but allows pnpm run and pnpm nx
+	configContent := fmt.Sprintf(`{
+  "wrappers": {
+    "tsc": {
+      "action": "block",
+      "message": "Use 'pnpm run typecheck' or 'pnpm nx typecheck' instead",
+      "paths": ["%s"],
+      "passthrough": {
+        "invocationRegexp": ["pnpm (run|nx)"]
+      }
+    }
+  }
+}`, tscPath)
+
+	configPath := env.CreateConfig(env.ProjectDir, configContent)
+	env.GitAdd(env.ProjectDir, "ribbin.jsonc")
+	env.GitCommit(env.ProjectDir, "Add ribbin config")
+
+	// Wrap tsc
+	t.Log("Wrapping tsc...")
+	env.MustRunRibbin(env.ProjectDir, "wrap")
+	env.MustRunRibbin(env.ProjectDir, "activate", "--global")
+
+	// Verify tsc is wrapped
+	env.AssertSymlink(tscPath, env.RibbinPath)
+	t.Log("✓ tsc is wrapped")
+
+	// Test 1: Direct pnpm exec tsc should be BLOCKED
+	t.Log("Test 1: Direct 'pnpm exec tsc' should be blocked...")
+	cmd := exec.Command("pnpm", "exec", "tsc", "--version")
+	cmd.Dir = env.ProjectDir
+	cmd.Env = env.Environ()
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Errorf("direct 'pnpm exec tsc' should be blocked, got: %s", output)
+	}
+	env.AssertOutputContains(string(output), "blocked")
+	t.Log("✓ Test 1 passed: 'pnpm exec tsc' blocked")
+
+	// Test 2: pnpm run typecheck should PASS THROUGH
+	t.Log("Test 2: 'pnpm run typecheck' should pass through...")
+	cmd = exec.Command("pnpm", "run", "typecheck")
+	cmd.Dir = env.ProjectDir
+	cmd.Env = env.Environ()
+	output, err = cmd.CombinedOutput()
+
+	if err != nil {
+		t.Errorf("'pnpm run typecheck' should pass through: %v\nOutput: %s", err, output)
+	}
+	env.AssertOutputNotContains(string(output), "blocked")
+	env.AssertOutputContains(string(output), "Version")
+	t.Log("✓ Test 2 passed: 'pnpm run typecheck' passes through")
+
+	// Test 3: pnpm nx typecheck should PASS THROUGH
+	t.Log("Test 3: 'pnpm nx typecheck' should pass through...")
+	cmd = exec.Command("pnpm", "nx", "typecheck")
+	cmd.Dir = env.ProjectDir
+	cmd.Env = env.Environ()
+	output, err = cmd.CombinedOutput()
+
+	if err != nil {
+		t.Errorf("'pnpm nx typecheck' should pass through: %v\nOutput: %s", err, output)
+	}
+	env.AssertOutputNotContains(string(output), "blocked")
+	env.AssertOutputContains(string(output), "Version")
+	t.Log("✓ Test 3 passed: 'pnpm nx typecheck' passes through")
+
+	// Cleanup
+	env.MustRunRibbin(env.ProjectDir, "unwrap")
+
+	t.Log("pnpm nx passthrough test completed!")
+
+	_ = configPath
+}

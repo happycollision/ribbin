@@ -204,6 +204,33 @@ ribbin audit show
 
 Look for `bypass.used` or `security.violation` events.
 
+## Troubleshooting
+
+### Task Runner Caching (nx, turborepo, etc.)
+
+**Problem:** You've configured passthrough correctly, but the command is still blocked.
+
+**Cause:** Task runners like nx and turborepo cache command outputs, including failures. If a command was blocked *before* you configured passthrough, the cached failure might be replayed if your runner doesn't know better. This is especially likely if your ribbin config file is not housed in your project, but in a parent directory.
+
+**Solution:** Clear your task runner's cache:
+
+```bash
+# nx
+pnpm nx reset
+
+# turborepo
+pnpm turbo daemon clean
+# or delete .turbo directory
+```
+
+**How to verify it's a caching issue:**
+
+1. Look for `[local cache]` or similar in the task runner output
+2. The block message appears instantly without actually running the command
+3. Running with `--skip-cache` works correctly
+
+**Prevention:** When testing ribbin configuration changes, always clear your task runner cache or use `--skip-cache` to ensure you're seeing fresh results.
+
 ## See Also
 
 - [Block Commands](block-commands.md) - Basic blocking
