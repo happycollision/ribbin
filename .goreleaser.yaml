@@ -1,5 +1,9 @@
 version: 2
 
+before:
+  hooks:
+    - make copy-schemas
+
 builds:
   - main: ./cmd/ribbin
     binary: ribbin
