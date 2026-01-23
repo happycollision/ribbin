@@ -107,18 +107,42 @@ This allows Ribbin to:
 
 When Ribbin intercepts a command, it resolves the effective config:
 
-1. **Find config file** - Walk up directories looking for `ribbin.jsonc` or `ribbin.local.jsonc`
-2. **Determine scope** - Match current working directory against scope paths
-3. **Apply inheritance** - Process `extends` to build merged wrappers
-4. **Look up command** - Find the wrapper definition
+### Config Discovery Algorithm
+
+1. **Start at current directory** - Begin at the process's working directory
+2. **Check for local override first** - Look for `ribbin.local.jsonc`
+3. **Fall back to standard config** - If no local file, look for `ribbin.jsonc`
+4. **Stop at first match** - Return immediately when a config file is found
+5. **Walk up to parent** - If neither exists, move to parent directory
+6. **Repeat until root** - Continue until filesystem root is reached
+
+**Key point:** `ribbin.local.jsonc` always takes priority over `ribbin.jsonc` in the same directory. This allows personal overrides without modifying the shared config.
+
+```
+/project/
+├── ribbin.jsonc          # Shared team config
+├── ribbin.local.jsonc    # Personal overrides (gitignored) ← Used if present
+└── apps/
+    └── frontend/
+        └── ribbin.jsonc  # App-specific config ← Used for commands run here
+```
+
+### After Config Discovery
+
+1. **Determine scope** - Match current working directory against scope paths
+2. **Apply inheritance** - Process `extends` to build merged wrappers
+3. **Look up command** - Find the wrapper definition for the invoked command
 
 ```
 /project/apps/frontend/src/index.ts
                     ↓
-        Look for ribbin.jsonc
+        Look for config (local first, then standard)
                     ↓
+/project/apps/frontend/ribbin.local.jsonc? No
 /project/apps/frontend/ribbin.jsonc? No
+/project/apps/ribbin.local.jsonc? No
 /project/apps/ribbin.jsonc? No
+/project/ribbin.local.jsonc? No
 /project/ribbin.jsonc? Yes!
                     ↓
         Current dir matches "frontend" scope?

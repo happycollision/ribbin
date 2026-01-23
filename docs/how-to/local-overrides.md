@@ -2,6 +2,13 @@
 
 Use `ribbin.local.jsonc` for personal overrides that aren't committed to the repository.
 
+## Priority Rules
+
+When both files exist in the same directory:
+- **`ribbin.local.jsonc` completely replaces `ribbin.jsonc`** — it takes full priority
+- Use `extends: ["./ribbin.jsonc"]` inside local config to inherit shared rules
+- This is why local configs typically use scopes with extends rather than defining wrappers at root level
+
 ## Create Local Config
 
 Create `ribbin.local.jsonc` in the same directory as `ribbin.jsonc`:

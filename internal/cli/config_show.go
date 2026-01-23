@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/happycollision/ribbin/internal/config"
@@ -16,16 +17,21 @@ var (
 )
 
 var configShowCmd = &cobra.Command{
-	Use:   "show",
+	Use:   "show [config-path]",
 	Short: "Show effective wrapper configuration with provenance",
-	Long: `Display the effective wrapper configuration for the current working directory.
+	Long: `Display the effective wrapper configuration.
+
+If no path is provided, finds the nearest config and shows effective wrappers
+for the current directory. With a path, shows effective wrappers from that
+specific config file.
 
 Shows which config file applies, which scope matches (if any), and lists
 all effective wrappers with their sources. This is useful for understanding
 how scope inheritance and extends work together.
 
 Examples:
-  ribbin config show                    Show all effective wrappers
+  ribbin config show                    Show effective wrappers for cwd
+  ribbin config show ./ribbin.jsonc     Show wrappers from specific config
   ribbin config show --json             Output in JSON format
   ribbin config show --command npm      Show only the 'npm' wrapper configuration`,
 	RunE: runConfigShow,
@@ -63,14 +69,55 @@ type shimSourceJSON struct {
 }
 
 func runConfigShow(cmd *cobra.Command, args []string) error {
-	// Get effective config for current working directory
-	configPath, matchedScope, shims, err := config.GetEffectiveConfigForCwd()
-	if err != nil {
-		return fmt.Errorf("failed to get effective config: %w", err)
-	}
+	var configPath string
+	var matchedScope *config.MatchedScope
+	var shims map[string]config.ResolvedShim
+	var err error
 
-	if configPath == "" {
-		return fmt.Errorf("No ribbin.jsonc found. Run 'ribbin init' to create one.")
+	if len(args) > 0 {
+		// Use specified config file
+		configPath = args[0]
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			return fmt.Errorf("config file not found: %s", configPath)
+		}
+		configPath, err = filepath.Abs(configPath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Load and resolve manually
+		cfg, err := config.LoadProjectConfig(configPath)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get working directory: %w", err)
+		}
+		configDir := filepath.Dir(configPath)
+		matchedScope = config.FindMatchingScope(cfg, configDir, cwd)
+
+		resolver := config.NewResolver()
+		var scope *config.ScopeConfig
+		var scopeName string
+		if matchedScope != nil {
+			scope = &matchedScope.Config
+			scopeName = matchedScope.Name
+		}
+		shims, err = resolver.ResolveEffectiveShimsWithProvenance(cfg, configPath, scope, scopeName)
+		if err != nil {
+			return fmt.Errorf("failed to resolve config: %w", err)
+		}
+	} else {
+		// Use automatic discovery
+		configPath, matchedScope, shims, err = config.GetEffectiveConfigForCwd()
+		if err != nil {
+			return fmt.Errorf("failed to get effective config: %w", err)
+		}
+		if configPath == "" {
+			return fmt.Errorf("No ribbin.jsonc found. Run 'ribbin init' to create one.")
+		}
 	}
 
 	// Filter by command if specified

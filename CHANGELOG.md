@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Explicit config path for all config subcommands**: `config list`, `config show`, `config add`, `config edit`, and `config remove` now accept an optional config file path as the first argument
+  - Example: `ribbin config list ./ribbin.jsonc` or `ribbin config add ./ribbin.jsonc npm --action block`
+  - When omitted, commands auto-discover the nearest config (existing behavior)
+
+### Documentation
+- **Config discovery algorithm documented**: Explicit step-by-step explanation of how Ribbin finds config files, with clear statement that `ribbin.local.jsonc` takes priority over `ribbin.jsonc` in the same directory
+- Updated CLI reference with new command signatures showing optional config path arguments
+
 ## [0.1.0-alpha.9] - 2026-01-23
 
 ### Added

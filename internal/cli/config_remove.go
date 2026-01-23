@@ -15,16 +15,19 @@ var (
 )
 
 var configRemoveCmd = &cobra.Command{
-	Use:   "remove <command>",
+	Use:   "remove [config-path] <command>",
 	Short: "Remove a wrapper configuration",
-	Long: `Remove a wrapper configuration from ribbin.jsonc.
+	Long: `Remove a wrapper configuration from a config file.
+
+If no config path is provided, uses the nearest ribbin.jsonc or ribbin.local.jsonc.
 
 Prompts for confirmation unless --force is used.
 
 Examples:
   ribbin config remove tsc              Remove 'tsc' wrapper (with confirmation)
+  ribbin config remove ./ribbin.jsonc tsc --force   Remove from specific config
   ribbin config remove npm --force      Remove 'npm' wrapper without confirmation`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: runConfigRemove,
 }
 
@@ -33,16 +36,25 @@ func init() {
 }
 
 func runConfigRemove(cmd *cobra.Command, args []string) error {
-	cmdName := args[0]
+	var configPath string
+	var cmdName string
+	var err error
 
-	// Find ribbin.jsonc
-	configPath, err := config.FindProjectConfig()
-	if err != nil {
-		return fmt.Errorf("failed to find config: %w", err)
-	}
-
-	if configPath == "" {
-		return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
+	if len(args) == 2 {
+		configPath = args[0]
+		cmdName = args[1]
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			return fmt.Errorf("config file not found: %s", configPath)
+		}
+	} else {
+		cmdName = args[0]
+		configPath, err = config.FindProjectConfig()
+		if err != nil {
+			return fmt.Errorf("failed to find config: %w", err)
+		}
+		if configPath == "" {
+			return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
+		}
 	}
 
 	// Load and check configuration

@@ -23,10 +23,10 @@ ribbin init --force
 
 ## ribbin wrap
 
-Install wrappers for commands defined in config.
+Install wrappers for commands defined in config. By default, uses the nearest `ribbin.jsonc` or `ribbin.local.jsonc`. You can optionally specify config files explicitly.
 
 ```bash
-ribbin wrap [flags]
+ribbin wrap [config-files...] [flags]
 ```
 
 **Flags:**
@@ -37,17 +37,19 @@ ribbin wrap [flags]
 
 **Example:**
 ```bash
-ribbin wrap
+ribbin wrap                           # Use nearest config
+ribbin wrap ./ribbin.jsonc            # Use specific config
+ribbin wrap ./a.jsonc ./b.jsonc       # Use multiple configs
 ribbin wrap --dry-run
 sudo ribbin wrap --confirm-system-dir
 ```
 
 ## ribbin unwrap
 
-Remove wrappers and restore original binaries.
+Remove wrappers and restore original binaries. By default, uses the nearest config. You can optionally specify config files explicitly.
 
 ```bash
-ribbin unwrap [flags]
+ribbin unwrap [config-files...] [flags]
 ```
 
 **Flags:**
@@ -58,8 +60,9 @@ ribbin unwrap [flags]
 
 **Example:**
 ```bash
-ribbin unwrap
-ribbin unwrap --all
+ribbin unwrap                         # Use nearest config
+ribbin unwrap ./ribbin.jsonc          # Use specific config
+ribbin unwrap --all                   # Unwrap everything
 ```
 
 ## ribbin activate
@@ -90,10 +93,10 @@ ribbin activate ./ribbin.jsonc
 
 ## ribbin deactivate
 
-Disable Ribbin wrappers.
+Disable Ribbin wrappers. You can optionally specify config files for config-scoped deactivation.
 
 ```bash
-ribbin deactivate [flags]
+ribbin deactivate [config-files...] [flags]
 ```
 
 **Flags:**
@@ -107,6 +110,7 @@ ribbin deactivate [flags]
 ```bash
 ribbin deactivate --global
 ribbin deactivate --shell
+ribbin deactivate ./ribbin.jsonc      # Config-scoped deactivation
 ribbin deactivate --all
 ```
 
@@ -152,68 +156,101 @@ ribbin recover --dry-run
 
 ## ribbin config add
 
-Add a wrapper to the config file.
+Add a wrapper to a config file. By default, uses the nearest config.
 
 ```bash
 ribbin config add <command> [flags]
+ribbin config add <config-path> <command> [flags]
 ```
-
-**Arguments:**
-| Argument | Description |
-|----------|-------------|
-| `command` | Command name to wrap |
 
 **Flags:**
 | Flag | Description |
 |------|-------------|
-| `--action` | Action type: `block`, `warn`, `redirect`, `passthrough` |
+| `--action` | Action type: `block`, `warn`, `redirect`, `passthrough` (required) |
 | `--message` | Message to display |
 | `--redirect` | Script path (for redirect action) |
 
 **Example:**
 ```bash
 ribbin config add tsc --action=block --message="Use pnpm run typecheck"
+ribbin config add ./ribbin.jsonc tsc --action=block   # Add to specific config
 ribbin config add npm --action=block --message="Use pnpm"
+```
+
+## ribbin config edit
+
+Edit an existing wrapper in a config file. By default, uses the nearest config.
+
+```bash
+ribbin config edit <command> [flags]
+ribbin config edit <config-path> <command> [flags]
+```
+
+**Flags:**
+| Flag | Description |
+|------|-------------|
+| `--action` | Change action type: `block`, `redirect` |
+| `--message` | Update message |
+| `--redirect` | Update redirect script path |
+| `--paths` | Update binary path restrictions |
+| `--clear-message` | Clear the message field |
+| `--clear-paths` | Clear the paths restrictions |
+| `--clear-redirect` | Clear the redirect field |
+
+**Example:**
+```bash
+ribbin config edit tsc --message="Use 'bun run typecheck'"
+ribbin config edit ./ribbin.jsonc tsc --message="..."   # Edit in specific config
+ribbin config edit npm --action=redirect --redirect=/usr/local/bin/pnpm
 ```
 
 ## ribbin config remove
 
-Remove a wrapper from the config file.
+Remove a wrapper from a config file. By default, uses the nearest config.
 
 ```bash
-ribbin config remove <command>
+ribbin config remove <command> [flags]
+ribbin config remove <config-path> <command> [flags]
 ```
+
+**Flags:**
+| Flag | Description |
+|------|-------------|
+| `--force` | Skip confirmation prompt |
 
 **Example:**
 ```bash
 ribbin config remove tsc
+ribbin config remove ./ribbin.jsonc tsc --force   # Remove from specific config
 ```
 
 ## ribbin config list
 
-List all configured wrappers.
+List all configured wrappers. By default, uses the nearest config.
 
 ```bash
-ribbin config list [flags]
+ribbin config list [config-path] [flags]
 ```
 
 **Flags:**
 | Flag | Description |
 |------|-------------|
 | `--json` | Output in JSON format |
+| `--command` | Filter to specific command |
 
 **Example:**
 ```bash
-ribbin config list
+ribbin config list                    # Use nearest config
+ribbin config list ./ribbin.jsonc     # Use specific config
 ribbin config list --json
 ```
 
 ## ribbin config show
 
-Show effective config for current directory.
+Show effective config for current directory. By default, uses the nearest config.
 
 ```bash
-ribbin config show [flags]
+ribbin config show [config-path] [flags]
 ```
 
 Shows merged config after applying scopes and inheritance.
@@ -222,10 +259,12 @@ Shows merged config after applying scopes and inheritance.
 | Flag | Description |
 |------|-------------|
 | `--json` | Output in JSON format |
+| `--command` | Filter to specific command |
 
 **Example:**
 ```bash
-ribbin config show
+ribbin config show                    # Use nearest config
+ribbin config show ./ribbin.jsonc     # Use specific config
 cd apps/frontend && ribbin config show
 ```
 

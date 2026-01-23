@@ -17,14 +17,17 @@ var (
 )
 
 var configListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list [config-path]",
 	Short: "List all wrapper configurations",
-	Long: `Display all configured wrappers from ribbin.jsonc.
+	Long: `Display all configured wrappers from a config file.
+
+If no path is provided, uses the nearest ribbin.jsonc or ribbin.local.jsonc.
 
 Shows command name, action type, and configuration details.
 
 Examples:
-  ribbin config list                    List all wrappers in table format
+  ribbin config list                    List wrappers from nearest config
+  ribbin config list ./ribbin.jsonc     List wrappers from specific config
   ribbin config list --json             Output in JSON format
   ribbin config list --command tsc      Show only the 'tsc' wrapper configuration`,
 	RunE: runConfigList,
@@ -36,14 +39,22 @@ func init() {
 }
 
 func runConfigList(cmd *cobra.Command, args []string) error {
-	// Find ribbin.jsonc
-	configPath, err := config.FindProjectConfig()
-	if err != nil {
-		return fmt.Errorf("failed to find config: %w", err)
-	}
+	var configPath string
+	var err error
 
-	if configPath == "" {
-		return fmt.Errorf("No ribbin.jsonc found. Run 'ribbin init' to create one.")
+	if len(args) > 0 {
+		configPath = args[0]
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			return fmt.Errorf("config file not found: %s", configPath)
+		}
+	} else {
+		configPath, err = config.FindProjectConfig()
+		if err != nil {
+			return fmt.Errorf("failed to find config: %w", err)
+		}
+		if configPath == "" {
+			return fmt.Errorf("No ribbin.jsonc found. Run 'ribbin init' to create one.")
+		}
 	}
 
 	// Load the config

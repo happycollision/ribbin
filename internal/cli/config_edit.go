@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/happycollision/ribbin/internal/config"
@@ -19,19 +20,22 @@ var (
 )
 
 var configEditCmd = &cobra.Command{
-	Use:   "edit <command>",
+	Use:   "edit [config-path] <command>",
 	Short: "Edit an existing wrapper configuration",
-	Long: `Edit an existing wrapper configuration in ribbin.jsonc.
+	Long: `Edit an existing wrapper configuration in a config file.
+
+If no config path is provided, uses the nearest ribbin.jsonc or ribbin.local.jsonc.
 
 Only specified fields are updated; others remain unchanged.
 
 Examples:
   ribbin config edit tsc --message "Use 'bun run typecheck'"
+  ribbin config edit ./ribbin.jsonc tsc --message "Use 'bun run typecheck'"
   ribbin config edit npm --action redirect --redirect /usr/local/bin/pnpm
   ribbin config edit node --redirect ./scripts/new-wrapper.sh
   ribbin config edit tsc --clear-message
   ribbin config edit cat --paths /bin/cat,/usr/bin/cat`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: runConfigEdit,
 }
 
@@ -46,16 +50,25 @@ func init() {
 }
 
 func runConfigEdit(cmd *cobra.Command, args []string) error {
-	cmdName := args[0]
+	var configPath string
+	var cmdName string
+	var err error
 
-	// Find ribbin.jsonc
-	configPath, err := config.FindProjectConfig()
-	if err != nil {
-		return fmt.Errorf("failed to find config: %w", err)
-	}
-
-	if configPath == "" {
-		return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
+	if len(args) == 2 {
+		configPath = args[0]
+		cmdName = args[1]
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			return fmt.Errorf("config file not found: %s", configPath)
+		}
+	} else {
+		cmdName = args[0]
+		configPath, err = config.FindProjectConfig()
+		if err != nil {
+			return fmt.Errorf("failed to find config: %w", err)
+		}
+		if configPath == "" {
+			return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
+		}
 	}
 
 	// Check if at least one flag is specified

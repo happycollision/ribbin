@@ -19,18 +19,21 @@ var (
 )
 
 var configAddCmd = &cobra.Command{
-	Use:   "add <command>",
+	Use:   "add [config-path] <command>",
 	Short: "Add a new wrapper configuration",
-	Long: `Add a new wrapper configuration to ribbin.jsonc.
+	Long: `Add a new wrapper configuration to a config file.
+
+If no config path is provided, uses the nearest ribbin.jsonc or ribbin.local.jsonc.
 
 For block actions, specify --action block and optionally --message.
 For redirect actions, specify --action redirect and --redirect (script path).
 
 Examples:
   ribbin config add tsc --action block --message "Use pnpm typecheck"
+  ribbin config add ./ribbin.jsonc tsc --action block --message "Use pnpm typecheck"
   ribbin config add npm --action redirect --redirect ./scripts/npm.sh
   ribbin config add curl --action block --message "Use the project API client" --paths /bin/curl,/usr/bin/curl`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: runConfigAdd,
 }
 
@@ -45,21 +48,30 @@ func init() {
 }
 
 func runConfigAdd(cmd *cobra.Command, args []string) error {
-	cmdName := args[0]
+	var configPath string
+	var cmdName string
+	var err error
+
+	if len(args) == 2 {
+		configPath = args[0]
+		cmdName = args[1]
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			return fmt.Errorf("config file not found: %s", configPath)
+		}
+	} else {
+		cmdName = args[0]
+		configPath, err = config.FindProjectConfig()
+		if err != nil {
+			return fmt.Errorf("failed to find config: %w", err)
+		}
+		if configPath == "" {
+			return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
+		}
+	}
 
 	// Validate action
 	if addAction != "block" && addAction != "redirect" {
 		return fmt.Errorf("action must be either 'block' or 'redirect'")
-	}
-
-	// Find ribbin.jsonc
-	configPath, err := config.FindProjectConfig()
-	if err != nil {
-		return fmt.Errorf("failed to find config: %w", err)
-	}
-
-	if configPath == "" {
-		return fmt.Errorf("ribbin.jsonc not found. Run 'ribbin init' first.")
 	}
 
 	// Load existing config to check for duplicates
