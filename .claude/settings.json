@@ -1,0 +1,43 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v bd >/dev/null && bd prime || true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v bd >/dev/null && bd prime || true"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(go build:*)",
+      "Bash(go get:*)",
+      "Bash(make test:*)",
+      "Bash(make build:*)",
+      "Bash(docker *:*)",
+      "Bash(./ribbin:*)",
+      "Bash(ln:*)",
+      "Bash(bd close:*)",
+      "Bash(bd create:*)",
+      "Bash(bd dep:*)",
+      "Bash(bd list:*)",
+      "Bash(bd prime:*)",
+      "Bash(bd ready:*)",
+      "Bash(bd show:*)",
+      "Bash(bd update:*)"
+    ]
+  }
+}
