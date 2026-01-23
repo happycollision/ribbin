@@ -198,7 +198,7 @@ func (r *Resolver) loadExternalConfig(path string) (*ProjectConfig, error) {
 		return config, nil
 	}
 
-	config, err := LoadProjectConfig(path)
+	config, err := LoadExtendsConfig(path)
 	if err != nil {
 		return nil, err
 	}

@@ -185,6 +185,67 @@ func TestValidateConfigPath_WorldWritable(t *testing.T) {
 	}
 }
 
+func TestValidateExtendsConfigPath_AnyFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test various filenames - all should be valid
+	testNames := []string{
+		"base.jsonc",
+		"team-defaults.json",
+		"hardened.jsonc",
+		"rules.monkey", // any extension is fine
+		"no-extension",
+	}
+
+	for _, name := range testNames {
+		configPath := filepath.Join(tmpDir, name)
+		err := os.WriteFile(configPath, []byte(`{"wrappers":{}}`), 0644)
+		if err != nil {
+			t.Fatalf("failed to create %s: %v", name, err)
+		}
+
+		err = ValidateExtendsConfigPath(configPath)
+		if err != nil {
+			t.Errorf("ValidateExtendsConfigPath(%q) = %v, want nil", name, err)
+		}
+	}
+}
+
+func TestValidateExtendsConfigPath_WorldWritable(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "base.jsonc")
+
+	// Create world-writable config (0666 = rw-rw-rw-)
+	err := os.WriteFile(configPath, []byte(`{"wrappers":{}}`), 0666)
+	if err != nil {
+		t.Fatalf("failed to create config: %v", err)
+	}
+
+	// Verify the file is actually world-writable
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("failed to stat config: %v", err)
+	}
+	if info.Mode().Perm()&0002 == 0 {
+		t.Skip("skipping world-writable test - filesystem doesn't support world-writable permissions")
+	}
+
+	err = ValidateExtendsConfigPath(configPath)
+	if err == nil {
+		t.Error("expected error for world-writable config")
+	}
+	if err != nil && !contains(err.Error(), "world-writable") {
+		t.Errorf("expected 'world-writable' error, got: %v", err)
+	}
+}
+
+func TestValidateExtendsConfigPath_NotFound(t *testing.T) {
+	err := ValidateExtendsConfigPath("/nonexistent/path/config.jsonc")
+	if err == nil {
+		t.Error("expected error for nonexistent file")
+	}
+}
+
 func TestValidateSymlinkTarget_ValidTarget(t *testing.T) {
 	tmpDir := t.TempDir()
 

@@ -288,12 +288,8 @@ func TestResolveEffectiveShims_ExternalFile(t *testing.T) {
 	// Create a temporary external config file
 	tmpDir := t.TempDir()
 
-	// Create external config in a subdirectory (must be named ribbin.jsonc per security rules)
-	externalDir := filepath.Join(tmpDir, "external")
-	if err := os.MkdirAll(externalDir, 0755); err != nil {
-		t.Fatalf("failed to create external dir: %v", err)
-	}
-	externalPath := filepath.Join(externalDir, "ribbin.jsonc")
+	// External configs can have any filename (not restricted to ribbin.jsonc)
+	externalPath := filepath.Join(tmpDir, "team-defaults.jsonc")
 	externalContent := `{
   "wrappers": {
     "external-cmd": {
@@ -316,7 +312,7 @@ func TestResolveEffectiveShims_ExternalFile(t *testing.T) {
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./external/ribbin.jsonc"},
+				Extends: []string{"./team-defaults.jsonc"},
 				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},
@@ -348,12 +344,8 @@ func TestResolveEffectiveShims_ExternalFileWithFragment(t *testing.T) {
 	// Create a temporary external config file with scopes
 	tmpDir := t.TempDir()
 
-	// Create external config with a scope (in subdirectory, named ribbin.jsonc)
-	teamDir := filepath.Join(tmpDir, "team")
-	if err := os.MkdirAll(teamDir, 0755); err != nil {
-		t.Fatalf("failed to create team dir: %v", err)
-	}
-	externalPath := filepath.Join(teamDir, "ribbin.jsonc")
+	// External configs can have any filename
+	externalPath := filepath.Join(tmpDir, "hardened-rules.jsonc")
 	externalContent := `{
   "wrappers": {
     "team-cmd": {
@@ -383,7 +375,7 @@ func TestResolveEffectiveShims_ExternalFileWithFragment(t *testing.T) {
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./team/ribbin.jsonc#root.hardened"},
+				Extends: []string{"./hardened-rules.jsonc#root.hardened"},
 				Wrappers:   map[string]ShimConfig{},
 			},
 		},
@@ -409,12 +401,8 @@ func TestResolver_ConfigCaching(t *testing.T) {
 	// Verify that external configs are cached
 	tmpDir := t.TempDir()
 
-	// Create external config in subdirectory (must be named ribbin.jsonc)
-	externalDir := filepath.Join(tmpDir, "external")
-	if err := os.MkdirAll(externalDir, 0755); err != nil {
-		t.Fatalf("failed to create external dir: %v", err)
-	}
-	externalPath := filepath.Join(externalDir, "ribbin.jsonc")
+	// External configs can have any filename
+	externalPath := filepath.Join(tmpDir, "shared-base.jsonc")
 	externalContent := `{
   "wrappers": {
     "ext": {
@@ -432,12 +420,12 @@ func TestResolver_ConfigCaching(t *testing.T) {
 	config := &ProjectConfig{
 		Scopes: map[string]ScopeConfig{
 			"a": {
-				Extends: []string{"./external/ribbin.jsonc"},
-				Wrappers:   map[string]ShimConfig{},
+				Extends:  []string{"./shared-base.jsonc"},
+				Wrappers: map[string]ShimConfig{},
 			},
 			"b": {
-				Extends: []string{"./external/ribbin.jsonc"},
-				Wrappers:   map[string]ShimConfig{},
+				Extends:  []string{"./shared-base.jsonc"},
+				Wrappers: map[string]ShimConfig{},
 			},
 		},
 	}
@@ -629,11 +617,8 @@ func TestResolveEffectiveShimsWithProvenance_ExternalFile(t *testing.T) {
 	// Create a temporary external config file
 	tmpDir := t.TempDir()
 
-	externalDir := filepath.Join(tmpDir, "external")
-	if err := os.MkdirAll(externalDir, 0755); err != nil {
-		t.Fatalf("failed to create external dir: %v", err)
-	}
-	externalPath := filepath.Join(externalDir, "ribbin.jsonc")
+	// External configs can have any filename
+	externalPath := filepath.Join(tmpDir, "company-standards.jsonc")
 	externalContent := `{
   "wrappers": {
     "external-cmd": {
@@ -652,7 +637,7 @@ func TestResolveEffectiveShimsWithProvenance_ExternalFile(t *testing.T) {
 		Scopes: map[string]ScopeConfig{
 			"frontend": {
 				Path:    "apps/frontend",
-				Extends: []string{"./external/ribbin.jsonc"},
+				Extends: []string{"./company-standards.jsonc"},
 				Wrappers: map[string]ShimConfig{
 					"npm": {Action: "block", Message: "use pnpm"},
 				},

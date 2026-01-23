@@ -145,6 +145,44 @@ func LoadProjectConfig(path string) (*ProjectConfig, error) {
 	return &config, nil
 }
 
+// LoadExtendsConfig loads a config file referenced via extends.
+// Unlike LoadProjectConfig, this allows any filename - extended configs
+// don't need to be named ribbin.jsonc or ribbin.local.jsonc.
+func LoadExtendsConfig(path string) (*ProjectConfig, error) {
+	// Use relaxed validation for extends (any filename allowed)
+	if err := security.ValidateExtendsConfigPath(path); err != nil {
+		return nil, fmt.Errorf("invalid extends config path: %w", err)
+	}
+
+	// Read the file
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse JSONC (JSON with comments) to standard JSON
+	standardJSON, err := hujson.Standardize(data)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSONC: %w", err)
+	}
+
+	// Unmarshal JSON into config struct
+	var config ProjectConfig
+	if err := json.Unmarshal(standardJSON, &config); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	// Validate scope paths
+	configDir := filepath.Dir(path)
+	for name, scope := range config.Scopes {
+		if err := ValidateScopePath(scope.Path, configDir); err != nil {
+			return nil, fmt.Errorf("scope %q: %w", name, err)
+		}
+	}
+
+	return &config, nil
+}
+
 // ValidateScopePath validates that a scope path is safe.
 // It must not contain ".." traversal and must resolve to a descendant of configDir.
 // Empty path is valid (defaults to ".").

@@ -89,6 +89,28 @@ func ValidateConfigPath(path string) error {
 	return nil
 }
 
+// ValidateExtendsConfigPath validates a config file referenced via extends.
+// Unlike ValidateConfigPath, this allows any filename - it only checks
+// that the file exists and is not world-writable.
+func ValidateExtendsConfigPath(path string) error {
+	clean := filepath.Clean(path)
+	abs, err := filepath.Abs(clean)
+	if err != nil {
+		return fmt.Errorf("cannot resolve config path: %w", err)
+	}
+
+	// Check file permissions (not world-writable)
+	info, err := os.Stat(abs)
+	if err != nil {
+		return fmt.Errorf("cannot stat config: %w", err)
+	}
+	if info.Mode().Perm()&0002 != 0 {
+		return fmt.Errorf("config file is world-writable: %s", abs)
+	}
+
+	return nil
+}
+
 // ValidateSymlinkTarget safely resolves and validates a symlink.
 // It ensures the symlink target is within allowed directories and doesn't
 // escape via path traversal.
