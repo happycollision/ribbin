@@ -1,11 +1,18 @@
-.PHONY: build install install-next test test-unit test-coverage test-host benchmark benchmark-grep benchmark-all benchmark-full scenario release clean
+.PHONY: build install install-next test test-unit test-coverage test-host benchmark benchmark-grep benchmark-all benchmark-full scenario release clean copy-schemas
 
 BINARY_NAME=ribbin
 BUILD_DIR=bin
 TEST_IMAGE=ribbin-test
 INSTALL_DIR=$(HOME)/.local/bin
+SCHEMA_SRC=schemas/v1
+SCHEMA_DEST=internal/config/schemas/v1
 
-build:
+# Copy schemas before build (required for go:embed)
+copy-schemas:
+	@mkdir -p $(SCHEMA_DEST)
+	@cp $(SCHEMA_SRC)/*.json $(SCHEMA_DEST)/
+
+build: copy-schemas
 	go build -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/ribbin
 
 install: build

@@ -46,95 +46,29 @@ const LatestSchemaURL = "https://github.com/happycollision/ribbin/schemas/" + La
 const defaultConfig = `{
   "$schema": "` + LatestSchemaURL + `",
 
-  // ribbin - Command wrapping tool
-  // https://github.com/happycollision/ribbin
+  // ribbin - Intercept commands and redirect to project-approved alternatives
   //
-  // ribbin intercepts calls to specified commands and can either block them with
-  // helpful error messages or redirect them to alternative commands. This is useful for:
+  // Config reference: https://github.com/happycollision/ribbin/blob/main/docs/reference/config-schema.md
   //
-  //   - Enforcing project conventions (e.g., "use pnpm, not npm")
-  //   - Preventing AI agents from running commands directly
-  //   - Redirecting to project-specific wrappers with correct config
+  // Common use cases:
+  //   Block commands:      https://github.com/happycollision/ribbin/blob/main/docs/how-to/block-commands.md
+  //   Redirect commands:   https://github.com/happycollision/ribbin/blob/main/docs/how-to/redirect-commands.md
+  //   AI agent guardrails: https://github.com/happycollision/ribbin/blob/main/docs/how-to/integrate-ai-agents.md
   //
-  // Quick start:
-  //   1. Edit this file to configure your wrappers
-  //   2. Run 'ribbin wrap' to install the wrappers
-  //   3. Run 'ribbin activate --global' to enable everywhere
-  //
-  // Bypass: Set RIBBIN_BYPASS=1 to run the original command when needed.
+  // Run 'ribbin config --example' to see a comprehensive example config.
 
   "wrappers": {
-    // Example: Block direct tsc usage (use project's typecheck script instead)
-    // "tsc": {
-    //   "action": "block",
-    //   "message": "Use 'pnpm run typecheck' instead - it uses the project's tsconfig"
-    // },
-
-    // Example: Enforce pnpm in this project
     // "npm": {
     //   "action": "block",
-    //   "message": "This project uses pnpm. Run 'pnpm install' instead."
-    // },
-
-    // Example: Block direct calls but allow via pnpm scripts (passthrough)
-    // "tsc": {
-    //   "action": "block",
-    //   "message": "Use 'pnpm run typecheck' instead",
-    //   "passthrough": {
-    //     "invocation": ["pnpm run typecheck", "pnpm run build"],
-    //     "invocationRegexp": ["pnpm (typecheck|build)"]
-    //   }
-    // },
-
-    // Example: Block curl, suggest project API client
-    // "curl": {
-    //   "action": "block",
-    //   "message": "Use the project's API client at ./scripts/api.sh instead",
-    //   "paths": ["/bin/curl", "/usr/bin/curl"]  // Optional: only block specific paths
-    // },
-
-    // Example: Custom wrapper script (relative path)
-    // "node": {
-    //   "action": "redirect",
-    //   "redirect": "./scripts/node-wrapper.sh"
+    //   "message": "This project uses pnpm"
     // }
   }
 
-  // Scopes: Different rules for different directories (great for monorepos)
-  // "scopes": {
-  //   // Frontend app: stricter rules
-  //   "frontend": {
-  //     "path": "apps/frontend",
-  //     "extends": ["root"],  // Inherit root wrappers
-  //     "wrappers": {
-  //       "yarn": {
-  //         "action": "block",
-  //         "message": "Use pnpm in frontend"
-  //       }
-  //     }
-  //   },
-  //
-  //   // Backend app: allow npm for legacy reasons
-  //   "backend": {
-  //     "path": "apps/backend",
-  //     "extends": ["root"],
-  //     "wrappers": {
-  //       "npm": {
-  //         "action": "passthrough"  // Override root's block
-  //       }
-  //     }
-  //   },
-  //
-  //   // Mixin (no path): can only be extended by other scopes
-  //   "hardened": {
-  //     "wrappers": {
-  //       "rm": {
-  //         "action": "block",
-  //         "message": "Use trash-cli instead"
-  //       }
-  //     }
-  //   }
-  // }
+  // Scopes: Apply different rules to different directories.
+  // Great for monorepos, or defining config outside the project entirely.
+  //   Monorepo guide:     https://github.com/happycollision/ribbin/blob/main/docs/how-to/monorepo-scopes.md
+  //   External config:    https://github.com/happycollision/ribbin/blob/main/docs/how-to/external-config.md
+  // "scopes": {}
 }
 `
 
@@ -160,6 +94,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Created %s\n", configPath)
 	fmt.Println("\nEdit the file to add your wrapper configurations, then run 'ribbin wrap' to install them.")
+	fmt.Println("Run 'ribbin config --example' to see a comprehensive example config.")
 
 	return nil
 }

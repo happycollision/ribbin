@@ -28,4 +28,7 @@ RUN go mod download
 
 COPY . .
 
+# Copy schemas for go:embed (canonical source is schemas/v1/)
+RUN mkdir -p internal/config/schemas/v1 && cp schemas/v1/*.json internal/config/schemas/v1/
+
 CMD ["gotestsum", "--format", "testdox", "./..."]

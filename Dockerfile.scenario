@@ -21,6 +21,8 @@ WORKDIR /home/tester
 # Copy and build ribbin
 COPY --chown=tester:tester . /app
 WORKDIR /app
+# Copy schemas for go:embed (canonical source is schemas/v1/)
+RUN mkdir -p internal/config/schemas/v1 && cp schemas/v1/*.json internal/config/schemas/v1/
 RUN go build -buildvcs=false -o /usr/local/bin/ribbin ./cmd/ribbin
 
 # Copy scenario scripts

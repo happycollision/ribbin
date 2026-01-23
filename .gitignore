@@ -2,6 +2,9 @@
 bin/
 /ribbin
 
+# Generated schema copies (canonical source is schemas/v1/)
+internal/config/schemas/
+
 # Go
 *.exe
 *.exe~

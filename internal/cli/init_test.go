@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/happycollision/ribbin/internal/config"
 	_ "github.com/happycollision/ribbin/internal/testsafety"
 )
 
@@ -72,5 +73,29 @@ func TestDefaultConfigContainsSchemaAtStart(t *testing.T) {
 
 	if !foundSchema {
 		t.Error("$schema should be present near the start of defaultConfig")
+	}
+}
+
+func TestInitCreatedConfigPassesValidation(t *testing.T) {
+	_, tempDir, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	// Run init command
+	err := runInit(initCmd, []string{})
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// Read the created config
+	configPath := filepath.Join(tempDir, "ribbin.jsonc")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read created config: %v", err)
+	}
+
+	// Validate the created config against the schema
+	err = config.ValidateAgainstSchema(content, config.ValidationStrict)
+	if err != nil {
+		t.Errorf("init-created config failed schema validation: %v", err)
 	}
 }
